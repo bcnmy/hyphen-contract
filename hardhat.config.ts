@@ -4,6 +4,7 @@ import { HardhatUserConfig, task } from "hardhat/config";
 import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
+import "@openzeppelin/hardhat-upgrades";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
 
@@ -23,8 +24,18 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
 // Go to https://hardhat.org/config/ to learn more
 
 const config: HardhatUserConfig = {
+  mocha: {
+    timeout: 500000,
+  },
   solidity: "0.8.4",
   networks: {
+    hardhat: {
+      allowUnlimitedContractSize: false,
+      gas: 6000000,
+      forking: {
+        url: `https://mainnet.infura.io/v3/${process.env.INFURA_KEY}`,
+      },
+    },
     ropsten: {
       url: process.env.ROPSTEN_URL || "",
       accounts:
