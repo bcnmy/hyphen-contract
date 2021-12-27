@@ -121,7 +121,7 @@ contract LiquidityPool is
     _updatePeriod(_token);
 
     uint256 amount = liquidityAddedAmount[_msgSender()][_token];
-    uint256 reward = calculateReward(_msgSender(), _token);
+    uint256 reward = _calculateReward(_msgSender(), _token);
 
     liquidityAddedAmount[_msgSender()][_token] = 0;
     totalLiquidityByToken[_token] -= amount;
@@ -142,8 +142,8 @@ contract LiquidityPool is
     );
   }
 
-  function calculateReward(address _lp, IERC20Upgradeable _token)
-    public
+  function _calculateReward(address _lp, IERC20Upgradeable _token)
+    internal
     view
     returns (uint256)
   {
