@@ -32,9 +32,9 @@ const config: HardhatUserConfig = {
     hardhat: {
       allowUnlimitedContractSize: false,
       gas: 6000000,
-      forking: {
-        url: `https://mainnet.infura.io/v3/${process.env.INFURA_KEY}`,
-      },
+      // forking: {
+      //   url: `https://mainnet.infura.io/v3/${process.env.INFURA_KEY}`,
+      // },
     },
     ropsten: {
       url: process.env.ROPSTEN_URL || "",

@@ -16,8 +16,29 @@ contract LiquidityPool is
   using SafeERC20Upgradeable for IERC20Upgradeable;
   using ABDKMathQuad for bytes16;
 
-  event LiquidityAdded(address, IERC20Upgradeable, uint256);
-  event LiquidityRemoved(address, IERC20Upgradeable);
+  event LiquidityAdded(
+    address lp,
+    IERC20Upgradeable token,
+    uint256 amount,
+    uint256 periodAdded
+  );
+  event LiquidityRemoved(
+    address lp,
+    IERC20Upgradeable token,
+    uint256 amount,
+    uint256 periodRemoved
+  );
+  event RewardAdded(
+    IERC20Upgradeable token,
+    uint256 amount,
+    uint256 periodAdded
+  );
+  event RewardDebited(
+    address lp,
+    IERC20Upgradeable token,
+    uint256 amount,
+    uint256 periodRemoved
+  );
 
   mapping(IERC20Upgradeable => uint256) public currentPeriodIndex;
   mapping(uint256 => mapping(IERC20Upgradeable => uint256))
@@ -60,6 +81,8 @@ contract LiquidityPool is
     );
     _token.safeTransferFrom(_msgSender(), address(this), _amount);
     rewardAccuredByPeriod[currentPeriodIndex[_token]][_token] += _amount;
+
+    emit RewardAdded(_token, _amount, currentPeriodIndex[_token]);
   }
 
   function addLiquidity(IERC20Upgradeable _token, uint256 _amount) external {
@@ -81,7 +104,12 @@ contract LiquidityPool is
       _token
     ];
 
-    emit LiquidityAdded(_msgSender(), _token, _amount);
+    emit LiquidityAdded(
+      _msgSender(),
+      _token,
+      _amount,
+      currentPeriodIndex[_token]
+    );
   }
 
   function removeLiquidity(IERC20Upgradeable _token) external {
@@ -97,13 +125,21 @@ contract LiquidityPool is
 
     liquidityAddedAmount[_msgSender()][_token] = 0;
     totalLiquidityByToken[_token] -= amount;
-    rewardAccuredByPeriod[currentPeriodIndex[_token]][_token] =
-      rewardAccuredByPeriod[currentPeriodIndex[_token] - 1][_token] -
-      reward;
 
     _token.safeTransfer(_msgSender(), amount + reward);
 
-    emit LiquidityRemoved(_msgSender(), _token);
+    emit LiquidityRemoved(
+      _msgSender(),
+      _token,
+      amount,
+      currentPeriodIndex[_token]
+    );
+    emit RewardDebited(
+      _msgSender(),
+      _token,
+      reward,
+      currentPeriodIndex[_token]
+    );
   }
 
   function calculateReward(address _lp, IERC20Upgradeable _token)
@@ -151,10 +187,10 @@ contract LiquidityPool is
       previousRewardToLiquidityRatioPrefix = ABDKMathQuad.fromUInt(0);
     }
 
-    rewardToLiquidityRatioPrefix[_token][
-      currentPeriodIndex[_token]
-    ] = previousRewardToLiquidityRatioPrefix.add(
-      _calculateCurrentRewardToLiquidityRatio(_token)
+    rewardToLiquidityRatioPrefix[_token].push(
+      previousRewardToLiquidityRatioPrefix.add(
+        _calculateCurrentRewardToLiquidityRatio(_token)
+      )
     );
 
     currentPeriodIndex[_token] += 1;
