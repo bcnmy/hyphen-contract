@@ -39,7 +39,15 @@ contract LiquidityPool is
     uint256 amount,
     uint256 periodRemoved
   );
+  event GasFeeAdded(IERC20Upgradeable token, address executor, uint256 amount);
+  event GasFeeRemoved(
+    IERC20Upgradeable token,
+    address executor,
+    uint256 amount,
+    address to
+  );
 
+  // Rewards Distribution
   mapping(IERC20Upgradeable => uint256) public currentPeriodIndex;
   mapping(uint256 => mapping(IERC20Upgradeable => uint256))
     public rewardAccuredByPeriod;
@@ -49,6 +57,10 @@ contract LiquidityPool is
     public periodAtLiquidityAddition;
   mapping(IERC20Upgradeable => bytes16[]) public rewardToLiquidityRatioPrefix;
   mapping(IERC20Upgradeable => uint256) public totalLiquidityByToken;
+
+  //Gas Fee
+  mapping(IERC20Upgradeable => mapping(address => uint256))
+    public gasFeeAccumulated;
 
   function initialize(address _trustedForwarder) public initializer {
     __ERC2771Context_init(_trustedForwarder);
@@ -83,6 +95,32 @@ contract LiquidityPool is
     rewardAccuredByPeriod[currentPeriodIndex[_token]][_token] += _amount;
 
     emit RewardAdded(_token, _amount, currentPeriodIndex[_token]);
+  }
+
+  // Only used for testing, will be removed from production
+  function addGasFee(
+    IERC20Upgradeable _token,
+    address _executor,
+    uint256 _amount
+  ) external {
+    require(
+      _token.allowance(_msgSender(), address(this)) >= _amount,
+      "ERR__INSUFFICIENT_ALLOWANCE"
+    );
+    _token.safeTransferFrom(_msgSender(), address(this), _amount);
+    gasFeeAccumulated[_token][_executor] += _amount;
+
+    emit GasFeeAdded(_token, _executor, _amount);
+  }
+
+  function extractGasFee(IERC20Upgradeable _token, address _to) external {
+    address executor = _msgSender();
+    uint256 amount = gasFeeAccumulated[_token][executor];
+    require(amount > 0, "ERR_NO_GAS_FEE_ACCUMULATED");
+    gasFeeAccumulated[_token][executor] = 0;
+    _token.safeTransfer(_to, amount);
+
+    emit GasFeeRemoved(_token, executor, amount, _to);
   }
 
   function addLiquidity(IERC20Upgradeable _token, uint256 _amount) external {
