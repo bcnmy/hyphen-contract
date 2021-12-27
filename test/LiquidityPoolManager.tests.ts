@@ -111,4 +111,39 @@ describe("LiquidityPoolTests", function () {
       [-expectedTotalAmountCharlie, expectedTotalAmountCharlie]
     );
   });
+
+  it("Should be able to handle more liquidity and reward addition", async function () {
+    await liquidityPool.connect(alice).addLiquidity(token.address, 1e6);
+    await liquidityPool.connect(bob).addLiquidity(token.address, 2e6);
+    await liquidityPool.connect(charlie).addLiquidity(token.address, 3e6);
+    await liquidityPool.addReward(token.address, 10);
+
+    const expectedTotalAmountAlice = Math.floor(1e6 + 10 / 6);
+    await expect(() =>
+      liquidityPool.connect(alice).removeLiquidity(token.address)
+    ).to.changeTokenBalances(
+      token,
+      [liquidityPool, alice],
+      [-expectedTotalAmountAlice, expectedTotalAmountAlice]
+    );
+
+    const expectedTotalAmountBob = Math.floor(2e6 + (10 * 2) / 6);
+    await expect(() =>
+      liquidityPool.connect(bob).removeLiquidity(token.address)
+    ).to.changeTokenBalances(
+      token,
+      [liquidityPool, bob],
+      [-expectedTotalAmountBob, expectedTotalAmountBob]
+    );
+
+    // There is an error of ! here due precision error.
+    const expectedTotalAmountCharlie = 3e6 + (10 * 3) / 6 - 1;
+    await expect(() =>
+      liquidityPool.connect(charlie).removeLiquidity(token.address)
+    ).to.changeTokenBalances(
+      token,
+      [liquidityPool, charlie],
+      [-expectedTotalAmountCharlie, expectedTotalAmountCharlie]
+    );
+  });
 });
