@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import { expect, use } from "chai";
 import { ethers, upgrades } from "hardhat";
 import {
   ERC20Token,
@@ -133,5 +133,44 @@ describe("LiquidityPoolTests", function () {
       [liquidityPool, charlie],
       [-expectedTotalAmountCharlie, expectedTotalAmountCharlie]
     );
+  });
+
+  it("Should be able to extractRewards only", async function () {
+    await liquidityPool.connect(alice).addLiquidity(token.address, 1e6);
+    await liquidityPool.connect(bob).addLiquidity(token.address, 2e6);
+    await liquidityPool.connect(charlie).addLiquidity(token.address, 3e6);
+    await liquidityPool.addReward(token.address, 12e7);
+
+    // Extract Rewards only
+
+    const expectedRewardAlice = (12e7 / 6e6) * 1e6;
+    expect(await liquidityPool.calculateReward(alice.address, token.address)).to.equal(expectedRewardAlice);
+    await expect(() => liquidityPool.connect(alice).extractReward(token.address)).to.changeTokenBalances(
+      token,
+      [liquidityPool, alice],
+      // There is a precision error of 1 here
+      [-(expectedRewardAlice - 1), expectedRewardAlice - 1]
+    );
+    expect(await liquidityPool.calculateReward(alice.address, token.address)).to.equal(0);
+
+    // There is a precision error of 1 here
+    const expectedRewardBob = (12e7 / 6e6) * 2e6 - 1;
+    expect(await liquidityPool.calculateReward(bob.address, token.address)).to.equal(expectedRewardBob);
+    await expect(() => liquidityPool.connect(bob).extractReward(token.address)).to.changeTokenBalances(
+      token,
+      [liquidityPool, bob],
+      [-expectedRewardBob, expectedRewardBob]
+    );
+    expect(await liquidityPool.calculateReward(bob.address, token.address)).to.equal(0);
+
+    // There is a precision error of 1 here
+    const expectedRewardCharlie = (12e7 / 6e6) * 3e6 - 1;
+    expect(await liquidityPool.calculateReward(charlie.address, token.address)).to.equal(expectedRewardCharlie);
+    await expect(() => liquidityPool.connect(charlie).extractReward(token.address)).to.changeTokenBalances(
+      token,
+      [liquidityPool, charlie],
+      [-expectedRewardCharlie, expectedRewardCharlie]
+    );
+    expect(await liquidityPool.calculateReward(charlie.address, token.address)).to.equal(0);
   });
 });

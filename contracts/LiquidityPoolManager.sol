@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "abdk-libraries-solidity/ABDKMathQuad.sol";
+import "hardhat/console.sol";
 
 contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -15,7 +16,7 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
     event LiquidityAdded(address lp, IERC20Upgradeable token, uint256 amount, uint256 periodAdded);
     event LiquidityRemoved(address lp, IERC20Upgradeable token, uint256 amount, uint256 periodRemoved);
     event RewardAdded(IERC20Upgradeable token, uint256 amount, uint256 periodAdded);
-    event RewardDebited(address lp, IERC20Upgradeable token, uint256 amount, uint256 periodRemoved);
+    event RewardExtracted(address lp, IERC20Upgradeable token, uint256 amount, uint256 periodRemoved);
     event GasFeeAdded(IERC20Upgradeable token, address executor, uint256 amount);
     event GasFeeRemoved(IERC20Upgradeable token, address executor, uint256 amount, address to);
 
@@ -23,7 +24,7 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
     mapping(IERC20Upgradeable => uint256) public currentPeriodIndex;
     mapping(uint256 => mapping(IERC20Upgradeable => uint256)) public rewardAccuredByPeriod;
     mapping(address => mapping(IERC20Upgradeable => uint256)) public liquidityAddedAmount;
-    mapping(address => mapping(IERC20Upgradeable => uint256)) public periodAtLiquidityAddition;
+    mapping(address => mapping(IERC20Upgradeable => uint256)) public lastRewardExtractionPeriodByLp;
     mapping(IERC20Upgradeable => bytes16[]) public rewardToLiquidityRatioPrefix;
     mapping(IERC20Upgradeable => uint256) public totalLiquidityByToken;
 
@@ -84,7 +85,7 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
 
         liquidityAddedAmount[_msgSender()][_token] = _amount;
         totalLiquidityByToken[_token] += _amount;
-        periodAtLiquidityAddition[_msgSender()][_token] = currentPeriodIndex[_token];
+        lastRewardExtractionPeriodByLp[_msgSender()][_token] = currentPeriodIndex[_token];
 
         emit LiquidityAdded(_msgSender(), _token, _amount, currentPeriodIndex[_token]);
     }
@@ -99,20 +100,33 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
 
         liquidityAddedAmount[_msgSender()][_token] = 0;
         totalLiquidityByToken[_token] -= amount;
+        lastRewardExtractionPeriodByLp[_msgSender()][_token] = currentPeriodIndex[_token];
 
         _token.safeTransfer(_msgSender(), amount + reward);
 
         emit LiquidityRemoved(_msgSender(), _token, amount, currentPeriodIndex[_token]);
-        emit RewardDebited(_msgSender(), _token, reward, currentPeriodIndex[_token]);
+        emit RewardExtracted(_msgSender(), _token, reward, currentPeriodIndex[_token]);
+    }
+
+    function extractReward(IERC20Upgradeable _token) external {
+        _updatePeriod(_token);
+
+        uint256 reward = calculateReward(_msgSender(), _token);
+        require(reward > 0, "ERR_NO_REWARD_FOUND");
+        lastRewardExtractionPeriodByLp[_msgSender()][_token] = currentPeriodIndex[_token];
+
+        _token.safeTransfer(_msgSender(), reward);
+
+        emit RewardExtracted(_msgSender(), _token, reward, currentPeriodIndex[_token]);
     }
 
     function calculateReward(address _lp, IERC20Upgradeable _token) public view returns (uint256) {
-        uint256 periodLiquidityAddedAt = periodAtLiquidityAddition[_lp][_token];
+        uint256 lastExtractionPeriod = lastRewardExtractionPeriodByLp[_lp][_token];
         bytes16 rewardToLiquiditySum = rewardToLiquidityRatioPrefix[_token][currentPeriodIndex[_token] - 1].sub(
-            rewardToLiquidityRatioPrefix[_token][periodLiquidityAddedAt - 1]
+            rewardToLiquidityRatioPrefix[_token][lastExtractionPeriod - 1]
         );
         // If being called by externally before current period's ratio is added, we need to account for current rewards as well
-        // IF this is called just after _updatePeriod then it's 0
+        // If this is called just after _updatePeriod then it's 0
         rewardToLiquiditySum = rewardToLiquiditySum.add(_calculateCurrentRewardToLiquidityRatio(_token));
 
         bytes16 reward = rewardToLiquiditySum.mul(ABDKMathQuad.fromUInt(liquidityAddedAmount[_lp][_token]));
