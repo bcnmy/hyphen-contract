@@ -95,7 +95,7 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         _updatePeriod(_token);
 
         uint256 amount = liquidityAddedAmount[_msgSender()][_token];
-        uint256 reward = _calculateReward(_msgSender(), _token);
+        uint256 reward = calculateReward(_msgSender(), _token);
 
         liquidityAddedAmount[_msgSender()][_token] = 0;
         totalLiquidityByToken[_token] -= amount;
@@ -106,11 +106,14 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         emit RewardDebited(_msgSender(), _token, reward, currentPeriodIndex[_token]);
     }
 
-    function _calculateReward(address _lp, IERC20Upgradeable _token) internal view returns (uint256) {
+    function calculateReward(address _lp, IERC20Upgradeable _token) public view returns (uint256) {
         uint256 periodLiquidityAddedAt = periodAtLiquidityAddition[_lp][_token];
         bytes16 rewardToLiquiditySum = rewardToLiquidityRatioPrefix[_token][currentPeriodIndex[_token] - 1].sub(
             rewardToLiquidityRatioPrefix[_token][periodLiquidityAddedAt - 1]
         );
+        // If being called by externally before current period's ratio is added, we need to account for current rewards as well
+        // IF this is called just after _updatePeriod then it's 0
+        rewardToLiquiditySum = rewardToLiquiditySum.add(_calculateCurrentRewardToLiquidityRatio(_token));
 
         bytes16 reward = rewardToLiquiditySum.mul(ABDKMathQuad.fromUInt(liquidityAddedAmount[_lp][_token]));
 
@@ -118,7 +121,7 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
     }
 
     function _calculateCurrentRewardToLiquidityRatio(IERC20Upgradeable _token) internal view returns (bytes16) {
-        if (totalLiquidityByToken[_token] > 0) {
+        if (totalLiquidityByToken[_token] > 0 && rewardAccuredByPeriod[currentPeriodIndex[_token]][_token] > 0) {
             bytes16 currentReward = ABDKMathQuad.fromUInt(rewardAccuredByPeriod[currentPeriodIndex[_token]][_token]);
             bytes16 currentLiquidity = ABDKMathQuad.fromUInt(totalLiquidityByToken[_token]);
             return currentReward.div(currentLiquidity);
