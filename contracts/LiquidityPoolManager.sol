@@ -27,6 +27,7 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
     mapping(address => mapping(IERC20Upgradeable => uint256)) public lastRewardExtractionPeriodByLp;
     mapping(IERC20Upgradeable => bytes16[]) public rewardToLiquidityRatioPrefix;
     mapping(IERC20Upgradeable => uint256) public totalLiquidityByToken;
+    mapping(address => mapping(IERC20Upgradeable => uint256)) public savedLpRewards;
 
     //Gas Fee
     mapping(IERC20Upgradeable => mapping(address => uint256)) public gasFeeAccumulated;
@@ -77,35 +78,29 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
     }
 
     function addLiquidity(IERC20Upgradeable _token, uint256 _amount) external {
-        require(liquidityAddedAmount[_msgSender()][_token] == 0, "ERR_ALREADY_PROVIDED_LIQUIDITY");
         require(_token.allowance(_msgSender(), address(this)) >= _amount, "ERR__INSUFFICIENT_ALLOWANCE");
 
-        _token.safeTransferFrom(_msgSender(), address(this), _amount);
-        _updatePeriod(_token);
+        _prepareForLiquidityModificationByLP(_msgSender(), _token);
 
-        liquidityAddedAmount[_msgSender()][_token] = _amount;
+        _token.safeTransferFrom(_msgSender(), address(this), _amount);
+
+        liquidityAddedAmount[_msgSender()][_token] += _amount;
         totalLiquidityByToken[_token] += _amount;
-        lastRewardExtractionPeriodByLp[_msgSender()][_token] = currentPeriodIndex[_token];
 
         emit LiquidityAdded(_msgSender(), _token, _amount, currentPeriodIndex[_token]);
     }
 
-    function removeLiquidity(IERC20Upgradeable _token) external {
-        require(liquidityAddedAmount[_msgSender()][_token] > 0, "ERR_NO_LIQUIDITY_PROVIDED");
+    function removeLiquidity(IERC20Upgradeable _token, uint256 _amount) external {
+        require(liquidityAddedAmount[_msgSender()][_token] >= _amount, "ERR_INSUFFICIENT_LIQUIDITY");
 
-        _updatePeriod(_token);
+        _prepareForLiquidityModificationByLP(_msgSender(), _token);
 
-        uint256 amount = liquidityAddedAmount[_msgSender()][_token];
-        uint256 reward = calculateReward(_msgSender(), _token);
+        liquidityAddedAmount[_msgSender()][_token] -= _amount;
+        totalLiquidityByToken[_token] -= _amount;
 
-        liquidityAddedAmount[_msgSender()][_token] = 0;
-        totalLiquidityByToken[_token] -= amount;
-        lastRewardExtractionPeriodByLp[_msgSender()][_token] = currentPeriodIndex[_token];
+        _token.safeTransfer(_msgSender(), _amount);
 
-        _token.safeTransfer(_msgSender(), amount + reward);
-
-        emit LiquidityRemoved(_msgSender(), _token, amount, currentPeriodIndex[_token]);
-        emit RewardExtracted(_msgSender(), _token, reward, currentPeriodIndex[_token]);
+        emit LiquidityRemoved(_msgSender(), _token, _amount, currentPeriodIndex[_token]);
     }
 
     function extractReward(IERC20Upgradeable _token) external {
@@ -113,17 +108,18 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
 
         uint256 reward = calculateReward(_msgSender(), _token);
         require(reward > 0, "ERR_NO_REWARD_FOUND");
-        lastRewardExtractionPeriodByLp[_msgSender()][_token] = currentPeriodIndex[_token];
+        lastRewardExtractionPeriodByLp[_msgSender()][_token] = currentPeriodIndex[_token] - 1;
+        savedLpRewards[_msgSender()][_token] = 0;
 
         _token.safeTransfer(_msgSender(), reward);
 
-        emit RewardExtracted(_msgSender(), _token, reward, currentPeriodIndex[_token]);
+        emit RewardExtracted(_msgSender(), _token, reward, currentPeriodIndex[_token] - 1);
     }
 
     function calculateReward(address _lp, IERC20Upgradeable _token) public view returns (uint256) {
         uint256 lastExtractionPeriod = lastRewardExtractionPeriodByLp[_lp][_token];
         bytes16 rewardToLiquiditySum = rewardToLiquidityRatioPrefix[_token][currentPeriodIndex[_token] - 1].sub(
-            rewardToLiquidityRatioPrefix[_token][lastExtractionPeriod - 1]
+            rewardToLiquidityRatioPrefix[_token][lastExtractionPeriod]
         );
         // If being called by externally before current period's ratio is added, we need to account for current rewards as well
         // If this is called just after _updatePeriod then it's 0
@@ -131,7 +127,15 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
 
         bytes16 reward = rewardToLiquiditySum.mul(ABDKMathQuad.fromUInt(liquidityAddedAmount[_lp][_token]));
 
-        return reward.toUInt();
+        // Add saved rewards
+        return reward.toUInt() + savedLpRewards[_lp][_token];
+    }
+
+    function _prepareForLiquidityModificationByLP(address _lp, IERC20Upgradeable _token) internal {
+        _updatePeriod(_token);
+        uint256 reward = calculateReward(_lp, _token);
+        savedLpRewards[_lp][_token] += reward;
+        lastRewardExtractionPeriodByLp[_msgSender()][_token] = currentPeriodIndex[_token] - 1;
     }
 
     function _calculateCurrentRewardToLiquidityRatio(IERC20Upgradeable _token) internal view returns (bytes16) {

@@ -59,16 +59,25 @@ describe("LiquidityPoolTests", function () {
     );
   });
 
-  it("Should be able to remove liquidity with reward", async function () {
-    const expectedRewardAlice = 3e5 / 3;
-    const expectedTotalAmountAlice = 1e5 + expectedRewardAlice;
+  it("Should be able to remove liquidity", async function () {
+    const aliceLiquidity = 1e5;
 
-    expect(await liquidityPool.calculateReward(alice.address, token.address)).to.equal(expectedRewardAlice);
-    await expect(() => liquidityPool.removeLiquidity(token.address)).to.changeTokenBalances(
+    await expect(() => liquidityPool.removeLiquidity(token.address, aliceLiquidity)).to.changeTokenBalances(
       token,
       [liquidityPool, alice],
-      [-expectedTotalAmountAlice, expectedTotalAmountAlice]
+      [-aliceLiquidity, aliceLiquidity]
     );
+  });
+
+  it("Should be able to extract rewards", async function () {
+    const expectedRewardAlice = 3e5 / 3;
+    expect(await liquidityPool.calculateReward(alice.address, token.address)).to.equal(expectedRewardAlice);
+    await expect(() => liquidityPool.connect(alice).extractReward(token.address)).to.changeTokenBalances(
+      token,
+      [liquidityPool, alice],
+      [-expectedRewardAlice, expectedRewardAlice]
+    );
+    expect(await liquidityPool.calculateReward(alice.address, token.address)).to.equal(0);
   });
 
   it("Should be able to handle more rewards properly", async function () {
@@ -76,63 +85,40 @@ describe("LiquidityPoolTests", function () {
     await liquidityPool.addReward(token.address, 8e5);
 
     const expectedRewardBob = 3e5 / 3 + 2e5 / 2 + 8e5 / 2;
-    const expectedTotalAmountBob = 1e5 + expectedRewardBob;
+    const bobLiquidity = 1e5;
 
-    expect(await liquidityPool.calculateReward(bob.address, token.address)).to.equal(expectedRewardBob);
-    await expect(() => liquidityPool.connect(bob).removeLiquidity(token.address)).to.changeTokenBalances(
+    await expect(() => liquidityPool.connect(bob).removeLiquidity(token.address, bobLiquidity)).to.changeTokenBalances(
       token,
       [liquidityPool, bob],
-      [-expectedTotalAmountBob, expectedTotalAmountBob]
+      [-bobLiquidity, bobLiquidity]
     );
+
+    expect(await liquidityPool.calculateReward(bob.address, token.address)).to.equal(expectedRewardBob);
+    await expect(() => liquidityPool.connect(bob).extractReward(token.address)).to.changeTokenBalances(
+      token,
+      [liquidityPool, bob],
+      [-expectedRewardBob, expectedRewardBob]
+    );
+    expect(await liquidityPool.calculateReward(bob.address, token.address)).to.equal(0);
   });
 
   it("Should be able to handle more rewards properly", async function () {
     await liquidityPool.addReward(token.address, 5e5);
 
     const expectedRewardCharlie = 3e5 / 3 + 2e5 / 2 + 8e5 / 2 + 5e5;
-    const expectedTotalAmountCharlie = 1e5 + expectedRewardCharlie;
+    const charlieLiquidity = 1e5;
+
+    await expect(() =>
+      liquidityPool.connect(charlie).removeLiquidity(token.address, charlieLiquidity)
+    ).to.changeTokenBalances(token, [liquidityPool, charlie], [-charlieLiquidity, charlieLiquidity]);
 
     expect(await liquidityPool.calculateReward(charlie.address, token.address)).to.equal(expectedRewardCharlie);
-    await expect(() => liquidityPool.connect(charlie).removeLiquidity(token.address)).to.changeTokenBalances(
+    await expect(() => liquidityPool.connect(charlie).extractReward(token.address)).to.changeTokenBalances(
       token,
       [liquidityPool, charlie],
-      [-expectedTotalAmountCharlie, expectedTotalAmountCharlie]
+      [-expectedRewardCharlie, expectedRewardCharlie]
     );
-  });
-
-  it("Should be able to handle more liquidity and reward addition", async function () {
-    await liquidityPool.connect(alice).addLiquidity(token.address, 1e6);
-    await liquidityPool.connect(bob).addLiquidity(token.address, 2e6);
-    await liquidityPool.connect(charlie).addLiquidity(token.address, 3e6);
-    await liquidityPool.addReward(token.address, 10);
-
-    const expectedRewardAlice = Math.floor(10 / 6);
-    const expectedTotalAmountAlice = 1e6 + expectedRewardAlice;
-    expect(await liquidityPool.calculateReward(alice.address, token.address)).to.equal(expectedRewardAlice);
-    await expect(() => liquidityPool.connect(alice).removeLiquidity(token.address)).to.changeTokenBalances(
-      token,
-      [liquidityPool, alice],
-      [-expectedTotalAmountAlice, expectedTotalAmountAlice]
-    );
-
-    const expectedRewardBob = Math.floor((10 * 2) / 6);
-    const expectedTotalAmountBob = 2e6 + expectedRewardBob;
-    expect(await liquidityPool.calculateReward(bob.address, token.address)).to.equal(expectedRewardBob);
-    await expect(() => liquidityPool.connect(bob).removeLiquidity(token.address)).to.changeTokenBalances(
-      token,
-      [liquidityPool, bob],
-      [-expectedTotalAmountBob, expectedTotalAmountBob]
-    );
-
-    // There is an error of ! here due precision error.
-    const expectedRewardCharlie = (10 * 3) / 6 - 1;
-    const expectedTotalAmountCharlie = 3e6 + expectedRewardCharlie;
-    expect(await liquidityPool.calculateReward(charlie.address, token.address)).to.equal(expectedRewardCharlie);
-    await expect(() => liquidityPool.connect(charlie).removeLiquidity(token.address)).to.changeTokenBalances(
-      token,
-      [liquidityPool, charlie],
-      [-expectedTotalAmountCharlie, expectedTotalAmountCharlie]
-    );
+    expect(await liquidityPool.calculateReward(charlie.address, token.address)).to.equal(0);
   });
 
   it("Should be able to extractRewards only", async function () {
@@ -141,20 +127,16 @@ describe("LiquidityPoolTests", function () {
     await liquidityPool.connect(charlie).addLiquidity(token.address, 3e6);
     await liquidityPool.addReward(token.address, 12e7);
 
-    // Extract Rewards only
-
     const expectedRewardAlice = (12e7 / 6e6) * 1e6;
     expect(await liquidityPool.calculateReward(alice.address, token.address)).to.equal(expectedRewardAlice);
     await expect(() => liquidityPool.connect(alice).extractReward(token.address)).to.changeTokenBalances(
       token,
       [liquidityPool, alice],
-      // There is a precision error of 1 here
-      [-(expectedRewardAlice - 1), expectedRewardAlice - 1]
+      [-expectedRewardAlice, expectedRewardAlice]
     );
     expect(await liquidityPool.calculateReward(alice.address, token.address)).to.equal(0);
 
-    // There is a precision error of 1 here
-    const expectedRewardBob = (12e7 / 6e6) * 2e6 - 1;
+    const expectedRewardBob = (12e7 / 6e6) * 2e6;
     expect(await liquidityPool.calculateReward(bob.address, token.address)).to.equal(expectedRewardBob);
     await expect(() => liquidityPool.connect(bob).extractReward(token.address)).to.changeTokenBalances(
       token,
@@ -163,8 +145,7 @@ describe("LiquidityPoolTests", function () {
     );
     expect(await liquidityPool.calculateReward(bob.address, token.address)).to.equal(0);
 
-    // There is a precision error of 1 here
-    const expectedRewardCharlie = (12e7 / 6e6) * 3e6 - 1;
+    const expectedRewardCharlie = (12e7 / 6e6) * 3e6;
     expect(await liquidityPool.calculateReward(charlie.address, token.address)).to.equal(expectedRewardCharlie);
     await expect(() => liquidityPool.connect(charlie).extractReward(token.address)).to.changeTokenBalances(
       token,
@@ -172,5 +153,74 @@ describe("LiquidityPoolTests", function () {
       [-expectedRewardCharlie, expectedRewardCharlie]
     );
     expect(await liquidityPool.calculateReward(charlie.address, token.address)).to.equal(0);
+  });
+
+  it("Should be able to partially extract liquidity and extract correct rewards", async function () {
+    await liquidityPool.addReward(token.address, 12e7);
+
+    await expect(() => liquidityPool.connect(alice).removeLiquidity(token.address, 1e6 / 8)).to.changeTokenBalances(
+      token,
+      [liquidityPool, alice],
+      [-1e6 / 8, 1e6 / 8]
+    );
+    await expect(() => liquidityPool.connect(bob).removeLiquidity(token.address, 2e6 / 4)).to.changeTokenBalances(
+      token,
+      [liquidityPool, bob],
+      [-2e6 / 4, 2e6 / 4]
+    );
+    await expect(() => liquidityPool.connect(charlie).removeLiquidity(token.address, 3e6 / 2)).to.changeTokenBalances(
+      token,
+      [liquidityPool, charlie],
+      [-3e6 / 2, 3e6 / 2]
+    );
+
+    await liquidityPool.addReward(token.address, 12e7);
+
+    const newTotalLiquidity = (1e6 * 7) / 8 + (2e6 * 3) / 4 + 3e6 / 2;
+
+    const expectedRewardAlice = Math.floor((12e7 / 6e6) * 1e6 + (12e7 / newTotalLiquidity) * ((1e6 * 7) / 8));
+    expect(await liquidityPool.calculateReward(alice.address, token.address)).to.equal(expectedRewardAlice);
+    await expect(() => liquidityPool.connect(alice).extractReward(token.address)).to.changeTokenBalances(
+      token,
+      [liquidityPool, alice],
+      [-expectedRewardAlice, expectedRewardAlice]
+    );
+    expect(await liquidityPool.calculateReward(alice.address, token.address)).to.equal(0);
+
+    const expectedRewardBob = Math.floor((12e7 / 6e6) * 2e6 + (12e7 / newTotalLiquidity) * ((2e6 * 3) / 4));
+    expect(await liquidityPool.calculateReward(bob.address, token.address)).to.equal(expectedRewardBob);
+    await expect(() => liquidityPool.connect(bob).extractReward(token.address)).to.changeTokenBalances(
+      token,
+      [liquidityPool, bob],
+      [-expectedRewardBob, expectedRewardBob]
+    );
+    expect(await liquidityPool.calculateReward(bob.address, token.address)).to.equal(0);
+
+    const expectedRewardCharlie = Math.floor((12e7 / 6e6) * 3e6 + (12e7 / newTotalLiquidity) * (3e6 / 2));
+    expect(await liquidityPool.calculateReward(charlie.address, token.address)).to.equal(expectedRewardCharlie);
+    await expect(() => liquidityPool.connect(charlie).extractReward(token.address)).to.changeTokenBalances(
+      token,
+      [liquidityPool, charlie],
+      [-expectedRewardCharlie, expectedRewardCharlie]
+    );
+    expect(await liquidityPool.calculateReward(charlie.address, token.address)).to.equal(0);
+  });
+
+  it("Should be able to withdraw remaining liquidity", async function () {
+    const aliceLiquidity = await liquidityPool.liquidityAddedAmount(alice.address, token.address);
+    const bobLiquidity = await liquidityPool.liquidityAddedAmount(bob.address, token.address);
+    const charlieLiquidity = await liquidityPool.liquidityAddedAmount(charlie.address, token.address);
+
+    await expect(() =>
+      liquidityPool.connect(alice).removeLiquidity(token.address, aliceLiquidity)
+    ).to.changeTokenBalances(token, [liquidityPool, alice], [-aliceLiquidity, aliceLiquidity]);
+    await expect(() => liquidityPool.connect(bob).removeLiquidity(token.address, bobLiquidity)).to.changeTokenBalances(
+      token,
+      [liquidityPool, bob],
+      [-bobLiquidity, bobLiquidity]
+    );
+    await expect(() =>
+      liquidityPool.connect(charlie).removeLiquidity(token.address, charlieLiquidity)
+    ).to.changeTokenBalances(token, [liquidityPool, charlie], [-charlieLiquidity, charlieLiquidity]);
   });
 });
