@@ -27,7 +27,24 @@ const config: HardhatUserConfig = {
   mocha: {
     timeout: 500000,
   },
-  solidity: "0.8.4",
+  solidity: {
+    compilers: [
+      {
+        version: "0.8.0",
+        settings:{
+          evmVersion: "istanbul",
+          optimizer: { enabled: true, runs: 200 }
+        }
+      },
+      {
+        version: "0.8.2",
+        settings:{
+          evmVersion: "istanbul",
+          optimizer: { enabled: true, runs: 200 }
+        }
+      }
+    ]
+  },
   networks: {
     hardhat: {
       allowUnlimitedContractSize: false,
