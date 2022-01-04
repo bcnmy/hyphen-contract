@@ -150,6 +150,32 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
     }
 
     /**
+     * @dev External Function to allow extraction of LP Fee
+     * @param _token Token for which Liquidity and Fee is to be extracted
+     */
+    function extractAllLiquidityAndReward(IERC20Upgradeable _token) external {
+        address lp = _msgSender();
+        _prepareForLiquidityModificationByLP(lp, _token);
+
+        uint256 currentLiquidity = liquidityAddedAmount[lp][_token];
+        uint256 reward = calculateReward(_msgSender(), _token);
+        require(currentLiquidity + reward >= 0, "ERR_NO_CLAIMABLE_AMOUNT");
+
+        // Update Liquidity
+        liquidityAddedAmount[lp][_token] -= currentLiquidity;
+        totalLiquidityByToken[_token] -= currentLiquidity;
+
+        // Update Rewards
+        lastRewardExtractionPeriodByLp[lp][_token] = currentPeriodIndex[_token] - 1;
+        savedLpRewards[lp][_token] = 0;
+
+        _token.safeTransfer(lp, currentLiquidity + reward);
+
+        emit LiquidityRemoved(lp, _token, currentLiquidity, currentPeriodIndex[_token]);
+        emit RewardExtracted(lp, _token, reward, currentPeriodIndex[_token] - 1);
+    }
+
+    /**
      * @dev Public function to calculate an LP's claimable fee for a given token.
      * @param _lp Address of LP
      * @param _token Token for which fee is to be calculated

@@ -223,4 +223,33 @@ describe("LiquidityPoolTests", function () {
       liquidityPool.connect(charlie).removeLiquidity(token.address, charlieLiquidity)
     ).to.changeTokenBalances(token, [liquidityPool, charlie], [-charlieLiquidity, charlieLiquidity]);
   });
+
+  it("Should be able to extract all rewards and liquidity", async function () {
+    await liquidityPool.connect(alice).addLiquidity(token.address, 1e6);
+    await liquidityPool.connect(bob).addLiquidity(token.address, 2e6);
+    await liquidityPool.connect(charlie).addLiquidity(token.address, 3e6);
+    await liquidityPool.addReward(token.address, 12e7);
+
+    const expectedAmountAlice = (12e7 / 6e6) * 1e6 + 1e6;
+    await expect(() => liquidityPool.connect(alice).extractAllLiquidityAndReward(token.address)).to.changeTokenBalances(
+      token,
+      [liquidityPool, alice],
+      [-expectedAmountAlice, expectedAmountAlice]
+    );
+    expect(await liquidityPool.calculateReward(alice.address, token.address)).to.equal(0);
+
+    const expectedAmountBob = (12e7 / 6e6) * 2e6 + 2e6;
+    await expect(() => liquidityPool.connect(bob).extractAllLiquidityAndReward(token.address)).to.changeTokenBalances(
+      token,
+      [liquidityPool, bob],
+      [-expectedAmountBob, expectedAmountBob]
+    );
+    expect(await liquidityPool.calculateReward(bob.address, token.address)).to.equal(0);
+
+    const expectedAmountCharlie = (12e7 / 6e6) * 3e6 + 3e6;
+    await expect(() =>
+      liquidityPool.connect(charlie).extractAllLiquidityAndReward(token.address)
+    ).to.changeTokenBalances(token, [liquidityPool, charlie], [-expectedAmountCharlie, expectedAmountCharlie]);
+    expect(await liquidityPool.calculateReward(charlie.address, token.address)).to.equal(0);
+  });
 });
