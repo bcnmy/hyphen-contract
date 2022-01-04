@@ -45,21 +45,16 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         return ERC2771ContextUpgradeable._msgData();
     }
 
-    // Only used for testing, will be removed from production
-    function addReward(IERC20Upgradeable _token, uint256 _amount) external {
-        require(_token.allowance(_msgSender(), address(this)) >= _amount, "ERR__INSUFFICIENT_ALLOWANCE");
-        _token.safeTransferFrom(_msgSender(), address(this), _amount);
+    function _addReward(IERC20Upgradeable _token, uint256 _amount) internal {
         rewardAccuredByPeriod[currentPeriodIndex[_token]][_token] += _amount;
-
         emit RewardAdded(_token, _amount, currentPeriodIndex[_token]);
     }
 
-    // Only used for testing, will be removed from production
-    function addGasFee(
+    function _addGasFee(
         IERC20Upgradeable _token,
         address _executor,
         uint256 _amount
-    ) external {
+    ) internal {
         require(_token.allowance(_msgSender(), address(this)) >= _amount, "ERR__INSUFFICIENT_ALLOWANCE");
         _token.safeTransferFrom(_msgSender(), address(this), _amount);
         gasFeeAccumulated[_token][_executor] += _amount;
@@ -163,3 +158,13 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         currentPeriodIndex[_token] += 1;
     }
 }
+
+/*
+TL: 6M
+User: transferring 100 USDT
+Fee: 0.1 USDT
+
+0.1 / 6M
+10 ^ -7 / 6
+
+*/
