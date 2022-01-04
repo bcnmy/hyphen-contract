@@ -32,24 +32,43 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
     //Gas Fee
     mapping(IERC20Upgradeable => mapping(address => uint256)) public gasFeeAccumulated;
 
+    /**
+     * @dev initalizes the contract, acts as constructor
+     * @param _trustedForwarder address of trusted forwarder
+     */
     function initialize(address _trustedForwarder) public initializer {
         __ERC2771Context_init(_trustedForwarder);
         __Ownable_init();
     }
 
+    /**
+     * @dev Meta-Transaction Helper, returns msgSender
+     */
     function _msgSender() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (address) {
         return ERC2771ContextUpgradeable._msgSender();
     }
 
+    /**
+     * @dev Meta-Transaction Helper, returns msgData
+     */
     function _msgData() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (bytes calldata) {
         return ERC2771ContextUpgradeable._msgData();
     }
 
+    /**
+     * @dev Adds Fee to current fee-period
+     */
     function _addReward(IERC20Upgradeable _token, uint256 _amount) internal {
         rewardAccuredByPeriod[currentPeriodIndex[_token]][_token] += _amount;
         emit RewardAdded(_token, _amount, currentPeriodIndex[_token]);
     }
 
+    /**
+     * @dev Adds Gas Fee for an executor
+     * @param _token ERC20 Token for which gas fee is saved
+     * @param _executor Executor address
+     * @param _amount Gas Fee amount to be stored
+     */
     function _addGasFee(
         IERC20Upgradeable _token,
         address _executor,
@@ -62,6 +81,11 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         emit GasFeeAdded(_token, _executor, _amount);
     }
 
+    /**
+     * @dev Function to allow extraction of saved gas fee by executors
+     * @param _token ERC20 Token for which gas fee is saved
+     * @param _to Account to which gas fee is to be credited
+     */
     function extractGasFee(IERC20Upgradeable _token, address _to) external {
         address executor = _msgSender();
         uint256 amount = gasFeeAccumulated[_token][executor];
@@ -72,6 +96,11 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         emit GasFeeRemoved(_token, executor, amount, _to);
     }
 
+    /**
+     * @dev External Function to allow LPs to add liquidity
+     * @param _token ERC20 Token for which liquidity is to be added
+     * @param _amount Token amount to be added
+     */
     function addLiquidity(IERC20Upgradeable _token, uint256 _amount) external {
         require(_token.allowance(_msgSender(), address(this)) >= _amount, "ERR__INSUFFICIENT_ALLOWANCE");
 
@@ -85,6 +114,11 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         emit LiquidityAdded(_msgSender(), _token, _amount, currentPeriodIndex[_token]);
     }
 
+    /**
+     * @dev External Function to allow LPs to remove liquidity
+     * @param _token ERC20 Token for which liquidity is to be removed
+     * @param _amount Token amount to removed
+     */
     function removeLiquidity(IERC20Upgradeable _token, uint256 _amount) external {
         require(liquidityAddedAmount[_msgSender()][_token] >= _amount, "ERR_INSUFFICIENT_LIQUIDITY");
 
@@ -98,6 +132,10 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         emit LiquidityRemoved(_msgSender(), _token, _amount, currentPeriodIndex[_token]);
     }
 
+    /**
+     * @dev External Function to allow extraction of LP Fee
+     * @param _token Token for which Fee is to be extracted
+     */
     function extractReward(IERC20Upgradeable _token) external {
         _updatePeriod(_token);
 
@@ -111,6 +149,12 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         emit RewardExtracted(_msgSender(), _token, reward, currentPeriodIndex[_token] - 1);
     }
 
+    /**
+     * @dev Public function to calculate an LP's claimable fee for a given token.
+     * @param _lp Address of LP
+     * @param _token Token for which fee is to be calculated
+     * @return Claimable Fee amount
+     */
     function calculateReward(address _lp, IERC20Upgradeable _token) public view returns (uint256) {
         uint256 lastExtractionPeriod = lastRewardExtractionPeriodByLp[_lp][_token];
         bytes16 rewardToLiquiditySum = rewardToLiquidityRatioPrefix[_token][currentPeriodIndex[_token] - 1].sub(
@@ -126,6 +170,12 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         return reward.toUInt() + savedLpRewards[_lp][_token];
     }
 
+    /**
+     * @dev Updates Token Perid and saves Claimable LP fee to savedLpRewards
+            Called before adding or removing liquidity.
+     * @param _lp Address of LP
+     * @param _token for which LP is to be updated
+     */
     function _prepareForLiquidityModificationByLP(address _lp, IERC20Upgradeable _token) internal {
         _updatePeriod(_token);
         uint256 reward = calculateReward(_lp, _token);
@@ -133,6 +183,11 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         lastRewardExtractionPeriodByLp[_msgSender()][_token] = currentPeriodIndex[_token] - 1;
     }
 
+    /**
+     * @dev Calculates Period Fee / Total Liquidity Ratio
+     * @param _token Token for which ratio is to be calculated
+     * @return Calculated Ratio in IEEE754 Floating Point Representation
+     */
     function _calculateCurrentRewardToLiquidityRatio(IERC20Upgradeable _token) internal view returns (bytes16) {
         if (totalLiquidityByToken[_token] > 0 && rewardAccuredByPeriod[currentPeriodIndex[_token]][_token] > 0) {
             bytes16 currentReward = ABDKMathQuad.fromUInt(rewardAccuredByPeriod[currentPeriodIndex[_token]][_token]);
@@ -143,6 +198,10 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         }
     }
 
+    /**
+     * @dev Updates the Fee/(Total Liquidity) Prefix Sum Array and starts a new period
+     * @param _token Token for which period is to be updated
+     */
     function _updatePeriod(IERC20Upgradeable _token) internal {
         bytes16 previousRewardToLiquidityRatioPrefix;
         if (currentPeriodIndex[_token] > 0) {
@@ -158,13 +217,3 @@ contract LiquidityPool is Initializable, ERC2771ContextUpgradeable, OwnableUpgra
         currentPeriodIndex[_token] += 1;
     }
 }
-
-/*
-TL: 6M
-User: transferring 100 USDT
-Fee: 0.1 USDT
-
-0.1 / 6M
-10 ^ -7 / 6
-
-*/
