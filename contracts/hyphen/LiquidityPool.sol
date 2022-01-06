@@ -3,19 +3,22 @@
 pragma solidity 0.8.0;
 pragma abicoder v2;
 
-import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "./metatx/ERC2771ContextUpgradeable.sol";
 import "../security/Pausable.sol";
 import "./ExecutorManager.sol";
 import "../interfaces/IERC20Permit.sol";
 
-contract LiquidityPoolManager is Initializable, ReentrancyGuardUpgradeable, OwnableUpgradeable, 
+contract LiquidityPool is Initializable, ReentrancyGuardUpgradeable, OwnableUpgradeable, 
     ERC2771ContextUpgradeable, Pausable {
 
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    uint256 private constant BASE_DIVISOR = 10000000000; // Basis Points * 100 for better accuracy
+
     uint256 public baseGas;
     
     ExecutorManager private executorManager;
@@ -109,6 +112,11 @@ contract LiquidityPoolManager is Initializable, ReentrancyGuardUpgradeable, Owna
         baseGas = 21000;
     }
 
+    function setTrustedForwarder(address trustedForwarder) public onlyOwner {
+        require(trustedForwarder != address(0), "TrustedForwarder can't be 0");
+        _trustedForwarder = trustedForwarder;
+    }
+
     function getEquilibriumFee() public view returns (uint256) {
         return equilibriumFee;
     }
@@ -160,6 +168,17 @@ contract LiquidityPoolManager is Initializable, ReentrancyGuardUpgradeable, Owna
         tokensInfo[tokenAddress].maxCap = maxCapLimit;
     }
 
+    function getCurrentLiquidity(address tokenAddress) public view returns(uint256 currentLiquidity) {
+        uint256 liquidityPoolBalance;
+        if(tokenAddress == NATIVE) {
+            liquidityPoolBalance = address(this).balance;
+        } else {
+            liquidityPoolBalance = IERC20Upgradeable(tokenAddress).balanceOf(address(this));
+        } 
+
+        currentLiquidity = liquidityPoolBalance - gasFeeAccumulatedByToken[tokenAddress] - adminFeeAccumulatedByToken[tokenAddress] - incentivePool[tokenAddress];
+    }
+
     function addNativeLiquidity() external payable whenNotPaused {
         require(msg.value != 0, "Amount cannot be 0");
         address sender = _msgSender();
@@ -188,7 +207,7 @@ contract LiquidityPoolManager is Initializable, ReentrancyGuardUpgradeable, Owna
         tokensInfo[tokenAddress].liquidityProvider[sender] = tokensInfo[tokenAddress].liquidityProvider[sender] + amount;
         tokensInfo[tokenAddress].liquidity = tokensInfo[tokenAddress].liquidity + amount;
         
-        SafeERC20.safeTransferFrom(IERC20(tokenAddress), sender, address(this), amount);
+        SafeERC20Upgradeable.safeTransferFrom(IERC20Upgradeable(tokenAddress), sender, address(this), amount);
         emit LiquidityAdded(sender, tokenAddress, address(this), amount);
     }
 
@@ -200,7 +219,7 @@ contract LiquidityPoolManager is Initializable, ReentrancyGuardUpgradeable, Owna
         tokensInfo[tokenAddress].liquidityProvider[sender] = tokensInfo[tokenAddress].liquidityProvider[sender] - amount;
         tokensInfo[tokenAddress].liquidity = tokensInfo[tokenAddress].liquidity - amount;
 
-        SafeERC20.safeTransfer(IERC20(tokenAddress), sender, amount);
+        SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), sender, amount);
         emit LiquidityRemoved( tokenAddress, amount, sender);
 
     }
@@ -220,27 +239,22 @@ contract LiquidityPoolManager is Initializable, ReentrancyGuardUpgradeable, Owna
             incentivePool[tokenAddress] = incentivePool[tokenAddress] - rewardAmount;
         }
 
-        SafeERC20.safeTransferFrom(IERC20(tokenAddress), sender, address(this), amount);
+        SafeERC20Upgradeable.safeTransferFrom(IERC20Upgradeable(tokenAddress), sender, address(this), amount);
         // Emit (amount + reward amount) in event
         emit Deposit(sender, tokenAddress, receiver, toChainId, amount + rewardAmount);
     }
 
     function getRewardAmount(uint256 amount, address tokenAddress) public view returns(uint256 rewardAmount) {
-        uint256 currentLiquidity;
-        if(tokenAddress == NATIVE) {
-            currentLiquidity = address(this).balance;
-        } else {
-            currentLiquidity = IERC20(tokenAddress).balanceOf(address(this));
-        }
+        uint256 currentLiquidity = getCurrentLiquidity(tokenAddress);
         uint256 providedLiquidity = tokensInfo[tokenAddress].liquidity;
-        if((currentLiquidity + amount) <= providedLiquidity) {
+        if(currentLiquidity < providedLiquidity) {
             uint256 liquidityDifference = providedLiquidity - currentLiquidity;
             if(amount >= liquidityDifference) {
                 rewardAmount = incentivePool[tokenAddress];
             } else {
                 // Multiply by 10000 to avoid 0 reward amount for small amount and liquidity difference
-                rewardAmount = (amount * incentivePool[tokenAddress] * 10000) / liquidityDifference;
-                rewardAmount = rewardAmount / 10000;
+                rewardAmount = (amount * incentivePool[tokenAddress] * 10000000000) / liquidityDifference;
+                rewardAmount = rewardAmount / 10000000000;
             }
         }
     }
@@ -303,8 +317,8 @@ contract LiquidityPoolManager is Initializable, ReentrancyGuardUpgradeable, Owna
             bool success = receiver.send(amountToTransfer);
             require(success, "Native Transfer Failed");
         } else {
-            require(IERC20(tokenAddress).balanceOf(address(this)) >= amountToTransfer, "Not Enough Balance");
-            SafeERC20.safeTransfer(IERC20(tokenAddress), receiver, amountToTransfer);
+            require(IERC20Upgradeable(tokenAddress).balanceOf(address(this)) >= amountToTransfer, "Not Enough Balance");
+            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, amountToTransfer);
         }
 
         emit AssetSent(tokenAddress, amount, amountToTransfer, receiver, depositHash);
@@ -315,12 +329,12 @@ contract LiquidityPoolManager is Initializable, ReentrancyGuardUpgradeable, Owna
         uint256 calculatedAdminFee;
         if(transferFee > equilibriumFee) {
             // Here add some fee to incentive pool also
-            calculatedAdminFee = (amount * equilibriumFee)/100000;
-            incentivePool[tokenAddress] = (incentivePool[tokenAddress] + (amount * (transferFee - equilibriumFee))) / 100000;
+            calculatedAdminFee = (amount * equilibriumFee)/BASE_DIVISOR;
+            incentivePool[tokenAddress] = (incentivePool[tokenAddress] + (amount * (transferFee - equilibriumFee))) / BASE_DIVISOR;
         } else {
-            calculatedAdminFee = (amount * transferFee) / 100000;
+            calculatedAdminFee = (amount * transferFee) / BASE_DIVISOR;
         }
-        uint256 transferFeeAmount = (amount * transferFee) / 100000;
+        uint256 transferFeeAmount = (amount * transferFee) / BASE_DIVISOR;
 
         adminFeeAccumulatedByToken[tokenAddress] = adminFeeAccumulatedByToken[tokenAddress] + calculatedAdminFee; 
 
@@ -333,7 +347,7 @@ contract LiquidityPoolManager is Initializable, ReentrancyGuardUpgradeable, Owna
     }
 
     function getTransferFee(address tokenAddress, uint256 amount) public view returns (uint256 fee) {
-        uint256 currentLiquidity = tokenAddress == NATIVE ? address(this).balance : IERC20(tokenAddress).balanceOf(address(this));
+        uint256 currentLiquidity = tokenAddress == NATIVE ? address(this).balance : IERC20Upgradeable(tokenAddress).balanceOf(address(this));
         uint256 providedLiquidity = tokensInfo[tokenAddress].liquidity;
         uint256 resultingLiquidity = currentLiquidity - amount;
 
@@ -357,29 +371,29 @@ contract LiquidityPoolManager is Initializable, ReentrancyGuardUpgradeable, Owna
         status = processedHash[hashSendTransaction];
     }
 
-    function withdrawErc20(address tokenAddress) external onlyOwner whenNotPaused {
-        uint256 profitEarned = (IERC20(tokenAddress).balanceOf(address(this)))
-                                - tokensInfo[tokenAddress].liquidity
-                                - adminFeeAccumulatedByToken[tokenAddress]
-                                - gasFeeAccumulatedByToken[tokenAddress];
-        require(profitEarned != 0, "Profit earned is 0");
-        address sender = _msgSender();
+    // function withdrawErc20(address tokenAddress) external onlyOwner whenNotPaused {
+    //     uint256 profitEarned = (IERC20Upgradeable(tokenAddress).balanceOf(address(this)))
+    //                             - tokensInfo[tokenAddress].liquidity
+    //                             - adminFeeAccumulatedByToken[tokenAddress]
+    //                             - gasFeeAccumulatedByToken[tokenAddress];
+    //     require(profitEarned != 0, "Profit earned is 0");
+    //     address sender = _msgSender();
 
-        SafeERC20.safeTransfer(IERC20(tokenAddress), sender, profitEarned);
+    //     SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), sender, profitEarned);
 
-        emit FundsWithdrawn(tokenAddress, sender,  profitEarned);
-    }
+    //     emit FundsWithdrawn(tokenAddress, sender,  profitEarned);
+    // }
 
-    function withdrawErc20AdminFee(address tokenAddress, address receiver) external onlyOwner whenNotPaused {
-        require(tokenAddress != NATIVE, "Can't withdraw native token fee");
-        uint256 adminFeeAccumulated = adminFeeAccumulatedByToken[tokenAddress];
-        require(adminFeeAccumulated != 0, "Admin Fee earned is 0");
+    // function withdrawErc20AdminFee(address tokenAddress, address receiver) external onlyOwner whenNotPaused {
+    //     require(tokenAddress != NATIVE, "Can't withdraw native token fee");
+    //     uint256 adminFeeAccumulated = adminFeeAccumulatedByToken[tokenAddress];
+    //     require(adminFeeAccumulated != 0, "Admin Fee earned is 0");
 
-        adminFeeAccumulatedByToken[tokenAddress] = 0;
+    //     adminFeeAccumulatedByToken[tokenAddress] = 0;
 
-        SafeERC20.safeTransfer(IERC20(tokenAddress), receiver, adminFeeAccumulated);
-        emit AdminFeeWithdraw(tokenAddress, receiver, adminFeeAccumulated);
-    }
+    //     SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, adminFeeAccumulated);
+    //     emit AdminFeeWithdraw(tokenAddress, receiver, adminFeeAccumulated);
+    // }
 
     function withdrawErc20GasFee(address tokenAddress, address receiver) external onlyOwner whenNotPaused {
         require(tokenAddress != NATIVE, "Can't withdraw native token fee");
@@ -388,34 +402,35 @@ contract LiquidityPoolManager is Initializable, ReentrancyGuardUpgradeable, Owna
 
         gasFeeAccumulatedByToken[tokenAddress] = 0;
 
-        SafeERC20.safeTransfer(IERC20(tokenAddress), receiver, gasFeeAccumulated);
+        SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, gasFeeAccumulated);
         emit GasFeeWithdraw(tokenAddress, receiver, gasFeeAccumulated);
     }
 
-    function withdrawNative() external onlyOwner whenNotPaused {
-        uint256 profitEarned = (address(this).balance)
-                                - tokensInfo[NATIVE].liquidity
-                                - adminFeeAccumulatedByToken[NATIVE]
-                                - gasFeeAccumulatedByToken[NATIVE];
+    // function withdrawNative() external onlyOwner whenNotPaused {
+    //     uint256 profitEarned = (address(this).balance)
+    //                             - tokensInfo[NATIVE].liquidity
+    //                             - adminFeeAccumulatedByToken[NATIVE]
+    //                             - gasFeeAccumulatedByToken[NATIVE]
+    //                             - incentivePool[NATIVE];
         
-        require(profitEarned != 0, "Profit earned is 0");
+    //     require(profitEarned != 0, "Profit earned is 0");
 
-        address sender = _msgSender();
-        bool success = payable(sender).send(profitEarned);
-        require(success, "Native Transfer Failed");
+    //     address sender = _msgSender();
+    //     bool success = payable(sender).send(profitEarned);
+    //     require(success, "Native Transfer Failed");
         
-        emit FundsWithdrawn(address(this), sender, profitEarned);
-    }
+    //     emit FundsWithdrawn(address(this), sender, profitEarned);
+    // }
 
-    function withdrawNativeAdminFee(address payable receiver) external onlyOwner whenNotPaused {
-        uint256 adminFeeAccumulated = adminFeeAccumulatedByToken[NATIVE];
-        require(adminFeeAccumulated != 0, "Admin Fee earned is 0");
-        adminFeeAccumulatedByToken[NATIVE] = 0;
-        bool success = receiver.send(adminFeeAccumulated);
-        require(success, "Native Transfer Failed");
+    // function withdrawNativeAdminFee(address payable receiver) external onlyOwner whenNotPaused {
+    //     uint256 adminFeeAccumulated = adminFeeAccumulatedByToken[NATIVE];
+    //     require(adminFeeAccumulated != 0, "Admin Fee earned is 0");
+    //     adminFeeAccumulatedByToken[NATIVE] = 0;
+    //     bool success = receiver.send(adminFeeAccumulated);
+    //     require(success, "Native Transfer Failed");
         
-        emit AdminFeeWithdraw(address(this), receiver, adminFeeAccumulated);
-    }
+    //     emit AdminFeeWithdraw(address(this), receiver, adminFeeAccumulated);
+    // }
 
     function withdrawNativeGasFee(address payable receiver) external onlyOwner whenNotPaused {
         uint256 gasFeeAccumulated = gasFeeAccumulatedByToken[NATIVE];

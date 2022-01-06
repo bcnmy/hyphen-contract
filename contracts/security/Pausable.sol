@@ -36,8 +36,8 @@ abstract contract Pausable is Initializable, PausableUpgradeable {
     /**
      * @return true if `msg.sender` is the owner of the contract.
      */
-    function isPauser() public view returns (bool) {
-        return msg.sender == _pauser;
+    function isPauser(address pauser) public view returns (bool) {
+        return pauser == _pauser;
     }
     
     /**
@@ -45,7 +45,7 @@ abstract contract Pausable is Initializable, PausableUpgradeable {
      */
     modifier onlyPauser() {
         require(
-            isPauser(),
+            isPauser(msg.sender),
             "Only pauser is allowed to perform this operation"
         );
         _;
