@@ -274,9 +274,9 @@ describe("LiquidityPoolTests", function () {
       let equilibriumLiquidity = poolInfo.liquidity;
       let currentBalance = await token.balanceOf(liquidityPool.address);
       let gasFeeAccumulated = await liquidityPool.gasFeeAccumulatedByToken(tokenAddress);
-      let adminFeeAccumulated = await liquidityPool.adminFeeAccumulatedByToken(tokenAddress);
+      let lpFeeAccumulated = await liquidityPool.lpFeeAccruedByToken(tokenAddress);
 
-      let currentLiquidity = currentBalance.sub(gasFeeAccumulated).sub(adminFeeAccumulated).sub(incentivePoolAmount);
+      let currentLiquidity = currentBalance.sub(gasFeeAccumulated).sub(lpFeeAccumulated).sub(incentivePoolAmount);
       let calculatedRewardAmount = BigNumber.from(amountToDeposit).mul(incentivePoolAmount).div((equilibriumLiquidity.sub(currentLiquidity)));
 
       expect(calculatedRewardAmount).to.equals(rewardAmoutFromContract);
