@@ -3,8 +3,9 @@
 pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./interface/IExecutorManager.sol";
 
-contract ExecutorManager is Ownable {
+contract ExecutorManager is IExecutorManager, Ownable {
     address[] internal executors;
     mapping(address => bool) internal executorStatus;
 
@@ -13,34 +14,27 @@ contract ExecutorManager is Ownable {
 
     // MODIFIERS
     modifier onlyExecutor() {
-        require(
-            executorStatus[msg.sender],
-            "You are not allowed to perform this operation"
-        );
+        require(executorStatus[msg.sender], "You are not allowed to perform this operation");
         _;
     }
 
-    function getExecutorStatus(address executor)
-        public
-        view
-        returns (bool status)
-    {
+    function getExecutorStatus(address executor) public view override returns (bool status) {
         status = executorStatus[executor];
     }
 
-    function getAllExecutors() public view returns (address[] memory) {
+    function getAllExecutors() public view override returns (address[] memory) {
         return executors;
     }
 
     //Register new Executors
-    function addExecutors(address[] calldata executorArray) external onlyOwner {
+    function addExecutors(address[] calldata executorArray) external override onlyOwner {
         for (uint256 i = 0; i < executorArray.length; i++) {
             addExecutor(executorArray[i]);
         }
     }
 
     // Register single executor
-    function addExecutor(address executorAddress) public onlyOwner {
+    function addExecutor(address executorAddress) public override onlyOwner {
         require(executorAddress != address(0), "executor address can not be 0");
         executors.push(executorAddress);
         executorStatus[executorAddress] = true;
@@ -48,14 +42,14 @@ contract ExecutorManager is Ownable {
     }
 
     //Remove registered Executors
-    function removeExecutors(address[] calldata executorArray) external onlyOwner {
+    function removeExecutors(address[] calldata executorArray) external override onlyOwner {
         for (uint256 i = 0; i < executorArray.length; i++) {
             removeExecutor(executorArray[i]);
         }
     }
 
     // Remove Register single executor
-    function removeExecutor(address executorAddress) public onlyOwner {
+    function removeExecutor(address executorAddress) public override onlyOwner {
         require(executorAddress != address(0), "executor address can not be 0");
         executorStatus[executorAddress] = false;
         emit ExecutorRemoved(executorAddress, msg.sender);
