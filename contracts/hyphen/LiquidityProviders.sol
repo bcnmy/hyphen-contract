@@ -14,7 +14,6 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
 
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     uint256 private constant BASE_DIVISOR = 10000000000;
-    uint256 public lpLockInPeriodBlocks;
 
     event LiquidityAdded(address lp, address token, uint256 amount);
     event LiquidityRemoved(address lp, address token, uint256 amount);
@@ -30,10 +29,9 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      * @dev initalizes the contract, acts as constructor
      * @param _trustedForwarder address of trusted forwarder
      */
-    function __LiquidityProviders_init(address _trustedForwarder, uint256 _lpLockInPeriodBlocks) public initializer {
+    function __LiquidityProviders_init(address _trustedForwarder) public initializer {
         __ERC2771Context_init(_trustedForwarder);
         __Ownable_init();
-        lpLockInPeriodBlocks = _lpLockInPeriodBlocks;
     }
 
     /**
@@ -60,10 +58,6 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
         returns (bytes calldata)
     {
         return ERC2771ContextUpgradeable._msgData();
-    }
-
-    function setLpLockInPeriodBlocks(uint256 _lpLockInPeriodBlocks) external onlyOwner {
-        lpLockInPeriodBlocks = _lpLockInPeriodBlocks;
     }
 
     function setLpToken(IERC20Upgradeable _baseToken, ILPToken _lpToken) external onlyOwner {
@@ -100,11 +94,13 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
             "ERR__INSUFFICIENT_ALLOWANCE"
         );
 
+        IERC20Upgradeable token = IERC20Upgradeable(_token);
         SafeERC20Upgradeable.safeTransferFrom(IERC20Upgradeable(_token), _msgSender(), address(this), _amount);
+        totalReserve[token] += _amount;
 
-        uint256 lpTokenPrice = getLpTokenPriceInTermsOfBaseToken(IERC20Upgradeable(_token));
+        uint256 lpTokenPrice = getLpTokenPriceInTermsOfBaseToken(token);
         uint256 mintedLpTokenAmount = (_amount * BASE_DIVISOR) / lpTokenPrice;
-        ILPToken lpToken = baseTokenToLpToken[IERC20Upgradeable(_token)];
+        ILPToken lpToken = baseTokenToLpToken[token];
         lpToken.mint(_msgSender(), mintedLpTokenAmount);
 
         emit LiquidityAdded(_msgSender(), _token, _amount);
@@ -120,10 +116,13 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
             "ERR__INSUFFICIENT_ALLOWANCE"
         );
 
+        IERC20Upgradeable token = IERC20Upgradeable(_token);
+
         uint256 amount = msg.value;
-        uint256 lpTokenPrice = getLpTokenPriceInTermsOfBaseToken(IERC20Upgradeable(_token));
+        totalReserve[token] += amount;
+        uint256 lpTokenPrice = getLpTokenPriceInTermsOfBaseToken(token);
         uint256 mintedLpTokenAmount = (amount * BASE_DIVISOR) / lpTokenPrice;
-        ILPToken lpToken = baseTokenToLpToken[IERC20Upgradeable(_token)];
+        ILPToken lpToken = baseTokenToLpToken[token];
         lpToken.mint(_msgSender(), mintedLpTokenAmount);
 
         emit LiquidityAdded(_msgSender(), _token, msg.value);
