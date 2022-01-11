@@ -10,7 +10,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "./LiquidityProviders.sol";
 import "../security/Pausable.sol";
-import "./ExecutorManager.sol";
+import "./interface/IExecutorManager.sol";
 import "../interfaces/IERC20Permit.sol";
 
 contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausable {
@@ -19,7 +19,7 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
 
     uint256 public baseGas;
 
-    ExecutorManager private executorManager;
+    IExecutorManager private executorManager;
     uint256 public equilibriumFee; // Represented in basis points
     uint256 public maxFee; // Represented in basis points
 
@@ -123,7 +123,7 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
         __ReentrancyGuard_init();
         __Ownable_init();
         __Pausable_init(pauser);
-        executorManager = ExecutorManager(_executorManagerAddress);
+        executorManager = IExecutorManager(_executorManagerAddress);
         equilibriumFee = _equilibriumFee;
         maxFee = _maxFee;
         baseGas = 21000;
@@ -160,7 +160,7 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
 
     function setExecutorManager(address _executorManagerAddress) external onlyOwner {
         require(_executorManagerAddress != address(0), "Executor Manager cannot be 0");
-        executorManager = ExecutorManager(_executorManagerAddress);
+        executorManager = IExecutorManager(_executorManagerAddress);
     }
 
     function setTokenTransferOverhead(address tokenAddress, uint256 gasOverhead)
