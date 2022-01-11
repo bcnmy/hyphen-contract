@@ -19,20 +19,12 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
     event LiquidityAdded(address lp, address token, uint256 amount);
     event LiquidityRemoved(address lp, address token, uint256 amount);
     event LPFeeAdded(address token, uint256 amount);
-    event LPTokenClaimed(address claimer, address lpToken, uint256 amount);
     event LPTokensBurnt(address claimer, address lpToken, uint256 lpTokenAmount, uint256 baseAmount);
-
-    struct LockedLpTokens {
-        ILPToken lpToken;
-        uint256 amount;
-        uint256 unlockBlock;
-    }
 
     // LP Fee Distribution
     mapping(IERC20Upgradeable => uint256) public totalReserve;
     mapping(IERC20Upgradeable => ILPToken) public baseTokenToLpToken;
     mapping(ILPToken => IERC20Upgradeable) public lpTokenToBaseToken;
-    mapping(address => LockedLpTokens[]) public lockedLpTokens;
 
     /**
      * @dev initalizes the contract, acts as constructor
@@ -83,7 +75,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      * @dev Returns current price of lp token in terms of base token.
      * @return Price multiplied by BASE
      */
-    function getLpTokenPriceInTermsOfBaseToken(IERC20Upgradeable _baseToken) public returns (uint256) {
+    function getLpTokenPriceInTermsOfBaseToken(IERC20Upgradeable _baseToken) public view returns (uint256) {
         IERC20Upgradeable lpToken = baseTokenToLpToken[_baseToken];
         require(lpToken != IERC20Upgradeable(address(0)), "ERR_TOKEN_NOT_SUPPORTED");
         return (totalReserve[_baseToken] * BASE_DIVISOR) / lpToken.totalSupply();
@@ -93,7 +85,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      * @dev Records fee being added to total reserve
      */
     function _addLPFee(address _token, uint256 _amount) internal {
-        totalReserve[IERC20Upgradeable(_token)] = totalReserve[IERC20Upgradeable(_token)] + _amount;
+        totalReserve[IERC20Upgradeable(_token)] += _amount;
         emit LPFeeAdded(_token, _amount);
     }
 
@@ -113,10 +105,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
         uint256 lpTokenPrice = getLpTokenPriceInTermsOfBaseToken(IERC20Upgradeable(_token));
         uint256 mintedLpTokenAmount = (_amount * BASE_DIVISOR) / lpTokenPrice;
         ILPToken lpToken = baseTokenToLpToken[IERC20Upgradeable(_token)];
-        lpToken.mint(address(this), mintedLpTokenAmount);
-        lockedLpTokens[_msgSender()].push(
-            LockedLpTokens(lpToken, mintedLpTokenAmount, block.number + lpLockInPeriodBlocks)
-        );
+        lpToken.mint(_msgSender(), mintedLpTokenAmount);
 
         emit LiquidityAdded(_msgSender(), _token, _amount);
     }
@@ -135,10 +124,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
         uint256 lpTokenPrice = getLpTokenPriceInTermsOfBaseToken(IERC20Upgradeable(_token));
         uint256 mintedLpTokenAmount = (amount * BASE_DIVISOR) / lpTokenPrice;
         ILPToken lpToken = baseTokenToLpToken[IERC20Upgradeable(_token)];
-        lpToken.mint(address(this), mintedLpTokenAmount);
-        lockedLpTokens[_msgSender()].push(
-            LockedLpTokens(lpToken, mintedLpTokenAmount, block.number + lpLockInPeriodBlocks)
-        );
+        lpToken.mint(_msgSender(), mintedLpTokenAmount);
 
         emit LiquidityAdded(_msgSender(), _token, msg.value);
     }
@@ -169,25 +155,5 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
         }
 
         emit LPTokensBurnt(_msgSender(), _lpToken, _amount, baseTokenAmount);
-    }
-
-    /**
-     * @dev Function to allow LPs to claim LP Tokens after lockup period
-     * @param _claimIndex Index determining the LP Token record which is to be claimed.
-     */
-    function claimLpTokens(uint256 _claimIndex) external {
-        require(lockedLpTokens[_msgSender()].length >= _claimIndex + 1, "ERR_INVALID_CLAIM_INDEX");
-        require(block.number >= lockedLpTokens[_msgSender()][_claimIndex].unlockBlock, "ERR_CANNOT_CLAIM_RIGHT_NOW");
-
-        uint256 amount = lockedLpTokens[_msgSender()][_claimIndex].amount;
-        ILPToken lpToken = lockedLpTokens[_msgSender()][_claimIndex].lpToken;
-        lockedLpTokens[_msgSender()][_claimIndex] = lockedLpTokens[_msgSender()][
-            lockedLpTokens[_msgSender()].length - 1
-        ];
-        lockedLpTokens[_msgSender()].pop();
-
-        SafeERC20Upgradeable.safeTransfer(lpToken, _msgSender(), amount);
-
-        emit LPTokenClaimed(_msgSender(), address(lpToken), amount);
     }
 }
