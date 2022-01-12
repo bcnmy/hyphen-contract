@@ -3,7 +3,7 @@
 pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./interface/IExecutorManager.sol";
+import "./interfaces/IExecutorManager.sol";
 
 contract ExecutorManager is IExecutorManager, Ownable {
     address[] internal executors;

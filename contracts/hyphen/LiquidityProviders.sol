@@ -5,8 +5,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "hardhat/console.sol";
-import "./interface/ILPToken.sol";
+import "./interfaces/ILPToken.sol";
 import "./metatx/ERC2771ContextUpgradeable.sol";
 
 contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, OwnableUpgradeable {
@@ -19,6 +18,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
     event LiquidityRemoved(address lp, address token, uint256 amount);
     event LPFeeAdded(address token, uint256 amount);
     event LPTokensBurnt(address claimer, address lpToken, uint256 lpTokenAmount, uint256 baseAmount);
+    event NewTokenRegistered(address baseToken, address lpToken);
 
     // LP Fee Distribution
     mapping(address => uint256) public totalReserve;
@@ -63,6 +63,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
     function setLpToken(address _baseToken, address _lpToken) external onlyOwner {
         baseTokenToLpToken[_baseToken] = _lpToken;
         lpTokenToBaseToken[_lpToken] = _baseToken;
+        emit NewTokenRegistered(_baseToken, _lpToken);
     }
 
     /**
@@ -70,9 +71,13 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      * @return Price multiplied by BASE
      */
     function getLpTokenPriceInTermsOfBaseToken(address _baseToken) public view returns (uint256) {
-        require(baseTokenToLpToken[_baseToken] != address(0), "ERR_TOKEN_NOT_SUPPORTED");
+        require(baseTokenToLpToken[_baseToken] != address(0), "ERR__TOKEN_NOT_SUPPORTED");
         ILPToken lpToken = ILPToken(baseTokenToLpToken[_baseToken]);
-        return (totalReserve[_baseToken] * BASE_DIVISOR) / lpToken.totalSupply();
+        uint256 supply = lpToken.totalSupply();
+        if (supply > 0) {
+            return (totalReserve[_baseToken] * BASE_DIVISOR) / lpToken.totalSupply();
+        }
+        return 1 * BASE_DIVISOR;
     }
 
     /**
@@ -95,34 +100,27 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
         );
 
         SafeERC20Upgradeable.safeTransferFrom(IERC20Upgradeable(_token), _msgSender(), address(this), _amount);
-        totalReserve[_token] += _amount;
-
         uint256 lpTokenPrice = getLpTokenPriceInTermsOfBaseToken(_token);
         uint256 mintedLpTokenAmount = (_amount * BASE_DIVISOR) / lpTokenPrice;
         ILPToken lpToken = ILPToken(baseTokenToLpToken[_token]);
         lpToken.mint(_msgSender(), mintedLpTokenAmount);
+        totalReserve[_token] += _amount;
 
         emit LiquidityAdded(_msgSender(), _token, _amount);
     }
 
     /**
      * @dev Internal Function to allow LPs to add native token liquidity
-     * @param _token ERC20 Token for which liquidity is to be added
      */
-    function _addNativeLiquidity(address _token) internal {
-        require(
-            IERC20Upgradeable(_token).allowance(_msgSender(), address(this)) >= msg.value,
-            "ERR__INSUFFICIENT_ALLOWANCE"
-        );
-
+    function _addNativeLiquidity() internal {
         uint256 amount = msg.value;
-        totalReserve[_token] += amount;
-        uint256 lpTokenPrice = getLpTokenPriceInTermsOfBaseToken(_token);
+        uint256 lpTokenPrice = getLpTokenPriceInTermsOfBaseToken(NATIVE);
         uint256 mintedLpTokenAmount = (amount * BASE_DIVISOR) / lpTokenPrice;
-        ILPToken lpToken = ILPToken(baseTokenToLpToken[_token]);
+        ILPToken lpToken = ILPToken(baseTokenToLpToken[NATIVE]);
         lpToken.mint(_msgSender(), mintedLpTokenAmount);
+        totalReserve[NATIVE] += amount;
 
-        emit LiquidityAdded(_msgSender(), _token, msg.value);
+        emit LiquidityAdded(_msgSender(), NATIVE, msg.value);
     }
 
     /**
@@ -132,9 +130,8 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      */
     function _burnLpTokens(address _lpToken, uint256 _amount) internal {
         address baseTokenAddress = lpTokenToBaseToken[_lpToken];
-        require(baseTokenAddress != address(0), "ERR_INVALID_LP_TOKEN");
+        require(baseTokenAddress != address(0), "ERR__INVALID_LP_TOKEN");
 
-        IERC20Upgradeable baseToken = IERC20Upgradeable(baseTokenAddress);
         ILPToken lpToken = ILPToken(_lpToken);
         require(lpToken.allowance(_msgSender(), address(this)) >= _amount, "ERR__INSUFFICIENT_ALLOWANCE");
 
@@ -144,12 +141,13 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
 
         lpToken.burnFrom(_msgSender(), _amount);
 
-        if (address(baseToken) == NATIVE) {
-            require(address(this).balance >= baseTokenAmount, "INSUFFICIENT_BALANCE");
+        if (baseTokenAddress == NATIVE) {
+            require(address(this).balance >= baseTokenAmount, "ERR__INSUFFICIENT_BALANCE");
             bool success = payable(_msgSender()).send(baseTokenAmount);
-            require(success, "ERR_NATIVE_TRANSFER_FAILED");
+            require(success, "ERR__NATIVE_TRANSFER_FAILED");
         } else {
-            require(baseToken.balanceOf(address(this)) >= baseTokenAmount, "INSUFFICIENT_BALANCE");
+            IERC20Upgradeable baseToken = IERC20Upgradeable(baseTokenAddress);
+            require(baseToken.balanceOf(address(this)) >= baseTokenAmount, "ERR__INSUFFICIENT_BALANCE");
             SafeERC20Upgradeable.safeTransfer(baseToken, _msgSender(), baseTokenAmount);
         }
 

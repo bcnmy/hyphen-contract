@@ -10,7 +10,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "./LiquidityProviders.sol";
 import "../security/Pausable.sol";
-import "./interface/IExecutorManager.sol";
+import "./interfaces/IExecutorManager.sol";
 import "../interfaces/IERC20Permit.sol";
 
 contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausable {
