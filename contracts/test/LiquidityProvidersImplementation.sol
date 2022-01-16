@@ -21,24 +21,28 @@ contract LiquidityProvidersImplementation is LiquidityProviders {
         _addLPFee(_token, _amount);
     }
 
-    function addTokenLiquidity(uint256 _nftId, uint256 _amount) external {
-        _addTokenLiquidity(_nftId, _amount);
+    function increaseTokenLiquidity(uint256 _nftId, uint256 _amount) external {
+        _increaseTokenLiquidity(_nftId, _amount);
     }
 
-    function addNativeLiquidity(uint256 _nftId) external payable {
-        _addNativeLiquidity(_nftId);
+    function increaseNativeLiquidity(uint256 _nftId) external payable {
+        _increaseNativeLiquidity(_nftId);
     }
 
-    function addTokenLiquidityToNewNft(address _token, uint256 _amount) external {
-        _addTokenLiquidityToNewNft(_token, _amount);
+    function addTokenLiquidity(address _token, uint256 _amount) external {
+        _addTokenLiquidity(_token, _amount);
     }
 
-    function addNativeLiquidityToNewNft() external payable {
-        _addNativeLiquidityToNewNft();
+    function addNativeLiquidity() external payable {
+        _addNativeLiquidity();
     }
 
-    function burnLpShares(uint256 _nftId, uint256 _amount) external {
-        _burnLpShares(_nftId, _amount);
+    function decreaseLiquidity(uint256 _nftId, uint256 _amount) external {
+        _decreaseLiquidity(_nftId, _amount);
+    }
+
+    function extractFee(uint256 _nftId) external {
+        _extractFee(_nftId);
     }
 
     function isTokenSupported(address) public pure override returns (bool) {

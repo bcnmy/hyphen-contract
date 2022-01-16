@@ -10,7 +10,16 @@ interface ILPToken is IERC721Upgradeable {
 
     function updateTokenMetadata(uint256 _tokenId, LpTokenMetadata memory _lpTokenMetadata) external;
 
-    function exists(uint256 _tokenId) external returns (bool);
+    function exists(uint256 _tokenId) external view returns (bool);
 
-    function tokenMetadata(uint256 _tokenId) external returns (address ,uint256,uint256);
+    function tokenMetadata(uint256 _tokenId)
+        external
+        view
+        returns (
+            address,
+            uint256,
+            uint256
+        );
+
+    function getAllNftIdsByUser(address _owner) external view returns (uint256[] memory);
 }

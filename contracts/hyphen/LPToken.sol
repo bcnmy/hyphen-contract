@@ -40,6 +40,14 @@ contract LPToken is
         _;
     }
 
+    function getAllNftIdsByUser(address _owner) public view override returns (uint256[] memory) {
+        uint256[] memory nftIds = new uint256[](balanceOf(_owner));
+        for (uint256 i = 0; i < nftIds.length; ++i) {
+            nftIds[i] = tokenOfOwnerByIndex(_owner, i);
+        }
+        return nftIds;
+    }
+
     function mint(address _to) external override onlyHyphenPools whenNotPaused returns (uint256) {
         uint256 tokenId = totalSupply() + 1;
         _safeMint(_to, tokenId);
