@@ -1,40 +1,37 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+pragma abicoder v2;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20BurnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import "./interfaces/ILPToken.sol";
 
 contract LPToken is
-    Initializable,
-    ERC20Upgradeable,
-    ERC20PausableUpgradeable,
-    ERC20BurnableUpgradeable,
-    ERC2771ContextUpgradeable,
     OwnableUpgradeable,
+    ERC721EnumerableUpgradeable,
+    ERC721PausableUpgradeable,
+    ERC721URIStorageUpgradeable,
+    ERC2771ContextUpgradeable,
     ILPToken
 {
     address public liquidityPoolAddress;
-    uint8 private decimals_;
+    mapping(uint256 => LpTokenMetadata) public override tokenMetadata;
 
     function initialize(
         string memory _name,
         string memory _symbol,
-        uint8 _decimals,
         address _trustedForwarder,
         address _liquidityPoolAddress
     ) public initializer {
-        __ERC20_init(_name, _symbol);
-        __ERC20Pausable_init();
-        __ERC20Burnable_init();
-        __ERC2771Context_init(_trustedForwarder);
         __Ownable_init();
-        decimals_ = _decimals;
+        __ERC721_init(_name, _symbol);
+        __ERC721Enumerable_init();
+        __ERC721Pausable_init();
+        __ERC721URIStorage_init();
+        __ERC2771Context_init(_trustedForwarder);
         liquidityPoolAddress = _liquidityPoolAddress;
     }
 
@@ -43,43 +40,79 @@ contract LPToken is
         _;
     }
 
+    function mint(address _to) external override onlyHyphenPools whenNotPaused returns (uint256) {
+        uint256 tokenId = totalSupply() + 1;
+        _safeMint(_to, tokenId);
+        return tokenId;
+    }
+
+    function updateTokenMetadata(uint256 _tokenId, LpTokenMetadata memory _lpTokenMetadata)
+        external
+        override
+        onlyHyphenPools
+        whenNotPaused
+    {
+        require(_exists(_tokenId), "ERR__TOKEN_DOES_NOT_EXIST");
+        tokenMetadata[_tokenId] = _lpTokenMetadata;
+    }
+
+    function exists(uint256 _tokenId) public view override returns (bool) {
+        return _exists(_tokenId);
+    }
+
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        virtual
+        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
+        returns (string memory)
+    {
+        return ERC721URIStorageUpgradeable.tokenURI(tokenId);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(ERC721Upgradeable, ERC721EnumerableUpgradeable, IERC165Upgradeable)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+
     function updateLiquidityPoolAddress(address _liquidityPoolAddress) external onlyOwner {
         liquidityPoolAddress = _liquidityPoolAddress;
     }
 
-    function mint(address _to, uint256 _amount) external override onlyHyphenPools {
-        _mint(_to, _amount);
-    }
-
-    function burn(uint256 _amount) public override(ERC20BurnableUpgradeable, ILPToken) onlyHyphenPools {
-        ERC20BurnableUpgradeable.burn(_amount);
-    }
-
-    function burnFrom(address _account, uint256 _amount)
-        public
-        override(ERC20BurnableUpgradeable, ILPToken)
-        onlyHyphenPools
+    function _msgSender()
+        internal
+        view
+        virtual
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
+        returns (address)
     {
-        ERC20BurnableUpgradeable.burnFrom(_account, _amount);
-    }
-
-    function decimals() public view override returns (uint8) {
-        return decimals_;
-    }
-
-    function _msgSender() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (address) {
         return ERC2771ContextUpgradeable._msgSender();
     }
 
-    function _msgData() internal view override(ContextUpgradeable, ERC2771ContextUpgradeable) returns (bytes calldata) {
+    function _msgData()
+        internal
+        view
+        virtual
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
+        returns (bytes calldata)
+    {
         return ERC2771ContextUpgradeable._msgData();
     }
 
     function _beforeTokenTransfer(
         address from,
         address to,
-        uint256 amount
-    ) internal override(ERC20Upgradeable, ERC20PausableUpgradeable) {
-        ERC20PausableUpgradeable._beforeTokenTransfer(from, to, amount);
+        uint256 tokenId
+    ) internal virtual override(ERC721EnumerableUpgradeable, ERC721PausableUpgradeable, ERC721Upgradeable) {
+        super._beforeTokenTransfer(from, to, tokenId);
+    }
+
+    function _burn(uint256 tokenId) internal virtual override(ERC721URIStorageUpgradeable, ERC721Upgradeable) {
+        ERC721URIStorageUpgradeable._burn(tokenId);
     }
 }

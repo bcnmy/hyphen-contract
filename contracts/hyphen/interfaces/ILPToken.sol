@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/IERC721Upgradeable.sol";
+import "../structures/LpTokenMetadata.sol";
+import "hardhat/console.sol";
 
-interface ILPToken is IERC20Upgradeable {
-    function mint(address _account, uint256 _amount) external;
+interface ILPToken is IERC721Upgradeable {
+    function mint(address _to) external returns (uint256);
 
-    function burn(uint256 _amount) external;
+    function updateTokenMetadata(uint256 _tokenId, LpTokenMetadata memory _lpTokenMetadata) external;
 
-    function burnFrom(address _account, uint256 _amount) external;
+    function exists(uint256 _tokenId) external returns (bool);
+
+    function tokenMetadata(uint256 _tokenId) external returns (address ,uint256,uint256);
 }
