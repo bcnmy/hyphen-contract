@@ -18,6 +18,8 @@ interface ILPToken is IERC721Upgradeable {
         returns (
             address,
             uint256,
+            uint256,
+            uint256,
             uint256
         );
 

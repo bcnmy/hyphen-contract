@@ -395,28 +395,16 @@ describe("LiquidityProviderTests", function () {
       await liquidityProviders.increaseTokenLiquidity(1, 100);
       await liquidityProviders.addLPFee(token.address, 10);
 
-      let { totalShares, totalSuppliedLiquidity } = await lpToken.tokenMetadata(1);
-      const expectedRewards = totalShares
-        .mul(await liquidityProviders.getLpSharePriceInTermsOfBaseToken(token.address))
-        .sub(totalSuppliedLiquidity.mul(BASE))
-        .div(BASE);
+      const price = await liquidityProviders.getLpSharePriceInTermsOfBaseToken(token.address);
+      const expectedRewards = await liquidityProviders.getFeeAccumulatedOnNft(1);
       // Error of 1 here
       expect(expectedRewards).to.equal(20 - 1);
       // Error of 1 here
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(20 - 1);
 
-      await expect(() => liquidityProviders.extractFee(1)).to.changeTokenBalances(
-        token,
-        [liquidityProviders, owner],
-        [-20, 20]
-      );
-
-      ({ totalShares, totalSuppliedLiquidity } = await lpToken.tokenMetadata(1));
-      expect(
-        totalShares
-          .mul(await liquidityProviders.getLpSharePriceInTermsOfBaseToken(token.address))
-          .sub(totalSuppliedLiquidity)
-      ).equals(0);
+      await expect(() =>
+        liquidityProviders.extractFee(1, expectedRewards.mul(BASE).div(price).add(1))
+      ).to.changeTokenBalances(token, [liquidityProviders, owner], [-19, 19]);
     });
 
     it("Should allow extraction of fee in NATIVE", async function () {
@@ -424,25 +412,15 @@ describe("LiquidityProviderTests", function () {
       await liquidityProviders.increaseNativeLiquidity(2, { value: 100 });
       await liquidityProviders.addLPFee(NATIVE, 10, { value: 10 });
 
-      let { totalShares, totalSuppliedLiquidity } = await lpToken.tokenMetadata(2);
-      const expectedRewards = totalShares
-        .mul(await liquidityProviders.getLpSharePriceInTermsOfBaseToken(NATIVE))
-        .sub(totalSuppliedLiquidity.mul(BASE))
-        .div(BASE);
-      // Error of 1 here
+      const expectedRewards = await liquidityProviders.getFeeAccumulatedOnNft(2); // Error of 1 here ;
+      const price = await liquidityProviders.getLpSharePriceInTermsOfBaseToken(NATIVE);
       expect(expectedRewards).to.equal(20 - 1);
       // Error of 1 here
       expect(await liquidityProviders.getFeeAccumulatedOnNft(2)).to.equal(20 - 1);
 
-      await expect(() => liquidityProviders.extractFee(2)).to.changeEtherBalances(
-        [liquidityProviders, owner],
-        [-20, 20]
-      );
-
-      ({ totalShares, totalSuppliedLiquidity } = await lpToken.tokenMetadata(2));
-      expect(
-        totalShares.mul(await liquidityProviders.getLpSharePriceInTermsOfBaseToken(NATIVE)).sub(totalSuppliedLiquidity)
-      ).equals(0);
+      await expect(() =>
+        liquidityProviders.extractFee(2, expectedRewards.mul(BASE).div(price).add(1))
+      ).to.changeEtherBalances([liquidityProviders, owner], [-19, 19]);
     });
   });
 });

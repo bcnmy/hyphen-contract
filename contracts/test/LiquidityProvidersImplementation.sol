@@ -41,8 +41,8 @@ contract LiquidityProvidersImplementation is LiquidityProviders {
         _decreaseLiquidity(_nftId, _amount);
     }
 
-    function extractFee(uint256 _nftId) external {
-        _extractFee(_nftId);
+    function extractFee(uint256 _nftId, uint256 _shares) external {
+        _extractFee(_nftId, _shares);
     }
 
     function isTokenSupported(address) public pure override returns (bool) {
