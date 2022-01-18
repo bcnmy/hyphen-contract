@@ -79,15 +79,10 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
      */
     function getFeeAccumulatedOnNft(uint256 _nftId) public view returns (uint256) {
         require(lpToken.exists(_nftId), "ERR__INVALID_NFT");
-        (
-            address token,
-            uint256 totalSuppliedLiquidity,
-            uint256 totalShares,
-            uint256 savedRewards,
-            uint256 priceWhenSavedRewards
-        ) = lpToken.tokenMetadata(_nftId);
+        (address token, , uint256 totalShares, uint256 savedRewards, uint256 priceWhenSavedRewards) = lpToken
+            .tokenMetadata(_nftId);
         uint256 price = getLpSharePriceInTermsOfBaseToken(token) - priceWhenSavedRewards;
-        return savedRewards + (totalShares * price - totalSuppliedLiquidity * BASE_DIVISOR) / BASE_DIVISOR;
+        return savedRewards + (totalShares * price) / BASE_DIVISOR;
     }
 
     /**
@@ -106,7 +101,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
      */
     function _addNativeLiquidity() internal {
         uint256 nftId = lpToken.mint(_msgSender());
-        LpTokenMetadata memory data = LpTokenMetadata(NATIVE, 0, 0, 0, 0);
+        LpTokenMetadata memory data = LpTokenMetadata(NATIVE, 0, 0, 0, getLpSharePriceInTermsOfBaseToken(NATIVE));
         lpToken.updateTokenMetadata(nftId, data);
         _increaseNativeLiquidity(nftId);
         emit LPTokenMinted(_msgSender(), nftId);
@@ -121,7 +116,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
     function _addTokenLiquidity(address _token, uint256 _amount) internal {
         require(_token != NATIVE, "ERR__WRONG_FUNCTION");
         uint256 nftId = lpToken.mint(_msgSender());
-        LpTokenMetadata memory data = LpTokenMetadata(_token, 0, 0, 0, 0);
+        LpTokenMetadata memory data = LpTokenMetadata(_token, 0, 0, 0, getLpSharePriceInTermsOfBaseToken(_token));
         lpToken.updateTokenMetadata(nftId, data);
         _increaseTokenLiquidity(nftId, _amount);
         emit LPTokenMinted(_msgSender(), nftId);
@@ -147,6 +142,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
         );
         require(token != NATIVE, "ERR__WRONG_FUNCTION");
         require(_amount > 0, "ERR_AMOUNT_IS_0");
+        (savedRewards, priceWhenSavedRewards) = _getUpdatedSavedRewardsAndPrice(_nftId);
 
         SafeERC20Upgradeable.safeTransferFrom(IERC20Upgradeable(token), _msgSender(), address(this), _amount);
         uint256 lpSharePrice = getLpSharePriceInTermsOfBaseToken(token);
@@ -178,6 +174,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
             uint256 priceWhenSavedRewards
         ) = lpToken.tokenMetadata(_nftId);
         require(token == NATIVE, "ERR__WRONG_FUNCTION");
+        (savedRewards, priceWhenSavedRewards) = _getUpdatedSavedRewardsAndPrice(_nftId);
 
         uint256 amount = msg.value;
         require(amount > 0, "ERR__AMOUNT_IS_0");
