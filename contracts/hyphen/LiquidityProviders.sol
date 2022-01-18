@@ -86,12 +86,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
             uint256 savedRewards,
             uint256 priceWhenSavedRewards
         ) = lpToken.tokenMetadata(_nftId);
-        uint256 price;
-        if (priceWhenSavedRewards != 0) {
-            price = getLpSharePriceInTermsOfBaseToken(token) - priceWhenSavedRewards;
-        } else {
-            price = getLpSharePriceInTermsOfBaseToken(token);
-        }
+        uint256 price = getLpSharePriceInTermsOfBaseToken(token) - priceWhenSavedRewards;
         return savedRewards + (totalShares * price - totalSuppliedLiquidity * BASE_DIVISOR) / BASE_DIVISOR;
     }
 
