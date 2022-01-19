@@ -88,7 +88,6 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
         string tag
     );
     event LiquidityAdded(address indexed from, address indexed tokenAddress, address indexed receiver, uint256 amount);
-    event LiquidityRemoved(address indexed tokenAddress, uint256 indexed amount, address indexed sender);
     event FundsWithdrawn(address indexed tokenAddress, address indexed owner, uint256 indexed amount);
     event AdminFeeWithdraw(address indexed tokenAddress, address indexed owner, uint256 indexed amount);
     event GasFeeWithdraw(address indexed tokenAddress, address indexed owner, uint256 indexed amount);

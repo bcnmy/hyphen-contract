@@ -15,14 +15,9 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     uint256 private constant BASE_DIVISOR = 10**27;
 
-    event LiquidityAdded(address lp, address token, uint256 amount);
-    event LiquidityRemoved(address lp, address token, uint256 amount);
-    event LPTokenMinted(address lp, uint256 tokenId);
-    event LPFeeAdded(address token, uint256 amount);
-    event LPSharesBurnt(address claimer, address token, uint256 sharesAmount, uint256 baseAmount);
-    event LpTokenUpdated(address lpToken);
-
     ILPToken public lpToken;
+
+    event LiquidityRemoved(address indexed tokenAddress, uint256 indexed amount, address indexed sender);
 
     // LP Fee Distribution
     mapping(address => uint256) public tokenToTotalReserve;
@@ -55,7 +50,6 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
      */
     function setLpToken(address _lpToken) external onlyOwner {
         lpToken = ILPToken(_lpToken);
-        emit LpTokenUpdated(_lpToken);
     }
 
     /**
@@ -92,7 +86,6 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
      */
     function _addLPFee(address _token, uint256 _amount) internal {
         tokenToTotalReserve[_token] += _amount;
-        emit LPFeeAdded(_token, _amount);
     }
 
     /**
@@ -104,7 +97,6 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
         LpTokenMetadata memory data = LpTokenMetadata(_token, 0, 0, 0, getLpSharePriceInTermsOfBaseToken(_token));
         lpToken.updateTokenMetadata(nftId, data);
         _increaseLiquidity(nftId, _amount);
-        emit LPTokenMinted(_msgSender(), nftId);
     }
 
     /**
@@ -159,8 +151,6 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
             priceWhenSavedRewards
         );
         lpToken.updateTokenMetadata(_nftId, data);
-
-        emit LiquidityAdded(_msgSender(), token, _amount);
     }
 
     /**
@@ -240,7 +230,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
             SafeERC20Upgradeable.safeTransfer(baseToken, _msgSender(), baseTokenAmount);
         }
 
-        emit LPSharesBurnt(_msgSender(), baseTokenAddress, _shares, baseTokenAmount);
+        emit LiquidityRemoved(baseTokenAddress, baseTokenAmount, _msgSender());
     }
 
     /**
