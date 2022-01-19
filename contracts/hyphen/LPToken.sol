@@ -7,20 +7,19 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
-import "./interfaces/ILPToken.sol";
 import "./interfaces/IWhiteListPeriodManager.sol";
+import "./structures/LpTokenMetadata.sol";
 
 contract LPToken is
     OwnableUpgradeable,
     ERC721EnumerableUpgradeable,
     ERC721PausableUpgradeable,
     ERC721URIStorageUpgradeable,
-    ERC2771ContextUpgradeable,
-    ILPToken
+    ERC2771ContextUpgradeable
 {
     address public liquidityPoolAddress;
     IWhiteListPeriodManager public whiteListPeriodManager;
-    mapping(uint256 => LpTokenMetadata) public override tokenMetadata;
+    mapping(uint256 => LpTokenMetadata) public tokenMetadata;
 
     event LiquidityPoolUpdated(address indexed lpm);
     event WhiteListPeriodManagerUpdated(address indexed manager);
@@ -53,7 +52,7 @@ contract LPToken is
         emit WhiteListPeriodManagerUpdated(_whiteListPeriodManager);
     }
 
-    function getAllNftIdsByUser(address _owner) public view override returns (uint256[] memory) {
+    function getAllNftIdsByUser(address _owner) public view returns (uint256[] memory) {
         uint256[] memory nftIds = new uint256[](balanceOf(_owner));
         for (uint256 i = 0; i < nftIds.length; ++i) {
             nftIds[i] = tokenOfOwnerByIndex(_owner, i);
@@ -61,7 +60,7 @@ contract LPToken is
         return nftIds;
     }
 
-    function mint(address _to) external override onlyHyphenPools whenNotPaused returns (uint256) {
+    function mint(address _to) external onlyHyphenPools whenNotPaused returns (uint256) {
         uint256 tokenId = totalSupply() + 1;
         _safeMint(_to, tokenId);
         return tokenId;
@@ -69,7 +68,6 @@ contract LPToken is
 
     function updateTokenMetadata(uint256 _tokenId, LpTokenMetadata memory _lpTokenMetadata)
         external
-        override
         onlyHyphenPools
         whenNotPaused
     {
@@ -77,7 +75,7 @@ contract LPToken is
         tokenMetadata[_tokenId] = _lpTokenMetadata;
     }
 
-    function exists(uint256 _tokenId) public view override returns (bool) {
+    function exists(uint256 _tokenId) public view returns (bool) {
         return _exists(_tokenId);
     }
 
@@ -95,7 +93,7 @@ contract LPToken is
         public
         view
         virtual
-        override(ERC721Upgradeable, ERC721EnumerableUpgradeable, IERC165Upgradeable)
+        override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
@@ -131,7 +129,7 @@ contract LPToken is
         uint256 tokenId
     ) internal virtual override(ERC721EnumerableUpgradeable, ERC721PausableUpgradeable, ERC721Upgradeable) {
         super._beforeTokenTransfer(from, to, tokenId);
-        
+
         // Only call whitelist period manager for NFT Transfers, not mint and burns
         if (from != address(0) && to != address(0)) {
             whiteListPeriodManager.beforeLiquidityTransfer(

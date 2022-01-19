@@ -2,6 +2,8 @@
 pragma solidity ^0.8.0;
 
 interface IWhiteListPeriodManager {
+    function areWhiteListRestrictionsEnabled() external view returns (bool);
+
     function beforeLiquidityAddition(
         address _lp,
         address _token,
@@ -21,9 +23,11 @@ interface IWhiteListPeriodManager {
         uint256 _amount
     ) external;
 
-    function areWhiteListRestrictionsEnabled() external view returns (bool);
+    function getMaxCommunityLpPositon(address _token) external view returns (uint256);
 
     function initialize(address _trustedForwarder, address _liquidityPool) external;
+
+    function isExcludedAddress(address) external view returns (bool);
 
     function isInstitutionalLp(address) external view returns (bool);
 
@@ -41,7 +45,7 @@ interface IWhiteListPeriodManager {
 
     function perTokenTotalCap(address) external view returns (uint256);
 
-    function perWalletTotalCapForCommunityLp(address) external view returns (uint256);
+    function perWalletCapForCommunityLp(address) external view returns (uint256);
 
     function renounceOwnership() external;
 
@@ -51,14 +55,14 @@ interface IWhiteListPeriodManager {
         address _token,
         uint256 _totalCap,
         uint256 _communityCap,
-        uint256 _perCommunityWalletCap
+        uint256 _perWalletCap
     ) external;
 
     function setCaps(
         address[] memory _tokens,
         uint256[] memory _totalCaps,
         uint256[] memory _communityCaps,
-        uint256[] memory _perCommunityWalletCaps
+        uint256[] memory _perWalletCaps
     ) external;
 
     function setCommunityCap(address _token, uint256 _communityCap) external;
@@ -67,9 +71,11 @@ interface IWhiteListPeriodManager {
 
     function setLiquidityPool(address _liquidityPool) external;
 
-    function setPerCommunityWalletCap(address _token, uint256 _perCommunityWalletCap) external;
+    function setPerWalletCapForCommunityLp(address _token, uint256 _perWalletCap) external;
 
     function setTotalCap(address _token, uint256 _totalCap) external;
+
+    function setisExcludedAddressStatus(address[] memory _addresses, bool[] memory _status) external;
 
     function totalLiquidityAddedByCommunityLps(address) external view returns (uint256);
 

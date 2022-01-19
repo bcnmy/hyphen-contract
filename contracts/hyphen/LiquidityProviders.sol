@@ -9,6 +9,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "./interfaces/ILPToken.sol";
 import "./interfaces/IWhiteListPeriodManager.sol";
 import "./metatx/ERC2771ContextUpgradeable.sol";
+import "hardhat/console.sol";
 
 abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, OwnableUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -103,7 +104,6 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
      */
     function _addLiquidity(address _token, uint256 _amount) private {
         require(_amount > 0, "ERR__AMOUNT_IS_0");
-        whiteListPeriodManager.beforeLiquidityAddition(_msgSender(), _token, _amount);
         uint256 nftId = lpToken.mint(_msgSender());
         LpTokenMetadata memory data = LpTokenMetadata(_token, 0, 0, 0, getLpSharePriceInTermsOfBaseToken(_token));
         lpToken.updateTokenMetadata(nftId, data);
