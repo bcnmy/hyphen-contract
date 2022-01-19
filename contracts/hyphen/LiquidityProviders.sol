@@ -282,6 +282,11 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
         emit LPSharesBurnt(_msgSender(), baseTokenAddress, _shares, baseTokenAmount);
     }
 
+    function _getSuppliedLiquidity(uint256 _nftId) internal view returns(uint256) {
+        (, uint256 totalSuppliedLiquidity, , ,) = lpToken.tokenMetadata(_nftId);
+        return totalSuppliedLiquidity;
+    }
+    
     function _getUpdatedSavedRewardsAndPrice(uint256 _nftId) internal view returns (uint256, uint256) {
         (address token, , , uint256 savedRewards, uint256 priceWhenSavedRewards) = lpToken.tokenMetadata(_nftId);
         priceWhenSavedRewards = getLpSharePriceInTermsOfBaseToken(token);
