@@ -138,7 +138,11 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
         return tokensInfo[tokenAddress].maxFee;
     }
 
-    function changeFee(address tokenAddress, uint256 _equilibriumFee, uint256 _maxFee) external onlyOwner whenNotPaused {
+    function changeFee(
+        address tokenAddress,
+        uint256 _equilibriumFee,
+        uint256 _maxFee
+    ) external onlyOwner whenNotPaused {
         require(_equilibriumFee != 0, "Equilibrium Fee cannot be 0");
         require(_maxFee != 0, "Max Fee cannot be 0");
         tokensInfo[tokenAddress].equilibriumFee = _equilibriumFee;
@@ -205,10 +209,7 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
             liquidityPoolBalance = IERC20Upgradeable(tokenAddress).balanceOf(address(this));
         }
 
-        currentLiquidity =
-            liquidityPoolBalance -
-            gasFeeAccumulatedByToken[tokenAddress] -
-            incentivePool[tokenAddress];
+        currentLiquidity = liquidityPoolBalance - gasFeeAccumulatedByToken[tokenAddress] - incentivePool[tokenAddress];
     }
 
     function addNativeLiquidity() external payable tokenChecks(NATIVE) nonReentrant whenNotPaused {
@@ -234,7 +235,7 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
         emit LiquidityAdded(_msgSender(), tokenAddress, address(this), amount);
     }
 
-    function calimFee(uint256 _nftId, uint256 _shares) external {
+    function claimFee(uint256 _nftId, uint256 _shares) external {
         _extractFee(_nftId, _shares);
     }
 
@@ -341,7 +342,11 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
      * @param receiver Address on toChainId where tokens needs to be transfered
      * @param toChainId Chain id where funds needs to be transfered
      */
-    function depositNative(address receiver, uint256 toChainId, string memory tag) external payable whenNotPaused {
+    function depositNative(
+        address receiver,
+        uint256 toChainId,
+        string memory tag
+    ) external payable whenNotPaused {
         require(
             tokensInfo[NATIVE].minCap <= msg.value && tokensInfo[NATIVE].maxCap >= msg.value,
             "Deposit amount not in Cap limit"
