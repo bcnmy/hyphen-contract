@@ -1,6 +1,7 @@
 import * as dotenv from "dotenv";
 
 import { HardhatUserConfig, task } from "hardhat/config";
+import "hardhat-contract-sizer";
 import "@nomiclabs/hardhat-etherscan";
 import "@nomiclabs/hardhat-waffle";
 import "@typechain/hardhat";
@@ -31,19 +32,19 @@ const config: HardhatUserConfig = {
     compilers: [
       {
         version: "0.8.0",
-        settings:{
+        settings: {
           evmVersion: "istanbul",
-          optimizer: { enabled: true, runs: 200 }
-        }
+          optimizer: { enabled: true, runs: 200 },
+        },
       },
       {
         version: "0.8.2",
-        settings:{
+        settings: {
           evmVersion: "istanbul",
-          optimizer: { enabled: true, runs: 200 }
-        }
-      }
-    ]
+          optimizer: { enabled: true, runs: 200 },
+        },
+      },
+    ],
   },
   networks: {
     hardhat: {
@@ -55,8 +56,7 @@ const config: HardhatUserConfig = {
     },
     ropsten: {
       url: process.env.ROPSTEN_URL || "",
-      accounts:
-        process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
   },
   gasReporter: {
@@ -65,6 +65,11 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
+  },
+  contractSizer: {
+    alphaSort: true,
+    disambiguatePaths: false,
+    runOnCompile: true,
   },
 };
 

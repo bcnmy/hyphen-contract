@@ -13,7 +13,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    uint256 private constant BASE_DIVISOR = 10000000000;
+    uint256 private constant BASE_DIVISOR = 10**27;
 
     event LiquidityAdded(address lp, address token, uint256 amount);
     event LiquidityRemoved(address lp, address token, uint256 amount);
@@ -141,7 +141,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
             "ERR__INSUFFICIENT_ALLOWANCE"
         );
         require(token != NATIVE, "ERR__WRONG_FUNCTION");
-        require(_amount > 0, "ERR_AMOUNT_IS_0");
+        require(_amount > 0, "ERR__AMOUNT_IS_0");
         (savedRewards, priceWhenSavedRewards) = _getUpdatedSavedRewardsAndPrice(_nftId);
 
         SafeERC20Upgradeable.safeTransferFrom(IERC20Upgradeable(token), _msgSender(), address(this), _amount);
@@ -209,7 +209,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
             uint256 savedRewards,
             uint256 priceWhenSavedRewards
         ) = lpToken.tokenMetadata(_nftId);
-        require(totalShares >= _shares, "ERR__INSUFFICIENT_SHARES");
+        require(totalShares >= _shares && _shares > 0, "ERR__INVALID_SHARES_AMOUNT");
         (savedRewards, priceWhenSavedRewards) = _getUpdatedSavedRewardsAndPrice(_nftId);
 
         uint256 baseTokenAmount = (_shares * priceWhenSavedRewards) / BASE_DIVISOR;
@@ -253,7 +253,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
             uint256 savedRewards,
             uint256 priceWhenSavedRewards
         ) = lpToken.tokenMetadata(_nftId);
-        require(totalShares >= _shares, "ERR__INSUFFICIENT_SHARES");
+        require(totalShares >= _shares && _shares > 0, "ERR__INVALID_SHARES_AMOUNT");
         (savedRewards, priceWhenSavedRewards) = _getUpdatedSavedRewardsAndPrice(_nftId);
 
         uint256 baseTokenAmount = (_shares * priceWhenSavedRewards) / BASE_DIVISOR;
@@ -282,11 +282,11 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
         emit LPSharesBurnt(_msgSender(), baseTokenAddress, _shares, baseTokenAmount);
     }
 
-    function _getSuppliedLiquidity(uint256 _nftId) internal view returns(uint256) {
-        (, uint256 totalSuppliedLiquidity, , ,) = lpToken.tokenMetadata(_nftId);
+    function _getSuppliedLiquidity(uint256 _nftId) internal view returns (uint256) {
+        (, uint256 totalSuppliedLiquidity, , , ) = lpToken.tokenMetadata(_nftId);
         return totalSuppliedLiquidity;
     }
-    
+
     function _getUpdatedSavedRewardsAndPrice(uint256 _nftId) internal view returns (uint256, uint256) {
         (address token, , , uint256 savedRewards, uint256 priceWhenSavedRewards) = lpToken.tokenMetadata(_nftId);
         priceWhenSavedRewards = getLpSharePriceInTermsOfBaseToken(token);
