@@ -213,11 +213,15 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
     }
 
     function addNativeLiquidity() external payable tokenChecks(NATIVE) nonReentrant whenNotPaused {
-        require(msg.value != 0, "Amount cannot be 0");
         address sender = _msgSender();
         tokensInfo[NATIVE].liquidity = tokensInfo[NATIVE].liquidity + msg.value;
         _addNativeLiquidity();
         emit LiquidityAdded(sender, NATIVE, address(this), msg.value);
+    }
+
+    function increaseNativeLiquidity(uint256 _nftId) external payable tokenChecks(NATIVE) nonReentrant whenNotPaused {
+        _increaseNativeLiquidity(_nftId);
+        emit LiquidityAdded(_msgSender(), NATIVE, address(this), msg.value);
     }
 
     function removePoolShare(uint256 _nftId, uint256 _shares) external tokenChecks(NATIVE) nonReentrant {
@@ -230,9 +234,15 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
         nonReentrant
         whenNotPaused
     {
-        require(amount != 0, "Amount cannot be 0");
         _addTokenLiquidity(tokenAddress, amount);
         emit LiquidityAdded(_msgSender(), tokenAddress, address(this), amount);
+    }
+
+    function increaseTokenLiquidity(uint256 _nftId, uint256 _amount) external nonReentrant whenNotPaused {
+        (address tokenAddress, , , , ) = lpToken.tokenMetadata(_nftId);
+        require(tokensInfo[tokenAddress].supportedToken, "Token not supported");
+        _increaseTokenLiquidity(_nftId, _amount);
+        emit LiquidityAdded(_msgSender(), tokenAddress, address(this), _amount);
     }
 
     function claimFee(uint256 _nftId, uint256 _shares) external {

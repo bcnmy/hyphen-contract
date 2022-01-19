@@ -188,13 +188,13 @@ describe("LiquidityProviderTests", function () {
         "ERR__TRANSACTOR_DOES_NOT_OWN_NFT"
       );
       await liquidityProviders.addNativeLiquidity({ value: 1000 });
-      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(2, 1000)).to.be.revertedWith(
+      await expect(liquidityProviders.connect(bob).increaseNativeLiquidity(2, { value: 1000 })).to.be.revertedWith(
         "ERR__TRANSACTOR_DOES_NOT_OWN_NFT"
       );
     });
   });
 
-  describe("Transfer Fee Addition and LP Token Price Increase", async function () {
+  describe("Transfer Fee Addition and LP Share Price Increase", async function () {
     this.beforeEach(async () => {
       await token.connect(owner).approve(liquidityProviders.address, await token.balanceOf(owner.address));
       await token.connect(bob).approve(liquidityProviders.address, await token.balanceOf(bob.address));
@@ -347,7 +347,7 @@ describe("LiquidityProviderTests", function () {
     });
   });
 
-  describe("LP Token Burning for Native base", async function () {
+  describe("LP Share Burning for Native base", async function () {
     let totalNativeSuppliedLiquidity: Record<string, BigNumber>;
     let nftId: Record<string, number>;
     let totalNativeFee = ethers.BigNumber.from(0);
