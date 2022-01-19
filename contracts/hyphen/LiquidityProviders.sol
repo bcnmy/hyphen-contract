@@ -7,6 +7,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 import "./interfaces/ILPToken.sol";
+import "./interfaces/IWhiteListPeriodManager.sol";
 import "./metatx/ERC2771ContextUpgradeable.sol";
 
 abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, OwnableUpgradeable {
@@ -16,6 +17,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
     uint256 private constant BASE_DIVISOR = 10**27;
 
     ILPToken public lpToken;
+    IWhiteListPeriodManager public whiteListPeriodManager;
 
     event LiquidityRemoved(address indexed tokenAddress, uint256 indexed amount, address indexed sender);
 
@@ -50,6 +52,14 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
      */
     function setLpToken(address _lpToken) external onlyOwner {
         lpToken = ILPToken(_lpToken);
+    }
+
+    /**
+     * @dev To be called post initialization, used to set address of WhiteListPeriodManager Contract
+     * @param _whiteListPeriodManager address of WhiteListPeriodManager
+     */
+    function setWhiteListPeriodManager(address _whiteListPeriodManager) external onlyOwner {
+        whiteListPeriodManager = IWhiteListPeriodManager(_whiteListPeriodManager);
     }
 
     /**
@@ -93,6 +103,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
      */
     function _addLiquidity(address _token, uint256 _amount) private {
         require(_amount > 0, "ERR__AMOUNT_IS_0");
+        whiteListPeriodManager.beforeLiquidityAddition(_msgSender(), _token, _amount);
         uint256 nftId = lpToken.mint(_msgSender());
         LpTokenMetadata memory data = LpTokenMetadata(_token, 0, 0, 0, getLpSharePriceInTermsOfBaseToken(_token));
         lpToken.updateTokenMetadata(nftId, data);
@@ -136,6 +147,8 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
         ) = lpToken.tokenMetadata(_nftId);
 
         require(_amount > 0, "ERR__AMOUNT_IS_0");
+        whiteListPeriodManager.beforeLiquidityAddition(_msgSender(), token, _amount);
+
         (savedRewards, priceWhenSavedRewards) = _getUpdatedSavedRewardsAndPrice(_nftId);
 
         uint256 lpSharePrice = getLpSharePriceInTermsOfBaseToken(token);
@@ -208,9 +221,11 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
         } else {
             // First burn SL, then burn from accumulated fee if required
             if (baseTokenAmount > totalSuppliedLiquidity) {
+                whiteListPeriodManager.beforeLiquidityRemoval(_msgSender(), baseTokenAddress, totalSuppliedLiquidity);
                 savedRewards -= (baseTokenAmount - totalSuppliedLiquidity);
                 totalSuppliedLiquidity = 0;
             } else {
+                whiteListPeriodManager.beforeLiquidityRemoval(_msgSender(), baseTokenAddress, baseTokenAmount);
                 totalSuppliedLiquidity -= baseTokenAmount;
             }
         }

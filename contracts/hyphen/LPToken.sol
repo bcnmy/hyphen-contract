@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Enumer
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import "./interfaces/ILPToken.sol";
+import "./interfaces/IWhiteListPeriodManager.sol";
 
 contract LPToken is
     OwnableUpgradeable,
@@ -18,13 +19,16 @@ contract LPToken is
     ILPToken
 {
     address public liquidityPoolAddress;
+    IWhiteListPeriodManager public whiteListPeriodManager;
     mapping(uint256 => LpTokenMetadata) public override tokenMetadata;
+
+    event LiquidityPoolUpdated(address indexed lpm);
+    event WhiteListPeriodManagerUpdated(address indexed manager);
 
     function initialize(
         string memory _name,
         string memory _symbol,
-        address _trustedForwarder,
-        address _liquidityPoolAddress
+        address _trustedForwarder
     ) public initializer {
         __Ownable_init();
         __ERC721_init(_name, _symbol);
@@ -32,12 +36,21 @@ contract LPToken is
         __ERC721Pausable_init();
         __ERC721URIStorage_init();
         __ERC2771Context_init(_trustedForwarder);
-        liquidityPoolAddress = _liquidityPoolAddress;
     }
 
     modifier onlyHyphenPools() {
         require(_msgSender() == liquidityPoolAddress, "ERR_UNAUTHORIZED");
         _;
+    }
+
+    function setLiquidtyPool(address _lpm) external onlyOwner {
+        liquidityPoolAddress = _lpm;
+        emit LiquidityPoolUpdated(_lpm);
+    }
+
+    function setWhiteListPeriodManager(address _whiteListPeriodManager) external onlyOwner {
+        whiteListPeriodManager = IWhiteListPeriodManager(_whiteListPeriodManager);
+        emit WhiteListPeriodManagerUpdated(_whiteListPeriodManager);
     }
 
     function getAllNftIdsByUser(address _owner) public view override returns (uint256[] memory) {
@@ -118,6 +131,16 @@ contract LPToken is
         uint256 tokenId
     ) internal virtual override(ERC721EnumerableUpgradeable, ERC721PausableUpgradeable, ERC721Upgradeable) {
         super._beforeTokenTransfer(from, to, tokenId);
+        
+        // Only call whitelist period manager for NFT Transfers, not mint and burns
+        if (from != address(0) && to != address(0)) {
+            whiteListPeriodManager.beforeLiquidityTransfer(
+                from,
+                to,
+                tokenMetadata[tokenId].token,
+                tokenMetadata[tokenId].totalSuppliedLiquidity
+            );
+        }
     }
 
     function _burn(uint256 tokenId) internal virtual override(ERC721URIStorageUpgradeable, ERC721Upgradeable) {

@@ -3,6 +3,7 @@ import { ethers, upgrades } from "hardhat";
 import {
   ERC20Token,
   LiquidityProvidersImplementation,
+  WhitelistPeriodManager,
   LPToken,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
@@ -24,6 +25,7 @@ describe("LiquidityProviderTests", function () {
   let charlie: SignerWithAddress, tf: SignerWithAddress, executor: SignerWithAddress;
   let token: ERC20Token, token2: ERC20Token;
   let lpToken: LPToken;
+  let wlpm: WhitelistPeriodManager;
   let liquidityProviders: LiquidityProvidersImplementation;
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
@@ -89,14 +91,21 @@ describe("LiquidityProviderTests", function () {
     }
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
-    lpToken = (await upgrades.deployProxy(lpTokenFactory, [
-      "LPToken",
-      "LPToken",
-      trustedForwarder,
-      liquidityProviders.address,
-    ])) as LPToken;
+    lpToken = (await upgrades.deployProxy(lpTokenFactory, ["LPToken", "LPToken", tf.address])) as LPToken;
 
     await liquidityProviders.setLpToken(lpToken.address);
+    await lpToken.setLiquidtyPool(liquidityProviders.address);
+
+    const wlpmFactory = await ethers.getContractFactory("WhitelistPeriodManager");
+    wlpm = (await upgrades.deployProxy(wlpmFactory, [
+      tf.address,
+      liquidityProviders.address,
+    ])) as WhitelistPeriodManager;
+    await wlpm.setLiquidityPool(liquidityProviders.address);
+    await liquidityProviders.setWhiteListPeriodManager(wlpm.address);
+    await lpToken.setWhiteListPeriodManager(wlpm.address);
+
+    await wlpm.setAreWhiteListRestrictionsEnabled(false);
 
     BASE = BigNumber.from(10).pow(27);
   });
