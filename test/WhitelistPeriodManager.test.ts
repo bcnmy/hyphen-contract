@@ -8,7 +8,7 @@ import {
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BigNumber, ContractTransaction } from "ethers";
+import { BigNumber } from "ethers";
 
 describe("WhiteListPeriodManager", function () {
   let owner: SignerWithAddress, pauser: SignerWithAddress, bob: SignerWithAddress;
@@ -67,6 +67,27 @@ describe("WhiteListPeriodManager", function () {
       expect(await wlpm.perWalletCapForCommunityLp(token.address)).to.equal(10);
     });
 
+    it("Should revert if invalid caps are provided", async function () {
+      await expect(wlpm.setCaps([token.address], [1000], [1001], [10])).to.be.revertedWith("ERR__COMM_CAP_GT_PTTC");
+      await expect(wlpm.setCaps([token.address], [1000], [500], [501])).to.be.revertedWith("ERR__PWC_GT_PTCC");
+    });
+
+    it("Should revert if invalid total cap is provided", async function () {
+      await wlpm.setCaps([token.address], [1000], [500], [10]);
+      await expect(wlpm.setTotalCap(token.address, 499)).to.be.revertedWith("ERR__TOTAL_CAP_LT_PTCC");
+    });
+
+    it("Should revert if invalid community total cap is provided", async function () {
+      await wlpm.setCaps([token.address], [1000], [500], [10]);
+      await expect(wlpm.setCommunityCap(token.address, 9)).to.be.revertedWith("ERR__COMM_CAP_LT_PWCFCL");
+      await expect(wlpm.setCommunityCap(token.address, 10001)).to.be.revertedWith("ERR__COMM_CAP_GT_PTTC");
+    });
+
+    it("Should revert if invalid per community wallet cap is provided", async function () {
+      await wlpm.setCaps([token.address], [1000], [500], [10]);
+      await expect(wlpm.setPerWalletCapForCommunityLp(token.address, 501)).to.be.revertedWith("ERR__PWC_GT_PTCC");
+    });
+
     it("Should set institutional addresses properly", async function () {
       await wlpm.setInstitutionalLpStatus([owner.address, bob.address], [true, false]);
       expect(await wlpm.isInstitutionalLp(owner.address)).to.be.true;
@@ -88,10 +109,20 @@ describe("WhiteListPeriodManager", function () {
       await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 5)).to.not.be.reverted;
     });
 
+    it("Should allow community LP to increase liquidity to same NFT within cap", async function () {
+      await expect(liquidityProviders.addTokenLiquidity(token.address, 5)).to.not.be.reverted;
+      await expect(liquidityProviders.increaseTokenLiquidity(1, 5)).to.not.be.reverted;
+    });
+
     it("Should prevent Community LPs from exceeding per wallet cap", async function () {
       await expect(liquidityProviders.addTokenLiquidity(token.address, 11)).to.be.revertedWith(
         "ERR__LIQUIDITY_EXCEEDS_CPWC"
       );
+    });
+
+    it("Should prevent community LP from increasing liquidity to same NFT above cap", async function () {
+      await expect(liquidityProviders.addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await expect(liquidityProviders.increaseTokenLiquidity(1, 6)).to.be.revertedWith("ERR__LIQUIDITY_EXCEEDS_CPWC");
     });
 
     it("Should prevent multiple Community LPs to exceed global community cap", async function () {
@@ -102,8 +133,22 @@ describe("WhiteListPeriodManager", function () {
       );
     });
 
+    it("Should prevent multiple Community LPs to exceed global community cap - 2", async function () {
+      await liquidityProviders.addTokenLiquidity(token.address, 9);
+      await liquidityProviders.connect(bob).addTokenLiquidity(token.address, 9);
+      await liquidityProviders.connect(charlie).addTokenLiquidity(token.address, 6);
+      await expect(liquidityProviders.connect(charlie).increaseTokenLiquidity(3, 2)).to.be.revertedWith(
+        "ERR__LIQUIDITY_EXCEEDS_CTC"
+      );
+    });
+
     it("Should allow institutional investors to add liquidity within cap", async function () {
       await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 1000 - 25)).to.not.be.reverted;
+    });
+
+    it("Should allow institutional investors to increase liquidity within cap", async function () {
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 500 - 25)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(dan).increaseTokenLiquidity(1, 500)).to.not.be.reverted;
     });
 
     it("Should allow institutional investors to add liquidity within cap - 2", async function () {
@@ -114,7 +159,14 @@ describe("WhiteListPeriodManager", function () {
     it("Should prevent institutional investors from exceeding institutional cap", async function () {
       await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 500)).to.not.be.reverted;
       await expect(liquidityProviders.connect(elon).addTokenLiquidity(token.address, 500 - 25 + 1)).to.be.revertedWith(
-        "ERR_LIQUIDITY_EXCEEDS_ITC"
+        "ERR__LIQUIDITY_EXCEEDS_ITC"
+      );
+    });
+
+    it("Should prevent institutional investors from increasing liquidity on same nft exceeding institutional cap", async function () {
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 500)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(dan).increaseTokenLiquidity(1, 500 - 25 + 1)).to.be.revertedWith(
+        "ERR__LIQUIDITY_EXCEEDS_ITC"
       );
     });
 
@@ -123,6 +175,16 @@ describe("WhiteListPeriodManager", function () {
       await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
       await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
       await expect(liquidityProviders.connect(charlie).addTokenLiquidity(token.address, 10)).to.be.revertedWith(
+        "ERR__LIQUIDITY_EXCEEDS_PTTC"
+      );
+    });
+
+    it("Should prevent Community LPs from exceeding total cap when adding liquidity to same NFT", async function () {
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 1000 - 25)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(charlie).addTokenLiquidity(token.address, 5)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(charlie).increaseTokenLiquidity(4, 1)).to.be.revertedWith(
         "ERR__LIQUIDITY_EXCEEDS_PTTC"
       );
     });
@@ -146,6 +208,16 @@ describe("WhiteListPeriodManager", function () {
       );
     });
 
+    it("Should prevent Institutional LPs from exceeding total cap via liquidity addition to same NFT", async function () {
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(charlie).addTokenLiquidity(token.address, 5)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 1000 - 25)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(dan).increaseTokenLiquidity(4, 1)).to.be.revertedWith(
+        "ERR__LIQUIDITY_EXCEEDS_PTTC"
+      );
+    });
+
     it("Should prevent Institutional LPs from exceeding total cap - 2", async function () {
       await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
       await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
@@ -154,6 +226,167 @@ describe("WhiteListPeriodManager", function () {
       await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 1)).to.be.revertedWith(
         "ERR__LIQUIDITY_EXCEEDS_PTTC"
       );
+    });
+
+    it("Should allow Community LPs to add more liquidity within cap after removing", async function () {
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await liquidityProviders.decreaseLiquidity(1, 5);
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 5)).to.not.be.reverted;
+    });
+
+    it("Should allow Institutions to add more liquidity within cap after removing", async function () {
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 1000 - 25)).to.not.be.reverted;
+      await liquidityProviders.connect(dan).decreaseLiquidity(1, 500);
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 500)).to.not.be.reverted;
+    });
+
+    it("Should allow Institutions to add more liquidity to same NFT within cap after removing", async function () {
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 1000 - 25)).to.not.be.reverted;
+      await liquidityProviders.connect(dan).decreaseLiquidity(1, 500);
+      await expect(liquidityProviders.connect(dan).increaseTokenLiquidity(1, 500)).to.not.be.reverted;
+    });
+
+    it("Should allow One Institution to take another institution's share after 1st has removed", async function () {
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 1000 - 25)).to.not.be.reverted;
+      await liquidityProviders.connect(dan).decreaseLiquidity(1, 500);
+      await expect(liquidityProviders.connect(elon).addTokenLiquidity(token.address, 500)).to.not.be.reverted;
+    });
+
+    it("Should allow community LPs to add more Liquidity after transferring their NFT", async function () {
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await lpToken.transferFrom(owner.address, bob.address, 1);
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+    });
+
+    it("Should allow Institutions to add more Liquidity after transferring their NFT", async function () {
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 500)).to.not.be.reverted;
+      await lpToken.connect(dan).transferFrom(dan.address, elon.address, 1);
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 400)).to.not.be.reverted;
+    });
+
+    it("Should block NFT receiver's limit for adding liquidity", async function () {
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await lpToken.transferFrom(owner.address, bob.address, 1);
+      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(1, 10)).to.be.revertedWith(
+        "ERR__LIQUIDITY_EXCEEDS_CPWC"
+      );
+    });
+
+    it("Should block NFT receiver's limit for adding liquidity - 2", async function () {
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 5)).to.not.be.reverted;
+      await lpToken.transferFrom(owner.address, bob.address, 1);
+      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(1, 5)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(1, 1)).to.be.revertedWith(
+        "ERR__LIQUIDITY_EXCEEDS_CPWC"
+      );
+    });
+
+    it("Should block NFT receiver's limit for adding liquidity - 3", async function () {
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 500)).to.not.be.reverted;
+      await lpToken.connect(dan).transferFrom(dan.address, elon.address, 1);
+      await expect(liquidityProviders.connect(elon).increaseTokenLiquidity(1, 500 - 25 + 1)).to.be.revertedWith(
+        "ERR__LIQUIDITY_EXCEEDS_ITC"
+      );
+    });
+
+    it("Should prevent NFT transfer if receiver's limit is exhaused", async function () {
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 5)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 6)).to.not.be.reverted;
+      await expect(lpToken.transferFrom(owner.address, bob.address, 1)).to.be.revertedWith(
+        "ERR__LIQUIDITY_EXCEEDS_CPWC"
+      );
+    });
+
+    it("Should prevent NFT transfer if receiver's limit is exhaused - 2", async function () {
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 1)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 1000 - 25)).to.not.be.reverted;
+      await expect(lpToken.transferFrom(owner.address, dan.address, 1)).to.be.revertedWith(
+        "ERR__LIQUIDITY_EXCEEDS_ITC"
+      );
+    });
+  });
+
+  describe("Cap Manipulation", async function () {
+    this.beforeEach(async function () {
+      await wlpm.setInstitutionalLpStatus([dan.address, elon.address], [true, true]);
+      await wlpm.setCaps([token.address], [1000], [25], [10]);
+    });
+
+    it("Should prevent setting community cap below current community contribution", async function () {
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 5)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 6)).to.not.be.reverted;
+      await expect(wlpm.setCommunityCap(token.address, 11)).to.not.be.reverted;
+      await expect(wlpm.setCommunityCap(token.address, 10)).to.be.revertedWith("ERR__TOTAL_CAP_LESS_THAN_CSL");
+    });
+
+    it("Should prevent setting community cap above institution contribution", async function () {
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 400)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(elon).addTokenLiquidity(token.address, 300)).to.not.be.reverted;
+      await expect(wlpm.setCommunityCap(token.address, 300)).to.not.be.reverted;
+      await expect(wlpm.setCommunityCap(token.address, 301)).to.be.revertedWith("ERR__COMM_CAP_EXCEEDS_AVAILABLE");
+    });
+
+    it("Should prevent setting total cap below total contribution", async function () {
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 400)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await expect(wlpm.setTotalCap(token.address, 410)).to.not.be.reverted;
+      await expect(wlpm.setTotalCap(token.address, 409)).to.be.revertedWith("ERR__TOTAL_CAP_LESS_THAN_SL");
+    });
+
+    it("Should allow community member to add more liquidity after increasing per wallet cap", async function () {
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(2, 5)).to.be.revertedWith(
+        "ERR__LIQUIDITY_EXCEEDS_CPWC"
+      );
+      await wlpm.setPerWalletCapForCommunityLp(token.address, 13);
+      await expect(liquidityProviders.connect(owner).increaseTokenLiquidity(1, 3)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(2, 2)).to.not.be.reverted;
+    });
+
+    it("Should allow community member to add more liquidity after increasing community cap", async function () {
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(charlie).addTokenLiquidity(token.address, 5)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(charlie).increaseTokenLiquidity(3, 5)).to.be.revertedWith(
+        "ERR__LIQUIDITY_EXCEEDS_CTC"
+      );
+      await wlpm.setCommunityCap(token.address, 30);
+      await expect(liquidityProviders.connect(charlie).increaseTokenLiquidity(3, 5)).to.not.be.reverted;
+    });
+
+    it("Should allow institutions to add more LP after decreasing community cap", async function () {
+      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, 500)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(elon).addTokenLiquidity(token.address, 500 - 25)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(dan).increaseTokenLiquidity(1, 10)).to.be.revertedWith(
+        "ERR__LIQUIDITY_EXCEEDS_ITC"
+      );
+      await wlpm.setCommunityCap(token.address, 10);
+      await expect(liquidityProviders.connect(dan).increaseTokenLiquidity(1, 10)).to.not.be.reverted;
+    });
+  });
+
+  describe("Max Community LP", async function () {
+    this.beforeEach(async function () {
+      await wlpm.setInstitutionalLpStatus([dan.address, elon.address], [true, true]);
+      await wlpm.setCaps([token.address], [1000], [300], [100]);
+    });
+
+    it("Should return correct max community lp value", async function () {
+      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
+      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(10);
+      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 30)).to.not.be.reverted;
+      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(30);
+      await expect(liquidityProviders.connect(charlie).addTokenLiquidity(token.address, 50)).to.not.be.reverted;
+      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(50);
+      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(2, 25)).to.not.be.reverted;
+      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(55);
+      await expect(liquidityProviders.connect(bob).decreaseLiquidity(2, 40)).to.not.be.reverted;
+      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(50);
+      await expect(liquidityProviders.connect(charlie).decreaseLiquidity(3, 25)).to.not.be.reverted;
+      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(25);
+      await expect(liquidityProviders.connect(charlie).decreaseLiquidity(3, 25)).to.not.be.reverted;
+      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(15);
     });
   });
 });

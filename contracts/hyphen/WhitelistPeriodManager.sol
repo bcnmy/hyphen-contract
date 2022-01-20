@@ -90,7 +90,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
                     totalLiquidityAddedByInstitutionalLps[_token] + _amount <=
                         perTokenTotalCap[_token] - perTokenCommunityCap[_token]
                 ),
-                "ERR_LIQUIDITY_EXCEEDS_ITC"
+                "ERR__LIQUIDITY_EXCEEDS_ITC"
             );
             totalLiquidityAddedByInstitutionalLps[_token] += _amount;
         } else {
@@ -203,6 +203,10 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
         require(liquidityPool.isTokenSupported(_token), "ERR__TOKEN_NOT_SUPPORTED");
         require(totalLiquidityAddedByCommunityLps[_token] <= _communityCap, "ERR__TOTAL_CAP_LESS_THAN_CSL");
         require(_communityCap <= perTokenTotalCap[_token], "ERR__COMM_CAP_GT_PTTC");
+        require(
+            totalLiquidityAddedByInstitutionalLps[_token] + _communityCap <= perTokenTotalCap[_token],
+            "ERR__COMM_CAP_EXCEEDS_AVAILABLE"
+        );
         require(_communityCap >= perWalletCapForCommunityLp[_token], "ERR__COMM_CAP_LT_PWCFCL");
         if (perTokenCommunityCap[_token] != _communityCap) {
             perTokenCommunityCap[_token] = _communityCap;
@@ -271,7 +275,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
         ILPToken lpToken = ILPToken(liquidityPool.lpToken());
         uint256 totalSupply = lpToken.totalSupply();
         uint256 maxLp = 0;
-        for (uint256 i = 0; i < totalSupply; ++i) {
+        for (uint256 i = 1; i <= totalSupply; ++i) {
             if (!isInstitutionalLp[lpToken.ownerOf(i)]) {
                 uint256 liquidity = liquidityAddedByCommunityLp[_token][lpToken.ownerOf(i)];
                 if (liquidity > maxLp) {
