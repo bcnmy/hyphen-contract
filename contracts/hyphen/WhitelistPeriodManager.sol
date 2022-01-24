@@ -9,37 +9,28 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "./metatx/ERC2771ContextUpgradeable.sol";
 import "./interfaces/ILiquidityPool.sol";
 import "./interfaces/ILPToken.sol";
-import "hardhat/console.sol";
 
 contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUpgradeable, ERC2771ContextUpgradeable {
     ILiquidityPool public liquidityPool;
     bool public areWhiteListRestrictionsEnabled;
 
     /* LP Status */
-    // EOA? -> status
-    mapping(address => bool) public isInstitutionalLp;
     // EOA? -> status, stores addresses that we want to ignore, like staking contracts.
     mapping(address => bool) public isExcludedAddress;
-    // Token -> Community EOA -> TVL
-    mapping(address => mapping(address => uint256)) public liquidityAddedByCommunityLp;
     // Token -> TVL
-    mapping(address => uint256) public totalLiquidityAddedByCommunityLps;
+    mapping(address => uint256) private totalLiquidity;
     // Token -> TVL
-    mapping(address => uint256) public totalLiquidityAddedByInstitutionalLps;
+    mapping(address => mapping(address => uint256)) private totalLiquidityByLp;
 
     /* Caps */
     // Token Address -> Limit
     mapping(address => uint256) public perTokenTotalCap;
     // Token Address -> Limit
-    mapping(address => uint256) public perTokenCommunityCap;
-    // Token Address -> Limit
-    mapping(address => uint256) public perWalletCapForCommunityLp;
+    mapping(address => uint256) public perTokenWalletCap;
 
-    event InstitutionalLpStatusUpdated(address indexed lp, bool indexed status);
     event ExcludedAddressStatusUpdated(address indexed lp, bool indexed status);
     event TotalCapUpdated(address indexed token, uint256 totalCap);
-    event TotalCommunityCapUpdated(address indexed token, uint256 communityCap);
-    event PerWalletCapForCommunityLpUpdated(address indexed token, uint256 perCommunityWalletCap);
+    event PerTokenWalletCap(address indexed token, uint256 perCommunityWalletCap);
     event WhiteListStatusUpdated(bool status);
 
     modifier onlyLiquidityPool() {
@@ -76,37 +67,13 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
             return;
         }
         // Per Token Total Cap or PTTC
+        require(ifEnabled(totalLiquidity[_token] + _amount <= perTokenTotalCap[_token]), "ERR__LIQUIDITY_EXCEEDS_PTTC");
         require(
-            ifEnabled(
-                totalLiquidityAddedByCommunityLps[_token] + totalLiquidityAddedByInstitutionalLps[_token] + _amount <=
-                    perTokenTotalCap[_token]
-            ),
-            "ERR__LIQUIDITY_EXCEEDS_PTTC"
+            ifEnabled(totalLiquidityByLp[_token][_lp] + _amount <= perTokenWalletCap[_token]),
+            "ERR__LIQUIDITY_EXCEEDS_PTWC"
         );
-        if (isInstitutionalLp[_lp]) {
-            // Institution Total Cap or ITT
-            require(
-                ifEnabled(
-                    totalLiquidityAddedByInstitutionalLps[_token] + _amount <=
-                        perTokenTotalCap[_token] - perTokenCommunityCap[_token]
-                ),
-                "ERR__LIQUIDITY_EXCEEDS_ITC"
-            );
-            totalLiquidityAddedByInstitutionalLps[_token] += _amount;
-        } else {
-            // Community Per Wallet Cap or CPWC
-            require(
-                ifEnabled(liquidityAddedByCommunityLp[_token][_lp] + _amount <= perWalletCapForCommunityLp[_token]),
-                "ERR__LIQUIDITY_EXCEEDS_CPWC"
-            );
-            // Community Total Cap or CTC
-            require(
-                ifEnabled(totalLiquidityAddedByCommunityLps[_token] + _amount <= perTokenCommunityCap[_token]),
-                "ERR__LIQUIDITY_EXCEEDS_CTC"
-            );
-            liquidityAddedByCommunityLp[_token][_lp] += _amount;
-            totalLiquidityAddedByCommunityLps[_token] += _amount;
-        }
+        totalLiquidity[_token] += _amount;
+        totalLiquidityByLp[_token][_lp] += _amount;
     }
 
     /**
@@ -130,12 +97,9 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
     ) internal {
         if (isExcludedAddress[_lp]) {
             return;
-        } else if (isInstitutionalLp[_lp]) {
-            totalLiquidityAddedByInstitutionalLps[_token] -= _amount;
-        } else {
-            liquidityAddedByCommunityLp[_token][_lp] -= _amount;
-            totalLiquidityAddedByCommunityLps[_token] -= _amount;
         }
+        totalLiquidityByLp[_token][_lp] -= _amount;
+        totalLiquidity[_token] -= _amount;
     }
 
     /**
@@ -169,15 +133,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
         liquidityPool = ILiquidityPool(_liquidityPool);
     }
 
-    function setInstitutionalLpStatus(address[] memory _addresses, bool[] memory _status) external onlyOwner {
-        require(_addresses.length == _status.length, "ERR__LENGTH_MISMATCH");
-        for (uint256 i = 0; i < _addresses.length; ++i) {
-            isInstitutionalLp[_addresses[i]] = _status[i];
-            emit InstitutionalLpStatusUpdated(_addresses[i], _status[i]);
-        }
-    }
-
-    function setisExcludedAddressStatus(address[] memory _addresses, bool[] memory _status) external onlyOwner {
+    function setIsExcludedAddressStatus(address[] memory _addresses, bool[] memory _status) external onlyOwner {
         require(_addresses.length == _status.length, "ERR__LENGTH_MISMATCH");
         for (uint256 i = 0; i < _addresses.length; ++i) {
             isExcludedAddress[_addresses[i]] = _status[i];
@@ -187,75 +143,50 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
 
     function setTotalCap(address _token, uint256 _totalCap) public onlyOwner {
         require(liquidityPool.isTokenSupported(_token), "ERR__TOKEN_NOT_SUPPORTED");
-        require(
-            totalLiquidityAddedByCommunityLps[_token] + totalLiquidityAddedByInstitutionalLps[_token] <= _totalCap,
-            "ERR__TOTAL_CAP_LESS_THAN_SL"
-        );
-        require(_totalCap >= perTokenCommunityCap[_token], "ERR__TOTAL_CAP_LT_PTCC");
-        require(_totalCap >= perWalletCapForCommunityLp[_token], "ERR__TOTAL_CAP_LT_PWCFCL");
+        require(totalLiquidity[_token] <= _totalCap, "ERR__TOTAL_CAP_LESS_THAN_SL");
+        require(_totalCap >= perTokenWalletCap[_token], "ERR__TOTAL_CAP_LT_PTWC");
         if (perTokenTotalCap[_token] != _totalCap) {
             perTokenTotalCap[_token] = _totalCap;
             emit TotalCapUpdated(_token, _totalCap);
         }
     }
 
-    function setCommunityCap(address _token, uint256 _communityCap) public onlyOwner {
-        require(liquidityPool.isTokenSupported(_token), "ERR__TOKEN_NOT_SUPPORTED");
-        require(totalLiquidityAddedByCommunityLps[_token] <= _communityCap, "ERR__TOTAL_CAP_LESS_THAN_CSL");
-        require(_communityCap <= perTokenTotalCap[_token], "ERR__COMM_CAP_GT_PTTC");
-        require(
-            totalLiquidityAddedByInstitutionalLps[_token] + _communityCap <= perTokenTotalCap[_token],
-            "ERR__COMM_CAP_EXCEEDS_AVAILABLE"
-        );
-        require(_communityCap >= perWalletCapForCommunityLp[_token], "ERR__COMM_CAP_LT_PWCFCL");
-        if (perTokenCommunityCap[_token] != _communityCap) {
-            perTokenCommunityCap[_token] = _communityCap;
-            emit TotalCommunityCapUpdated(_token, _communityCap);
-        }
-    }
-
     /**
      * @dev Special care must be taken when calling this function
-     *      There are no checks for _perWalletCap (since it's onlyOwner), but it's essential that it
-     *      should be >= max lp provided by a community lp
+     *      There are no checks for _perTokenWalletCap (since it's onlyOwner), but it's essential that it
+     *      should be >= max lp provided by an lp.
      *      Checking this on chain will probably require implementing a bbst, which needs more bandwidth
      *      Call the view function getMaxCommunityLpPositon() separately before changing this value
      */
-    function setPerWalletCapForCommunityLp(address _token, uint256 _perWalletCap) public onlyOwner {
+    function setPerTokenWalletCap(address _token, uint256 _perTokenWalletCap) public onlyOwner {
         require(liquidityPool.isTokenSupported(_token), "ERR__TOKEN_NOT_SUPPORTED");
-        require(_perWalletCap <= perTokenTotalCap[_token], "ERR__PWC_GT_PTTC");
-        require(_perWalletCap <= perTokenCommunityCap[_token], "ERR__PWC_GT_PTCC");
-        if (perWalletCapForCommunityLp[_token] != _perWalletCap) {
-            perWalletCapForCommunityLp[_token] = _perWalletCap;
-            emit PerWalletCapForCommunityLpUpdated(_token, _perWalletCap);
+        require(_perTokenWalletCap <= perTokenTotalCap[_token], "ERR__PWC_GT_PTTC");
+        if (perTokenWalletCap[_token] != _perTokenWalletCap) {
+            perTokenWalletCap[_token] = _perTokenWalletCap;
+            emit PerTokenWalletCap(_token, _perTokenWalletCap);
         }
     }
 
     function setCap(
         address _token,
         uint256 _totalCap,
-        uint256 _communityCap,
-        uint256 _perWalletCap
+        uint256 _perTokenWalletCap
     ) public onlyOwner {
         setTotalCap(_token, _totalCap);
-        setCommunityCap(_token, _communityCap);
-        setPerWalletCapForCommunityLp(_token, _perWalletCap);
+        setPerTokenWalletCap(_token, _perTokenWalletCap);
     }
 
     function setCaps(
         address[] memory _tokens,
         uint256[] memory _totalCaps,
-        uint256[] memory _communityCaps,
-        uint256[] memory _perWalletCaps
+        uint256[] memory _perTokenWalletCaps
     ) external onlyOwner {
         require(
-            _tokens.length == _totalCaps.length &&
-                _totalCaps.length == _communityCaps.length &&
-                _communityCaps.length == _perWalletCaps.length,
+            _tokens.length == _totalCaps.length && _totalCaps.length == _perTokenWalletCaps.length,
             "ERR__LENGTH_MISMACH"
         );
         for (uint256 i = 0; i < _tokens.length; ++i) {
-            setCap(_tokens[i], _totalCaps[i], _communityCaps[i], _perWalletCaps[i]);
+            setCap(_tokens[i], _totalCaps[i], _perTokenWalletCaps[i]);
         }
     }
 
@@ -276,11 +207,9 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
         uint256 totalSupply = lpToken.totalSupply();
         uint256 maxLp = 0;
         for (uint256 i = 1; i <= totalSupply; ++i) {
-            if (!isInstitutionalLp[lpToken.ownerOf(i)]) {
-                uint256 liquidity = liquidityAddedByCommunityLp[_token][lpToken.ownerOf(i)];
-                if (liquidity > maxLp) {
-                    maxLp = liquidity;
-                }
+            uint256 liquidity = totalLiquidityByLp[_token][lpToken.ownerOf(i)];
+            if (liquidity > maxLp) {
+                maxLp = liquidity;
             }
         }
         return maxLp;

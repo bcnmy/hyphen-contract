@@ -15,14 +15,14 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    uint256 private constant BASE_DIVISOR = 10**36;
+    uint256 private constant BASE_DIVISOR = 10**18;
 
     ILPToken public lpToken;
     IWhiteListPeriodManager public whiteListPeriodManager;
 
     event LiquidityRemoved(address indexed tokenAddress, uint256 indexed amount, address indexed lp);
     event FeeClaimed(address indexed tokenAddress, uint256 indexed fee, address indexed lp, uint256 sharesBurnt);
-    
+
     // LP Fee Distribution
     mapping(address => uint256) public totalReserve; // Include Liquidity + Fee accumulated
     mapping(address => uint256) public totalLiquidity; // Include Liquidity only
@@ -35,7 +35,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
      * @param _transactor typically msgSender(), passed to verify against owner of _tokenId
      */
     modifier onlyValidLpToken(uint256 _tokenId, address _transactor) {
-        (address token, ,) = lpToken.tokenMetadata(_tokenId);
+        (address token, , ) = lpToken.tokenMetadata(_tokenId);
         require(lpToken.exists(_tokenId), "ERR__TOKEN_DOES_NOT_EXIST");
         require(lpToken.ownerOf(_tokenId) == _transactor, "ERR__TRANSACTOR_DOES_NOT_OWN_NFT");
         _;
@@ -51,15 +51,15 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
         _setLPToken(_lpToken);
     }
 
-    function getTotalReserveByToken(address tokenAddress) public view returns(uint256) {
+    function getTotalReserveByToken(address tokenAddress) public view returns (uint256) {
         return totalReserve[tokenAddress];
     }
 
-    function getSuppliedLiquidityByToken(address tokenAddress) public view returns(uint256) {
+    function getSuppliedLiquidityByToken(address tokenAddress) public view returns (uint256) {
         return totalLiquidity[tokenAddress];
     }
 
-    function getTotalLPFeeByToken(address tokenAddress) public view returns(uint256) {
+    function getTotalLPFeeByToken(address tokenAddress) public view returns (uint256) {
         return totalLPFees[tokenAddress];
     }
 
@@ -110,7 +110,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
 
         (address _tokenAddress, uint256 nftSuppliedLiquidity, uint256 totalNFTShares) = lpToken.tokenMetadata(_nftId);
 
-        if(totalNFTShares == 0) {
+        if (totalNFTShares == 0) {
             return 0;
         }
         // Calculate rewards accumulated
@@ -169,18 +169,14 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
      * @dev Private helper function to increase liquidity in a given NFT
      */
     function _increaseLiquidity(uint256 _nftId, uint256 _amount) private onlyValidLpToken(_nftId, _msgSender()) {
-        (
-            address token,
-            uint256 totalSuppliedLiquidity,
-            uint256 totalShares
-        ) = lpToken.tokenMetadata(_nftId);
+        (address token, uint256 totalSuppliedLiquidity, uint256 totalShares) = lpToken.tokenMetadata(_nftId);
 
         require(_amount > 0, "ERR__AMOUNT_IS_0");
         whiteListPeriodManager.beforeLiquidityAddition(_msgSender(), token, _amount);
 
         uint256 mintedSharesAmount;
         // Adding liquidity in the pool for the first time
-        if(totalReserve[token] == 0) {
+        if (totalReserve[token] == 0) {
             mintedSharesAmount = BASE_DIVISOR * _amount;
         } else {
             mintedSharesAmount = (_amount * totalSharesMinted[token]) / totalReserve[token];
@@ -220,11 +216,10 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
      * @dev Internal Function to allow LPs to add native token liquidity to existing NFT
      */
     function _increaseNativeLiquidity(uint256 _nftId) internal {
-        (address token, ,) = lpToken.tokenMetadata(_nftId);
+        (address token, , ) = lpToken.tokenMetadata(_nftId);
         require(token == NATIVE, "ERR__WRONG_FUNCTION");
         _increaseLiquidity(_nftId, msg.value);
     }
-
 
     function _removeLiquidity(uint256 _nftId, uint256 amount) internal onlyValidLpToken(_nftId, _msgSender()) {
         (address _tokenAddress, uint256 nftSuppliedLiquidity, uint256 totalNFTShares) = lpToken.tokenMetadata(_nftId);
@@ -246,7 +241,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
         uint256 lpSharesToBurn = lpSharesForInputAmount + lpSharesRepresentingFee;
 
         // Handle round off errors to avoid dust lp token in contract
-        if(totalNFTShares - lpSharesToBurn < BASE_DIVISOR) {
+        if (totalNFTShares - lpSharesToBurn < BASE_DIVISOR) {
             lpSharesToBurn = totalNFTShares;
         }
         totalReserve[_tokenAddress] -= amountToWithdraw;
@@ -254,7 +249,7 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
         totalSharesMinted[_tokenAddress] -= lpSharesToBurn;
 
         _burnSharesFromNft(_nftId, lpSharesToBurn, amount, _tokenAddress);
-        
+
         _transfer(_tokenAddress, _msgSender(), amountToWithdraw);
 
         emit LiquidityRemoved(_tokenAddress, amountToWithdraw, _msgSender());
@@ -294,21 +289,18 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
         uint256 _tokenAmount,
         address _tokenAddress
     ) private {
-        (
-            ,
-            uint256 nftSuppliedLiquidity,
-            uint256 nftShares
-        ) = lpToken.tokenMetadata(_nftId);
+        (, uint256 nftSuppliedLiquidity, uint256 nftShares) = lpToken.tokenMetadata(_nftId);
         nftShares -= _shares;
         nftSuppliedLiquidity -= _tokenAmount;
-        
-        lpToken.updateTokenMetadata(
-            _nftId,
-            LpTokenMetadata(_tokenAddress, nftSuppliedLiquidity, nftShares)
-        );
+
+        lpToken.updateTokenMetadata(_nftId, LpTokenMetadata(_tokenAddress, nftSuppliedLiquidity, nftShares));
     }
 
-    function _transfer(address _tokenAddress, address _receiver, uint256 _tokenAmount) private {
+    function _transfer(
+        address _tokenAddress,
+        address _receiver,
+        uint256 _tokenAmount
+    ) private {
         if (_tokenAddress == NATIVE) {
             require(address(this).balance >= _tokenAmount, "ERR__INSUFFICIENT_BALANCE");
             bool success = payable(_receiver).send(_tokenAmount);
@@ -320,12 +312,12 @@ abstract contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable
         }
     }
 
-    function sharesToTokenAmount(uint256 _shares, address _tokenAddress) public view returns(uint256) {
-        return _shares * totalReserve[_tokenAddress] / totalSharesMinted[_tokenAddress];
+    function sharesToTokenAmount(uint256 _shares, address _tokenAddress) public view returns (uint256) {
+        return (_shares * totalReserve[_tokenAddress]) / totalSharesMinted[_tokenAddress];
     }
 
     function _getSuppliedLiquidity(uint256 _nftId) internal view returns (uint256) {
-        (, uint256 totalSuppliedLiquidity,) = lpToken.tokenMetadata(_nftId);
+        (, uint256 totalSuppliedLiquidity, ) = lpToken.tokenMetadata(_nftId);
         return totalSuppliedLiquidity;
     }
 

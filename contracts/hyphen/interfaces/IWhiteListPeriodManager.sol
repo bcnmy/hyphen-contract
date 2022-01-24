@@ -29,11 +29,7 @@ interface IWhiteListPeriodManager {
 
     function isExcludedAddress(address) external view returns (bool);
 
-    function isInstitutionalLp(address) external view returns (bool);
-
     function isTrustedForwarder(address forwarder) external view returns (bool);
-
-    function liquidityAddedByCommunityLp(address, address) external view returns (uint256);
 
     function liquidityPool() external view returns (address);
 
@@ -41,11 +37,9 @@ interface IWhiteListPeriodManager {
 
     function paused() external view returns (bool);
 
-    function perTokenCommunityCap(address) external view returns (uint256);
-
     function perTokenTotalCap(address) external view returns (uint256);
 
-    function perWalletCapForCommunityLp(address) external view returns (uint256);
+    function perTokenWalletCap(address) external view returns (uint256);
 
     function renounceOwnership() external;
 
@@ -54,32 +48,22 @@ interface IWhiteListPeriodManager {
     function setCap(
         address _token,
         uint256 _totalCap,
-        uint256 _communityCap,
-        uint256 _perWalletCap
+        uint256 _perTokenWalletCap
     ) external;
 
     function setCaps(
         address[] memory _tokens,
         uint256[] memory _totalCaps,
-        uint256[] memory _communityCaps,
-        uint256[] memory _perWalletCaps
+        uint256[] memory _perTokenWalletCaps
     ) external;
 
-    function setCommunityCap(address _token, uint256 _communityCap) external;
-
-    function setInstitutionalLpStatus(address[] memory _addresses, bool[] memory _status) external;
+    function setIsExcludedAddressStatus(address[] memory _addresses, bool[] memory _status) external;
 
     function setLiquidityPool(address _liquidityPool) external;
 
-    function setPerWalletCapForCommunityLp(address _token, uint256 _perWalletCap) external;
+    function setPerTokenWalletCap(address _token, uint256 _perTokenWalletCap) external;
 
     function setTotalCap(address _token, uint256 _totalCap) external;
-
-    function setisExcludedAddressStatus(address[] memory _addresses, bool[] memory _status) external;
-
-    function totalLiquidityAddedByCommunityLps(address) external view returns (uint256);
-
-    function totalLiquidityAddedByInstitutionalLps(address) external view returns (uint256);
 
     function transferOwnership(address newOwner) external;
 }

@@ -10,7 +10,7 @@ import {
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, ContractTransaction } from "ethers";
 
-let { getLocaleString } = require('./utils');
+let { getLocaleString } = require("./utils");
 
 describe("LiquidityProviderTests", function () {
   interface TransactionCall {
@@ -31,16 +31,15 @@ describe("LiquidityProviderTests", function () {
   let liquidityProviders: LiquidityProvidersImplementation;
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
-  let BASE: BigNumber = BigNumber.from(10).pow(36);
+  let BASE: BigNumber = BigNumber.from(10).pow(18);
 
-  const communityPerWalletMaxCap = getLocaleString(1000 * 1e18);
+  const perWalletMaxCap = getLocaleString(1000 * 1e18);
   const commuintyPerTokenMaxCap = getLocaleString(500000 * 1e18);
   const tokenMaxCap = getLocaleString(1000000 * 1e18);
 
-  const communityPerWalletNativeMaxCap = getLocaleString(1 * 1e18);
+  const perWalletNativeMaxCap = getLocaleString(1 * 1e18);
   const commuintyPerTokenNativeMaxCap = getLocaleString(100 * 1e18);
   const tokenNativeMaxCap = getLocaleString(200 * 1e18);
-
 
   const expectLpTokenMintedWithMetadata = async (
     call: TransactionCall,
@@ -91,7 +90,8 @@ describe("LiquidityProviderTests", function () {
 
     const liquidtyProvidersFactory = await ethers.getContractFactory("LiquidityProvidersImplementation");
     liquidityProviders = (await upgrades.deployProxy(liquidtyProvidersFactory, [
-      trustedForwarder, lpToken.address
+      trustedForwarder,
+      lpToken.address,
     ])) as LiquidityProvidersImplementation;
     await liquidityProviders.deployed();
 
@@ -118,7 +118,11 @@ describe("LiquidityProviderTests", function () {
     await liquidityProviders.setWhiteListPeriodManager(wlpm.address);
     await lpToken.setWhiteListPeriodManager(wlpm.address);
 
-    await wlpm.setCaps([token.address, NATIVE], [tokenMaxCap, tokenNativeMaxCap], [commuintyPerTokenMaxCap, commuintyPerTokenNativeMaxCap], [communityPerWalletMaxCap, communityPerWalletNativeMaxCap]);
+    await wlpm.setCaps(
+      [token.address, NATIVE],
+      [tokenMaxCap, tokenNativeMaxCap],
+      [perWalletMaxCap, perWalletNativeMaxCap]
+    );
     await wlpm.setAreWhiteListRestrictionsEnabled(false);
   });
 
@@ -225,9 +229,7 @@ describe("LiquidityProviderTests", function () {
 
     it("Should be able to add lp rewards and update base token price in lp shares correctly for ERC20", async function () {
       await liquidityProviders.addLPFee(token.address, 20);
-      expect(await liquidityProviders.getTokenPriceInLPShares(token.address)).to.equal(
-        BASE.mul(100).div(120)
-      );
+      expect(await liquidityProviders.getTokenPriceInLPShares(token.address)).to.equal(BASE.mul(100).div(120));
     });
 
     it("Should be able to add lp rewards and update lp token price correctly for Native", async function () {
@@ -243,7 +245,7 @@ describe("LiquidityProviderTests", function () {
         [30, 40],
         [1000, 9876],
         [1234, 5678],
-        [1, 10]
+        [1, 10],
       ]) {
         await liquidityProviders.addLPFee(token.address, fee);
         currentTokenReserve = currentTokenReserve.add(fee);
@@ -348,7 +350,7 @@ describe("LiquidityProviderTests", function () {
 
         let expectedSharesToBurn = sharedToBurnFromLiquidity.add(sharesRepresentingRewards);
 
-        if(tokenMetaData.shares.sub(expectedSharesToBurn).lt(BASE)) {
+        if (tokenMetaData.shares.sub(expectedSharesToBurn).lt(BASE)) {
           expectedSharesToBurn = tokenMetaData.shares;
         }
 
@@ -360,8 +362,9 @@ describe("LiquidityProviderTests", function () {
 
         expect((await lpToken.tokenMetadata(nftId[signer.address])).shares.lt(BASE)).to.be.true;
 
-        const claimedFee = (await token.balanceOf(signer.address))
-          .sub(tokenBalanceBefore.add(totalTokenSuppliedLiquidity[signer.address]));
+        const claimedFee = (await token.balanceOf(signer.address)).sub(
+          tokenBalanceBefore.add(totalTokenSuppliedLiquidity[signer.address])
+        );
         totalTokenFeeClaimed = totalTokenFeeClaimed.add(claimedFee);
         expect(claimedFee.toNumber()).to.greaterThan(0);
       };
@@ -369,23 +372,21 @@ describe("LiquidityProviderTests", function () {
       for (const signer of [owner, bob, charlie]) {
         await extractReward(signer);
       }
-      
+
       expect(totalTokenFeeClaimed.sub(totalTokenFee).toString()).to.eq("0");
     });
 
-      it("Should revert if attempted to remove more liquidity than available", async function () {
-        const suppliedLiquidity = (await lpToken.tokenMetadata(1)).suppliedLiquidity;
-        await expect(liquidityProviders.connect(bob).decreaseLiquidity(1, suppliedLiquidity.add(1))).to.be.revertedWith(
-          "ERR__INSUFFICIENT_LIQUIDITY"
-        );
-        await expect(liquidityProviders.connect(bob).decreaseLiquidity(1, suppliedLiquidity)).to.not.be.reverted;
-      });
+    it("Should revert if attempted to remove more liquidity than available", async function () {
+      const suppliedLiquidity = (await lpToken.tokenMetadata(1)).suppliedLiquidity;
+      await expect(liquidityProviders.connect(bob).decreaseLiquidity(1, suppliedLiquidity.add(1))).to.be.revertedWith(
+        "ERR__INSUFFICIENT_LIQUIDITY"
+      );
+      await expect(liquidityProviders.connect(bob).decreaseLiquidity(1, suppliedLiquidity)).to.not.be.reverted;
+    });
 
-      it("Should revert if attempted to remove 0 liquidity", async function () {
-        await expect(liquidityProviders.connect(bob).decreaseLiquidity(1, 0)).to.be.revertedWith(
-          "ERR__INVALID_AMOUNT"
-        );
-      });
+    it("Should revert if attempted to remove 0 liquidity", async function () {
+      await expect(liquidityProviders.connect(bob).decreaseLiquidity(1, 0)).to.be.revertedWith("ERR__INVALID_AMOUNT");
+    });
   });
 
   describe("LP Share Burning for Native base", async function () {
@@ -452,11 +453,13 @@ describe("LiquidityProviderTests", function () {
 
         let expectedSharesToBurn = sharedToBurnFromLiquidity.add(sharesRepresentingRewards);
 
-        if(tokenMetaData.shares.sub(expectedSharesToBurn).lt(BASE)) {
+        if (tokenMetaData.shares.sub(expectedSharesToBurn).lt(BASE)) {
           expectedSharesToBurn = tokenMetaData.shares;
         }
 
-        const { cumulativeGasUsed, effectiveGasPrice } = await (await liquidityProviders.connect(signer).decreaseLiquidity(nftId[signer.address], suppliedLiquidity)).wait();
+        const { cumulativeGasUsed, effectiveGasPrice } = await (
+          await liquidityProviders.connect(signer).decreaseLiquidity(nftId[signer.address], suppliedLiquidity)
+        ).wait();
 
         expect(totalLpSharesMinted.sub(await liquidityProviders.totalSharesMinted(NATIVE))).to.equal(
           expectedSharesToBurn
@@ -488,9 +491,7 @@ describe("LiquidityProviderTests", function () {
     });
 
     it("Should revert if attempted to remove 0 liquidity", async function () {
-      await expect(liquidityProviders.connect(bob).decreaseLiquidity(1, 0)).to.be.revertedWith(
-        "ERR__INVALID_AMOUNT"
-      );
+      await expect(liquidityProviders.connect(bob).decreaseLiquidity(1, 0)).to.be.revertedWith("ERR__INVALID_AMOUNT");
     });
   });
 
@@ -509,9 +510,11 @@ describe("LiquidityProviderTests", function () {
       const expectedRewards = await liquidityProviders.getFeeAccumulatedOnNft(1);
       expect(expectedRewards).to.equal(20);
 
-      await expect(() =>
-        liquidityProviders.extractFee(1)
-      ).to.changeTokenBalances(token, [liquidityProviders, owner], [-20, 20]);
+      await expect(() => liquidityProviders.extractFee(1)).to.changeTokenBalances(
+        token,
+        [liquidityProviders, owner],
+        [-20, 20]
+      );
     });
 
     it("Should allow extraction of fee in NATIVE", async function () {
@@ -522,9 +525,10 @@ describe("LiquidityProviderTests", function () {
       const expectedRewards = await liquidityProviders.getFeeAccumulatedOnNft(2);
       expect(expectedRewards).to.equal(20);
 
-      await expect(() =>
-        liquidityProviders.extractFee(2)
-      ).to.changeEtherBalances([liquidityProviders, owner], [-20, 20]);
+      await expect(() => liquidityProviders.extractFee(2)).to.changeEtherBalances(
+        [liquidityProviders, owner],
+        [-20, 20]
+      );
     });
 
     it("Should revert if more shares are burnt than available for reward", async function () {
@@ -533,9 +537,8 @@ describe("LiquidityProviderTests", function () {
   });
 
   describe("Real world flow tests", async function () {
-    
     const mulBy10e18 = (num: number): BigNumber => BigNumber.from(10).pow(18).mul(num);
-    
+
     this.beforeEach(async () => {
       await token.connect(owner).approve(liquidityProviders.address, await token.balanceOf(owner.address));
       await token.connect(bob).approve(liquidityProviders.address, await token.balanceOf(owner.address));
@@ -559,7 +562,7 @@ describe("LiquidityProviderTests", function () {
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(0);
 
       await liquidityProviders.addLPFee(token.address, 50);
-      
+
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(50);
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(50);
 
@@ -585,7 +588,7 @@ describe("LiquidityProviderTests", function () {
       await liquidityProviders.addLPFee(token.address, 90);
 
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(30);
-      
+
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(90);
 
       await expect(async () => liquidityProviders.extractFee(1)).to.changeTokenBalances(
@@ -608,26 +611,26 @@ describe("LiquidityProviderTests", function () {
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(0);
 
       await liquidityProviders.increaseTokenLiquidity(1, 100);
-      
+
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(100);
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(0);
 
       await liquidityProviders.addLPFee(token.address, 10);
-      
+
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(100);
-      
+
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(10);
 
       await liquidityProviders.increaseTokenLiquidity(1, 100);
-      
+
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(200);
-      
+
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(10);
 
       await liquidityProviders.addLPFee(token.address, 10);
-      
+
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(200);
-      
+
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(20);
     });
 
@@ -638,54 +641,63 @@ describe("LiquidityProviderTests", function () {
       await liquidityProviders.addLPFee(token.address, mulBy10e18(50));
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(mulBy10e18(50));
 
-      await expect(async () =>
-        liquidityProviders.decreaseLiquidity(1, mulBy10e18(50))
-      ).to.changeTokenBalances(token, [liquidityProviders, owner], [mulBy10e18(-100), mulBy10e18(100)]);
+      await expect(async () => liquidityProviders.decreaseLiquidity(1, mulBy10e18(50))).to.changeTokenBalances(
+        token,
+        [liquidityProviders, owner],
+        [mulBy10e18(-100), mulBy10e18(100)]
+      );
 
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(mulBy10e18(50));
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(0);
 
       await liquidityProviders.addLPFee(token.address, mulBy10e18(50));
-      
+
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(mulBy10e18(50));
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(mulBy10e18(50));
 
-      
-      await expect(async () =>
-        liquidityProviders.extractFee(1)
-      ).to.changeTokenBalances(token, [liquidityProviders, owner], [mulBy10e18(-50), mulBy10e18(50)]);
-      
+      await expect(async () => liquidityProviders.extractFee(1)).to.changeTokenBalances(
+        token,
+        [liquidityProviders, owner],
+        [mulBy10e18(-50), mulBy10e18(50)]
+      );
+
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(mulBy10e18(50));
 
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(0);
 
-      await expect(async () =>
-        liquidityProviders.decreaseLiquidity(1, mulBy10e18(20))
-      ).to.changeTokenBalances(token, [liquidityProviders, owner], [mulBy10e18(-20), mulBy10e18(20)]);
-      
+      await expect(async () => liquidityProviders.decreaseLiquidity(1, mulBy10e18(20))).to.changeTokenBalances(
+        token,
+        [liquidityProviders, owner],
+        [mulBy10e18(-20), mulBy10e18(20)]
+      );
+
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(mulBy10e18(30));
-      
+
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(0);
 
       await liquidityProviders.addLPFee(token.address, mulBy10e18(90));
-      
+
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(mulBy10e18(30));
-      
+
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(mulBy10e18(90));
 
-      await expect(async () =>
-        liquidityProviders.extractFee(1)
-      ).to.changeTokenBalances(token, [liquidityProviders, owner], [mulBy10e18(-90), mulBy10e18(90)]);
-      
+      await expect(async () => liquidityProviders.extractFee(1)).to.changeTokenBalances(
+        token,
+        [liquidityProviders, owner],
+        [mulBy10e18(-90), mulBy10e18(90)]
+      );
+
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(mulBy10e18(30));
-      
+
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(0);
 
-      await liquidityProviders.addLPFee(token.address, mulBy10e18(90));      
-      await expect(async () =>
-        liquidityProviders.decreaseLiquidity(1, mulBy10e18(30))
-      ).to.changeTokenBalances(token, [liquidityProviders, owner], [mulBy10e18(-120), mulBy10e18(120)]);
-      
+      await liquidityProviders.addLPFee(token.address, mulBy10e18(90));
+      await expect(async () => liquidityProviders.decreaseLiquidity(1, mulBy10e18(30))).to.changeTokenBalances(
+        token,
+        [liquidityProviders, owner],
+        [mulBy10e18(-120), mulBy10e18(120)]
+      );
+
       expect((await lpToken.tokenMetadata(1)).suppliedLiquidity).equal(0);
       expect(await liquidityProviders.getFeeAccumulatedOnNft(1)).to.equal(0);
     });
