@@ -165,8 +165,8 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
         _beforeLiquidityAddition(_to, _token, _amount);
     }
 
-    function setLiquidityPool(ILiquidityPool _liquidityPool) external onlyOwner {
-        liquidityPool = _liquidityPool;
+    function setLiquidityPool(address _liquidityPool) external onlyOwner {
+        liquidityPool = ILiquidityPool(_liquidityPool);
     }
 
     function setInstitutionalLpStatus(address[] memory _addresses, bool[] memory _status) external onlyOwner {

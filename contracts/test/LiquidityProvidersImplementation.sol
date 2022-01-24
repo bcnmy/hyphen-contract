@@ -8,8 +8,8 @@ contract LiquidityProvidersImplementation is LiquidityProviders {
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    function initialize(address _trustedForwarder) public initializer {
-        __LiquidityProviders_init(_trustedForwarder);
+    function initialize(address _trustedForwarder, address _lpToken) public initializer {
+        __LiquidityProviders_init(_trustedForwarder, _lpToken);
     }
 
     function addLPFee(address _token, uint256 _amount) external payable {
@@ -38,11 +38,11 @@ contract LiquidityProvidersImplementation is LiquidityProviders {
     }
 
     function decreaseLiquidity(uint256 _nftId, uint256 _amount) external {
-        _decreaseLiquidity(_nftId, _amount);
+        _removeLiquidity(_nftId, _amount);
     }
 
-    function extractFee(uint256 _nftId, uint256 _shares) external {
-        _extractFee(_nftId, _shares);
+    function extractFee(uint256 _nftId) external {
+        _claimFee(_nftId);
     }
 
     function isTokenSupported(address) public pure override returns (bool) {

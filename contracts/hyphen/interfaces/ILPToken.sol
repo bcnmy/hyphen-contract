@@ -69,9 +69,7 @@ interface ILPToken {
         returns (
             address token,
             uint256 totalSuppliedLiquidity,
-            uint256 totalShares,
-            uint256 savedRewards,
-            uint256 priceWhenSavedRewards
+            uint256 totalShares
         );
 
     function tokenOfOwnerByIndex(address _owner, uint256 index) external view returns (uint256);

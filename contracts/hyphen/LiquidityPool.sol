@@ -26,7 +26,6 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
         bool supportedToken;
         uint256 minCap;
         uint256 maxCap;
-        uint256 liquidity;
         uint256 equilibriumFee; // Percentage fee Represented in basis points
         uint256 maxFee; // Percentage fee Represented in basis points
     }
@@ -112,11 +111,12 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
     function initialize(
         address _executorManagerAddress,
         address pauser,
-        address _trustedForwarder
+        address _trustedForwarder,
+        address _lpToken
     ) public initializer {
         require(_executorManagerAddress != address(0), "ExecutorManager cannot be 0x0");
         require(_trustedForwarder != address(0), "TrustedForwarder cannot be 0x0");
-        __LiquidityProviders_init(_trustedForwarder);
+        __LiquidityProviders_init(_trustedForwarder, _lpToken);
         __ReentrancyGuard_init();
         __Ownable_init();
         __Pausable_init(pauser);
@@ -208,12 +208,11 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
             liquidityPoolBalance = IERC20Upgradeable(tokenAddress).balanceOf(address(this));
         }
 
-        currentLiquidity = liquidityPoolBalance - gasFeeAccumulatedByToken[tokenAddress] - incentivePool[tokenAddress];
+        currentLiquidity = liquidityPoolBalance - totalLPFees[tokenAddress] - gasFeeAccumulatedByToken[tokenAddress] - incentivePool[tokenAddress];
     }
 
     function addNativeLiquidity() external payable tokenChecks(NATIVE) nonReentrant whenNotPaused {
         address sender = _msgSender();
-        tokensInfo[NATIVE].liquidity = tokensInfo[NATIVE].liquidity + msg.value;
         _addNativeLiquidity();
         emit LiquidityAdded(sender, NATIVE, address(this), msg.value);
     }
@@ -223,8 +222,8 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
         emit LiquidityAdded(_msgSender(), NATIVE, address(this), msg.value);
     }
 
-    function removePoolShare(uint256 _nftId, uint256 _shares) external tokenChecks(NATIVE) nonReentrant {
-        _decreaseLiquidity(_nftId, _shares);
+    function removePoolShare(uint256 _nftId, uint256 _amount) external tokenChecks(NATIVE) nonReentrant {
+        _removeLiquidity(_nftId, _amount);
     }
 
     function addTokenLiquidity(address tokenAddress, uint256 amount)
@@ -238,14 +237,14 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
     }
 
     function increaseTokenLiquidity(uint256 _nftId, uint256 _amount) external nonReentrant whenNotPaused {
-        (address tokenAddress, , , , ) = lpToken.tokenMetadata(_nftId);
+        (address tokenAddress, ,) = lpToken.tokenMetadata(_nftId);
         require(tokensInfo[tokenAddress].supportedToken, "Token not supported");
         _increaseTokenLiquidity(_nftId, _amount);
         emit LiquidityAdded(_msgSender(), tokenAddress, address(this), _amount);
     }
 
-    function claimFee(uint256 _nftId, uint256 _shares) external {
-        _extractFee(_nftId, _shares);
+    function claimFee(uint256 _nftId) external {
+        _claimFee(_nftId);
     }
 
     function getSuppliedLiquidity(uint256 _nftId) public view returns (uint256) {
@@ -286,7 +285,7 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
 
     function getRewardAmount(uint256 amount, address tokenAddress) public view returns (uint256 rewardAmount) {
         uint256 currentLiquidity = getCurrentLiquidity(tokenAddress);
-        uint256 providedLiquidity = tokensInfo[tokenAddress].liquidity;
+        uint256 providedLiquidity = getSuppliedLiquidityByToken(tokenAddress);
         if (currentLiquidity < providedLiquidity) {
             uint256 liquidityDifference = providedLiquidity - currentLiquidity;
             if (amount >= liquidityDifference) {
@@ -448,16 +447,20 @@ contract LiquidityPool is LiquidityProviders, ReentrancyGuardUpgradeable, Pausab
     }
 
     function getTransferFee(address tokenAddress, uint256 amount) public view returns (uint256 fee) {
-        uint256 currentLiquidity = tokenAddress == NATIVE
-            ? address(this).balance
-            : IERC20Upgradeable(tokenAddress).balanceOf(address(this));
-        uint256 providedLiquidity = tokensInfo[tokenAddress].liquidity;
+        console.log("tokenAddress contract:", tokenAddress);
+        uint256 currentLiquidity = getCurrentLiquidity(tokenAddress);
+        uint256 providedLiquidity = getSuppliedLiquidityByToken(tokenAddress);
+
         uint256 resultingLiquidity = currentLiquidity - amount;
 
         uint256 equilibriumFee = tokensInfo[tokenAddress].equilibriumFee;
         uint256 maxFee = tokensInfo[tokenAddress].maxFee;
         // Fee is represented in basis points * 10 for better accuracy
+        console.log("providedLiquidity ", providedLiquidity);
+        console.log("equilibriumFee :",equilibriumFee);
+        console.log("maxFee: ", maxFee);
         uint256 numerator = providedLiquidity * equilibriumFee * maxFee; // F(max) * F(e) * L(e)
+        console.log(numerator);
         uint256 denominator = equilibriumFee * providedLiquidity + (maxFee - equilibriumFee) * resultingLiquidity; // F(e) * L(e) + (F(max) - F(e)) * L(r)
 
         fee = numerator / denominator;

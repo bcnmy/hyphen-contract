@@ -136,7 +136,7 @@ contract LPToken is
                 from,
                 to,
                 tokenMetadata[tokenId].token,
-                tokenMetadata[tokenId].totalSuppliedLiquidity
+                tokenMetadata[tokenId].suppliedLiquidity
             );
         }
     }
