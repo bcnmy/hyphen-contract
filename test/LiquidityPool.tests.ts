@@ -594,7 +594,7 @@ describe("LiquidityPoolTests", function () {
         let metadata = await lpToken.tokenMetadata(nftId.toString());
         console.log(metadata);
         await expect(
-            liquidityPool.connect(bob).removePoolShare(nftId.toString(), metadata.totalShares.add(1).toString())
+            liquidityPool.connect(bob).removePoolShare(nftId.toString(), metadata.shares.add(1).toString())
         ).to.be.revertedWith("ERR__INVALID_SHARES_AMOUNT");
     });
 
