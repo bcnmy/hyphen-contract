@@ -110,6 +110,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         require(_executorManagerAddress != address(0), "ExecutorManager cannot be 0x0");
         require(_trustedForwarder != address(0), "TrustedForwarder cannot be 0x0");
         require(_liquidityProviders != address(0), "LiquidityProviders cannot be 0x0");
+        __ERC2771Context_init(_trustedForwarder);
         __ReentrancyGuard_init();
         __Ownable_init();
         __Pausable_init(_pauser);
@@ -407,15 +408,15 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         emit GasFeeWithdraw(address(this), _msgSender(), _gasFeeAccumulated);
     }
 
-    function requestFunds(address _tokenAddress, uint256 _tokenAmount) external whenNotPaused onlyLiquidityProviders {
+    function transfer(address _tokenAddress, address receiver, uint256 _tokenAmount) external whenNotPaused onlyLiquidityProviders {
         if (_tokenAddress == NATIVE) {
             require(address(this).balance >= _tokenAmount, "ERR__INSUFFICIENT_BALANCE");
-            (bool success, ) = address(liquidityProviders).call{value: _tokenAmount}("");
+            (bool success, ) = receiver.call{value: _tokenAmount}("");
             require(success, "ERR__NATIVE_TRANSFER_FAILED");
         } else {
             IERC20Upgradeable baseToken = IERC20Upgradeable(_tokenAddress);
             require(baseToken.balanceOf(address(this)) >= _tokenAmount, "ERR__INSUFFICIENT_BALANCE");
-            SafeERC20Upgradeable.safeTransfer(baseToken, address(liquidityProviders), _tokenAmount);
+            SafeERC20Upgradeable.safeTransfer(baseToken, receiver, _tokenAmount);
         }
     }
 

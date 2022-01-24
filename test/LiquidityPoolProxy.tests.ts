@@ -13,13 +13,14 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 describe("LiquidityPoolProxyTests", function () {
   let alice: SignerWithAddress, pauser: SignerWithAddress, bob: SignerWithAddress, charlie: SignerWithAddress, tf: SignerWithAddress;
   let proxyAdmin: SignerWithAddress;
+  let tokenManager: SignerWithAddress, liquidityProviders: SignerWithAddress;
   let executorManager: ExecutorManager;
   let token: ERC20Token, liquidityPool: LiquidityPool, liquidityPoolImpl: LiquidityPool, liquidityPoolProxy: LiquidityPoolProxy;
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   let lpToken: LPToken;
 
   before(async function () {
-    [alice, pauser, bob, charlie, tf, proxyAdmin] = await ethers.getSigners();
+    [alice, pauser, bob, charlie, tf, proxyAdmin, tokenManager, liquidityProviders] = await ethers.getSigners();
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
     lpToken = (await upgrades.deployProxy(lpTokenFactory, ["Hyphen LP Token","HPT",trustedForwarder])) as LPToken;
@@ -38,7 +39,8 @@ describe("LiquidityPoolProxyTests", function () {
     liquidityPool = await ethers.getContractAt("contracts/hyphen/LiquidityPool.sol:LiquidityPool", 
       liquidityPoolProxy.address) as LiquidityPool;
 
-    await liquidityPool.initialize(executorManager.address, await pauser.getAddress(), trustedForwarder, lpToken.address);
+    await liquidityPool.initialize(executorManager.address, await pauser.getAddress(), 
+    trustedForwarder, tokenManager.address, liquidityProviders.address);
     
   });
 
@@ -56,7 +58,8 @@ describe("LiquidityPoolProxyTests", function () {
 
   it("Liquidity Pool Should not be initialised twice", async function () {
     await expect(
-      liquidityPool.initialize(executorManager.address, await pauser.getAddress(), trustedForwarder, lpToken.address)
+      liquidityPool.initialize(executorManager.address, await pauser.getAddress(), trustedForwarder, 
+        tokenManager.address, liquidityProviders.address)
     ).to.be.reverted;
   });
 

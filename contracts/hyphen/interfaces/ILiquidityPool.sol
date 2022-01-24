@@ -65,7 +65,7 @@ interface ILiquidityPool {
 
     function renouncePauser() external;
 
-    function requestFunds(address _tokenAddress, uint256 _tokenAmount) external;
+    function transfer(address _tokenAddress, address receiver, uint256 _tokenAmount) external;
 
     function sendFundsToUser(
         address tokenAddress,

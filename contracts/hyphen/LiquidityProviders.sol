@@ -380,16 +380,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
         address _receiver,
         uint256 _tokenAmount
     ) internal {
-        liquidityPool.requestFunds(_tokenAddress, _tokenAmount);
-        if (_tokenAddress == NATIVE) {
-            require(address(this).balance >= _tokenAmount, "ERR__INSUFFICIENT_BALANCE");
-            bool success = payable(_receiver).send(_tokenAmount);
-            require(success, "ERR__NATIVE_TRANSFER_FAILED");
-        } else {
-            IERC20Upgradeable baseToken = IERC20Upgradeable(_tokenAddress);
-            require(baseToken.balanceOf(address(this)) >= _tokenAmount, "ERR__INSUFFICIENT_BALANCE");
-            SafeERC20Upgradeable.safeTransfer(baseToken, _receiver, _tokenAmount);
-        }
+        liquidityPool.transfer(_tokenAddress, _receiver, _tokenAmount);
     }
 
     function getSuppliedLiquidity(uint256 _nftId) external view returns (uint256) {

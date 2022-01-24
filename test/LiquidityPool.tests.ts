@@ -3,9 +3,11 @@ import { ethers, upgrades } from "hardhat";
 import {
     ERC20Token,
     LiquidityPool,
+    LiquidityProvidersTest,
     ExecutorManager,
     LPToken,
-    WhitelistPeriodManager
+    WhitelistPeriodManager,
+    TokenManager
     // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -21,6 +23,8 @@ describe("LiquidityPoolTests", function () {
     let token: ERC20Token, liquidityPool: LiquidityPool;
     let lpToken: LPToken;
     let wlpm: WhitelistPeriodManager;
+    let liquidityProviders: LiquidityProvidersTest;
+    let tokenManager: TokenManager;
 
     let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
     let equilibriumFee = 10000000;
@@ -50,6 +54,9 @@ describe("LiquidityPoolTests", function () {
     beforeEach(async function () {
         [owner, pauser, charlie, bob, tf, proxyAdmin, executor] = await ethers.getSigners();
 
+        const tokenManagerFactory = await ethers.getContractFactory("TokenManager");
+        tokenManager = await tokenManagerFactory.deploy(trustedForwarder);
+
         const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
         executorManager = await executorManagerFactory.deploy();
         await executorManager.deployed();
@@ -57,17 +64,29 @@ describe("LiquidityPoolTests", function () {
         const lpTokenFactory = await ethers.getContractFactory("LPToken");
         lpToken = (await upgrades.deployProxy(lpTokenFactory, ["Hyphen LP Token", "HPT", trustedForwarder])) as LPToken;
 
+        
+        const liquidtyProvidersFactory = await ethers.getContractFactory("LiquidityProvidersTest");
+        liquidityProviders = (await upgrades.deployProxy(liquidtyProvidersFactory, [
+            trustedForwarder,
+            lpToken.address,
+            tokenManager.address,
+            pauser.address,
+        ])) as LiquidityProvidersTest;
+        
         const liquidtyPoolFactory = await ethers.getContractFactory("LiquidityPool");
         liquidityPool = (await upgrades.deployProxy(liquidtyPoolFactory,
-            [executorManager.address, await pauser.getAddress(), trustedForwarder, lpToken.address])) as LiquidityPool;
+            [executorManager.address, await pauser.getAddress(), trustedForwarder, tokenManager.address, liquidityProviders.address])) as LiquidityPool;
+
         await liquidityPool.deployed();
+
+        await liquidityProviders.setLiquidityPool(liquidityPool.address);
 
         const erc20factory = await ethers.getContractFactory("ERC20Token");
         token = (await upgrades.deployProxy(erc20factory, ["USDT", "USDT"])) as ERC20Token;
         tokenAddress = token.address;
 
         // Add supported ERC20 token
-        await liquidityPool.connect(owner).addSupportedToken(
+        await tokenManager.connect(owner).addSupportedToken(
             tokenAddress,
             minTokenCap,
             maxTokenCap,
@@ -76,26 +95,27 @@ describe("LiquidityPoolTests", function () {
         );
 
         // Add supported Native token
-        await liquidityPool.connect(owner).addSupportedToken(
+        await tokenManager.connect(owner).addSupportedToken(
             NATIVE,
             minNativeTokenCap,
             maxNativeTokenCap,
             equilibriumFee,
             maxFee
         );
-        await lpToken.setLiquidtyPool(liquidityPool.address);
+        await lpToken.setLiquidtyPool(liquidityProviders.address);
 
         const wlpmFactory = await ethers.getContractFactory("WhitelistPeriodManager");
         wlpm = (await upgrades.deployProxy(wlpmFactory, [
             trustedForwarder,
-            liquidityPool.address,
+            liquidityProviders.address,
+            tokenManager.address,
+            lpToken.address,
+            pauser.address,
         ])) as WhitelistPeriodManager;
 
-        await wlpm.setCaps([token.address, NATIVE], [tokenMaxCap, tokenNativeMaxCap], [commuintyPerTokenMaxCap, commuintyPerTokenNativeMaxCap], [communityPerWalletMaxCap, communityPerWalletNativeMaxCap]);
+        await wlpm.setCaps([token.address, NATIVE], [tokenMaxCap, tokenNativeMaxCap], [commuintyPerTokenMaxCap, commuintyPerTokenNativeMaxCap]);
 
-        liquidityPool.setWhiteListPeriodManager(wlpm.address);
-
-
+        await liquidityProviders.setWhiteListPeriodManager(wlpm.address);
 
         for (const signer of [owner, bob, charlie]) {
             await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
@@ -107,13 +127,13 @@ describe("LiquidityPoolTests", function () {
     });
 
     async function addTokenLiquidity(tokenAddress: string, tokenValue: string, sender: SignerWithAddress) {
-        let tx = await token.connect(sender).approve(liquidityPool.address, tokenValue);
+        let tx = await token.connect(sender).approve(liquidityProviders.address, tokenValue);
         await tx.wait();
-        await liquidityPool.connect(sender).addTokenLiquidity(tokenAddress, tokenValue);
+        await liquidityProviders.connect(sender).addTokenLiquidity(tokenAddress, tokenValue);
     }
 
     async function addNativeLiquidity(tokenValue: string, sender: SignerWithAddress) {
-        await liquidityPool.connect(sender).addNativeLiquidity({
+        await liquidityProviders.connect(sender).addNativeLiquidity({
             value: tokenValue
         });
     }
@@ -193,14 +213,14 @@ describe("LiquidityPoolTests", function () {
     })
 
     it("Should addSupportedToken successfully", async () => {
-        await liquidityPool.connect(owner).addSupportedToken(
+        await tokenManager.connect(owner).addSupportedToken(
             tokenAddress,
             minTokenCap,
             maxTokenCap,
             equilibriumFee,
             maxFee
         );
-        let checkTokenStatus = await liquidityPool.tokensInfo(
+        let checkTokenStatus = await tokenManager.tokensInfo(
             tokenAddress
         );
         expect(checkTokenStatus.supportedToken).to.equal(true);
@@ -211,13 +231,13 @@ describe("LiquidityPoolTests", function () {
     it("Should updateTokenCap successfully", async () => {
         let newMinTokenCap = "100000";
         let newMaxTokenCap = "100000000";
-        await liquidityPool.connect(owner).updateTokenCap(
+        await tokenManager.connect(owner).updateTokenCap(
             tokenAddress,
             newMinTokenCap,
             newMaxTokenCap
         );
 
-        let checkTokenStatus = await liquidityPool.tokensInfo(
+        let checkTokenStatus = await tokenManager.tokensInfo(
             tokenAddress
         );
 
@@ -228,20 +248,20 @@ describe("LiquidityPoolTests", function () {
 
     it("Should addNativeLiquidity successfully", async () => {
         let valueEth = ethers.utils.parseEther("1");
-        await liquidityPool.connect(owner).addNativeLiquidity({
+        await liquidityProviders.connect(owner).addNativeLiquidity({
             value: valueEth
         });
 
-        expect(valueEth).to.equal(await liquidityPool.getSuppliedLiquidityByToken(NATIVE));
+        expect(valueEth).to.equal(await liquidityProviders.getSuppliedLiquidityByToken(NATIVE));
     });
 
     it("Should addTokenLiquidity successfully", async () => {
         let tokenValue = "1000000";
-        let totalReserveBefore = await liquidityPool.getTotalReserveByToken(tokenAddress);
-        let tx = await token.connect(owner).approve(liquidityPool.address, tokenValue);
+        let totalReserveBefore = await liquidityProviders.getTotalReserveByToken(tokenAddress);
+        let tx = await token.connect(owner).approve(liquidityProviders.address, tokenValue);
         await tx.wait();
-        await liquidityPool.connect(owner).addTokenLiquidity(tokenAddress, tokenValue);
-        let totalReserveAfter = await liquidityPool.getTotalReserveByToken(tokenAddress);
+        await liquidityProviders.connect(owner).addTokenLiquidity(tokenAddress, tokenValue);
+        let totalReserveAfter = await liquidityProviders.getTotalReserveByToken(tokenAddress);
         expect(totalReserveBefore.add(tokenValue).toString()).to.equal(totalReserveAfter.toString());
     });
 
@@ -304,11 +324,11 @@ describe("LiquidityPoolTests", function () {
             await tx.wait();
             let rewardAmoutFromContract = await liquidityPool.getRewardAmount(amountToDeposit, tokenAddress);
             let incentivePoolAmount = await liquidityPool.incentivePool(tokenAddress);
-            let equilibriumLiquidity = await liquidityPool.getSuppliedLiquidityByToken(tokenAddress);
+            let equilibriumLiquidity = await liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
             let currentBalance = await token.balanceOf(liquidityPool.address);
             let gasFeeAccumulated = await liquidityPool.gasFeeAccumulatedByToken(tokenAddress);
             // TODO: Update this test case
-            let lpFeeAccumulated = await liquidityPool.getTotalLPFeeByToken(tokenAddress);
+            let lpFeeAccumulated = await liquidityProviders.getTotalLPFeeByToken(tokenAddress);
 
             let currentLiquidity = currentBalance.sub(gasFeeAccumulated).sub(lpFeeAccumulated).sub(incentivePoolAmount);
             let calculatedRewardAmount = BigNumber.from(amountToDeposit).mul(incentivePoolAmount).div((equilibriumLiquidity.sub(currentLiquidity)));
@@ -368,8 +388,8 @@ describe("LiquidityPoolTests", function () {
 
     it("Should setTokenTransferOverhead successfully", async () => {
         let gasOverhead = "21110";
-        await liquidityPool.connect(owner).setTokenTransferOverhead(tokenAddress, 21110);
-        let checkTokenGasOverhead = await liquidityPool.tokensInfo(
+        await tokenManager.connect(owner).setTokenTransferOverhead(tokenAddress, 21110);
+        let checkTokenGasOverhead = await tokenManager.tokensInfo(
             tokenAddress
         );
         expect(checkTokenGasOverhead.transferOverhead).to.equal(gasOverhead);
@@ -382,7 +402,7 @@ describe("LiquidityPoolTests", function () {
         await addTokenLiquidity(tokenAddress, minTokenCap, owner);
         const amount = minTokenCap;
         const usdtBalanceBefore = await token.balanceOf(liquidityPool.address);
-        const suppliedLiquidity = await liquidityPool.getSuppliedLiquidityByToken(tokenAddress);
+        const suppliedLiquidity = await liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
         await executorManager.connect(owner).addExecutor(await executor.getAddress());
 
         let transferFeeFromContract = await liquidityPool.getTransferFee(tokenAddress, amount);
@@ -464,7 +484,7 @@ describe("LiquidityPoolTests", function () {
         let minTokenCap = "100000000";
         let maxTokenCap = "10000000000";
         await expect(
-            liquidityPool.connect(bob).addSupportedToken(
+            tokenManager.connect(bob).addSupportedToken(
                 tokenAddress,
                 minTokenCap,
                 maxTokenCap,
@@ -478,7 +498,7 @@ describe("LiquidityPoolTests", function () {
         let minTokenCap = "10000000000";
         let maxTokenCap = "100000000";
         await expect(
-            liquidityPool.connect(bob).addSupportedToken(
+            tokenManager.connect(bob).addSupportedToken(
                 tokenAddress,
                 minTokenCap,
                 maxTokenCap,
@@ -492,7 +512,7 @@ describe("LiquidityPoolTests", function () {
         let minTokenCap = "10000000000";
         let maxTokenCap = "100000000";
         await expect(
-            liquidityPool.connect(bob).addSupportedToken(
+            tokenManager.connect(bob).addSupportedToken(
                 ZERO_ADDRESS,
                 minTokenCap,
                 maxTokenCap,
@@ -504,7 +524,7 @@ describe("LiquidityPoolTests", function () {
 
     it("Should fail to removeSupportedToken: Only owner can remove supported tokens", async () => {
         await expect(
-            liquidityPool.connect(bob).removeSupportedToken(tokenAddress)
+            tokenManager.connect(bob).removeSupportedToken(tokenAddress)
         ).to.be.reverted;
     });
 
@@ -513,7 +533,7 @@ describe("LiquidityPoolTests", function () {
         let maxTokenCap = "10000000000";
         let inactiveTokenAddress = await bob.getAddress();
         await expect(
-            liquidityPool.connect(owner).updateTokenCap(
+            tokenManager.connect(owner).updateTokenCap(
                 inactiveTokenAddress,
                 minTokenCap,
                 maxTokenCap
@@ -525,7 +545,7 @@ describe("LiquidityPoolTests", function () {
         let minTokenCap = "100000000";
         let maxTokenCap = "10000000000";
         await expect(
-            liquidityPool.connect(owner).updateTokenCap(
+            tokenManager.connect(owner).updateTokenCap(
                 ZERO_ADDRESS,
                 minTokenCap,
                 maxTokenCap
@@ -537,67 +557,13 @@ describe("LiquidityPoolTests", function () {
         let minTokenCap = "100000000";
         let maxTokenCap = "10000000000";
         await expect(
-            liquidityPool.connect(bob).updateTokenCap(
+            tokenManager.connect(bob).updateTokenCap(
                 tokenAddress,
                 minTokenCap,
                 maxTokenCap
             )
         ).to.be.reverted;
     });
-
-    it("Should fail to addNativeLiquidity: amount should be greater then 0", async () => {
-        let valueEth = ethers.utils.parseEther("0");
-        await expect(
-            liquidityPool.connect(owner).addNativeLiquidity({
-                value: valueEth
-            })
-        ).to.be.reverted;
-    });
-
-    it("Should fail to removeNativeLiquidity: NFT not supported", async () => {
-        let valueEth = ethers.utils.parseEther("50000");
-        await expect(
-            liquidityPool.connect(owner).removePoolShare(1, 2)
-        ).to.be.reverted;
-    });
-
-    it("Should fail to removeEthLiquidity: Amount cannot be 0", async () => {
-        await expect(
-          liquidityPool.connect(owner).removePoolShare(1, 0)
-        ).to.be.reverted;
-    });
-
-    it("Should fail to addTokenLiquidity: Token address cannot be 0", async () => {
-        await expect(
-            liquidityPool.connect(owner).addTokenLiquidity(ZERO_ADDRESS, "10000")
-        ).to.be.revertedWith("Token address cannot be 0");
-    });
-
-    it("Should fail to addTokenLiquidity: Token not supported", async () => {
-        let inactiveTokenAddress = await bob.getAddress();
-        await expect(
-            liquidityPool.connect(owner).addTokenLiquidity(inactiveTokenAddress, "10000")
-        ).to.be.revertedWith("Token not supported");
-    });
-
-    it("Should fail to addTokenLiquidity: amount should be greater then 0", async () => {
-        await expect(
-            liquidityPool.connect(owner).addTokenLiquidity(tokenAddress, "0")
-        ).to.be.revertedWith("ERR__AMOUNT_IS_0");
-    });
-
-    it("Should fail to removeTokenLiquidity: Not enough balance", async () => {
-        await addTokenLiquidity(tokenAddress, communityPerWalletMaxCap, bob);
-        let nftIds = await lpToken.getAllNftIdsByUser(await bob.getAddress());
-        expect(nftIds.length).to.eq(1);
-        let nftId = nftIds[0];
-        let metadata = await lpToken.tokenMetadata(nftId.toString());
-        console.log(metadata);
-        await expect(
-            liquidityPool.connect(bob).removePoolShare(nftId.toString(), metadata.shares.add(1).toString())
-        ).to.be.revertedWith("ERR__INVALID_SHARES_AMOUNT");
-    });
-
 
     it("Should fail to depositErc20: Token address cannot be 0", async () => {
         await expect(
@@ -651,7 +617,7 @@ describe("LiquidityPoolTests", function () {
     it("Should fail to setTokenTransferOverhead: TokenAddress not supported", async () => {
         let inactiveTokenAddress = await bob.getAddress();
         await expect(
-            liquidityPool.connect(owner).setTokenTransferOverhead(
+            tokenManager.connect(owner).setTokenTransferOverhead(
                 inactiveTokenAddress,
                 21110
             )
@@ -660,14 +626,14 @@ describe("LiquidityPoolTests", function () {
 
     it("Should fail to setTokenTransferOverhead: only owner can update", async () => {
         await expect(
-            liquidityPool.connect(bob).setTokenTransferOverhead(tokenAddress, 21110)
+            tokenManager.connect(bob).setTokenTransferOverhead(tokenAddress, 21110)
         ).to.be.reverted;
     });
 
     it("Should removeSupportedToken successfully", async () => {
-        await liquidityPool.connect(owner).removeSupportedToken(tokenAddress);
+        await tokenManager.connect(owner).removeSupportedToken(tokenAddress);
 
-        let checkTokenStatus = await liquidityPool.tokensInfo(
+        let checkTokenStatus = await tokenManager.tokensInfo(
             tokenAddress
         );
         expect(checkTokenStatus.supportedToken).to.equal(false);
