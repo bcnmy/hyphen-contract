@@ -25,13 +25,15 @@ interface IWhiteListPeriodManager {
 
     function getMaxCommunityLpPositon(address _token) external view returns (uint256);
 
-    function initialize(address _trustedForwarder, address _liquidityPool) external;
+    function initialize(
+        address _trustedForwarder,
+        address _liquidityProviders,
+        address _tokenManager
+    ) external;
 
     function isExcludedAddress(address) external view returns (bool);
 
     function isTrustedForwarder(address forwarder) external view returns (bool);
-
-    function liquidityPool() external view returns (address);
 
     function owner() external view returns (address);
 
@@ -59,9 +61,11 @@ interface IWhiteListPeriodManager {
 
     function setIsExcludedAddressStatus(address[] memory _addresses, bool[] memory _status) external;
 
-    function setLiquidityPool(address _liquidityPool) external;
+    function setLiquidityProviders(address _liquidityProviders) external;
 
     function setPerTokenWalletCap(address _token, uint256 _perTokenWalletCap) external;
+
+    function setTokenManager(address _tokenManager) external;
 
     function setTotalCap(address _token, uint256 _totalCap) external;
 

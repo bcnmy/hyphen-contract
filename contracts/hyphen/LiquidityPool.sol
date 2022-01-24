@@ -8,13 +8,14 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "./LiquidityProviders.sol";
+import "./metatx/ERC2771ContextUpgradeable.sol";
 import "../security/Pausable.sol";
 import "./interfaces/IExecutorManager.sol";
+import "./interfaces/ILiquidityProviders.sol";
 import "../interfaces/IERC20Permit.sol";
 import "./interfaces/ITokenManager.sol";
 
-contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
+contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeable, ERC2771ContextUpgradeable {
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     uint256 private constant BASE_DIVISOR = 10000000000; // Basis Points * 100 for better accuracy
 
@@ -22,6 +23,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
 
     IExecutorManager private executorManager;
     ITokenManager private tokenManager;
+    ILiquidityProviders private liquidityProviders;
 
     struct TransferConfig {
         uint256 min;
@@ -79,6 +81,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
     event LiquidityAdded(address indexed from, address indexed tokenAddress, address indexed receiver, uint256 amount);
     event GasFeeWithdraw(address indexed tokenAddress, address indexed owner, uint256 indexed amount);
     event TrustedForwarderChanged(address indexed forwarderAddress);
+    event LiquidityProvidersChanged(address indexed liquidityProvidersAddress);
     event EthReceived(address, uint256);
 
     // MODIFIERS
@@ -87,10 +90,14 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
         _;
     }
 
+    modifier onlyLiquidityProviders() {
+        require(_msgSender() == address(liquidityProviders), "Only liquidityProviders is allowed");
+        _;
+    }
+
     modifier tokenChecks(address tokenAddress) {
         require(tokenAddress != address(0), "Token address cannot be 0");
         require(tokenManager.getTokensInfo(tokenAddress).supportedToken, "Token not supported");
-
         _;
     }
 
@@ -98,17 +105,18 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
         address _executorManagerAddress,
         address pauser,
         address _trustedForwarder,
-        address _lpToken,
-        address _tokenManager
+        address _tokenManager,
+        address _liquidityProviders
     ) public initializer {
         require(_executorManagerAddress != address(0), "ExecutorManager cannot be 0x0");
         require(_trustedForwarder != address(0), "TrustedForwarder cannot be 0x0");
-        __LiquidityProviders_init(_trustedForwarder, _lpToken);
+        require(_liquidityProviders != address(0), "LiquidityProviders cannot be 0x0");
         __ReentrancyGuard_init();
         __Ownable_init();
         __Pausable_init(pauser);
         executorManager = IExecutorManager(_executorManagerAddress);
         tokenManager = ITokenManager(_tokenManager);
+        liquidityProviders = ILiquidityProviders(_liquidityProviders);
         baseGas = 21000;
     }
 
@@ -116,6 +124,12 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
         require(trustedForwarder != address(0), "TrustedForwarder can't be 0");
         _trustedForwarder = trustedForwarder;
         emit TrustedForwarderChanged(trustedForwarder);
+    }
+
+    function setLiquidityProviders(address _liquidityProviders) public onlyOwner {
+        require(_liquidityProviders != address(0), "LiquidityProviders can't be 0");
+        liquidityProviders = ILiquidityProviders(_liquidityProviders);
+        emit LiquidityProvidersChanged(_liquidityProviders);
     }
 
     function setBaseGas(uint128 gas) external onlyOwner {
@@ -139,47 +153,11 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
             liquidityPoolBalance = IERC20Upgradeable(tokenAddress).balanceOf(address(this));
         }
 
-        currentLiquidity = liquidityPoolBalance - totalLPFees[tokenAddress] - gasFeeAccumulatedByToken[tokenAddress] - incentivePool[tokenAddress];
-    }
-
-    function addNativeLiquidity() external payable tokenChecks(NATIVE) nonReentrant whenNotPaused {
-        address sender = _msgSender();
-        _addNativeLiquidity();
-        emit LiquidityAdded(sender, NATIVE, address(this), msg.value);
-    }
-
-    function increaseNativeLiquidity(uint256 _nftId) external payable tokenChecks(NATIVE) nonReentrant whenNotPaused {
-        _increaseNativeLiquidity(_nftId);
-        emit LiquidityAdded(_msgSender(), NATIVE, address(this), msg.value);
-    }
-
-    function removePoolShare(uint256 _nftId, uint256 _amount) external tokenChecks(NATIVE) nonReentrant {
-        _removeLiquidity(_nftId, _amount);
-    }
-
-    function addTokenLiquidity(address tokenAddress, uint256 amount)
-        external
-        tokenChecks(tokenAddress)
-        nonReentrant
-        whenNotPaused
-    {
-        _addTokenLiquidity(tokenAddress, amount);
-        emit LiquidityAdded(_msgSender(), tokenAddress, address(this), amount);
-    }
-
-    function increaseTokenLiquidity(uint256 _nftId, uint256 _amount) external nonReentrant whenNotPaused {
-        (address tokenAddress, ,) = lpToken.tokenMetadata(_nftId);
-        require(tokenManager.getTokensInfo(tokenAddress).supportedToken, "Token not supported");
-        _increaseTokenLiquidity(_nftId, _amount);
-        emit LiquidityAdded(_msgSender(), tokenAddress, address(this), _amount);
-    }
-
-    function claimFee(uint256 _nftId) external {
-        _claimFee(_nftId);
-    }
-
-    function getSuppliedLiquidity(uint256 _nftId) public view returns (uint256) {
-        return _getSuppliedLiquidity(_nftId);
+        currentLiquidity =
+            liquidityPoolBalance -
+            liquidityProviders.totalLPFees(tokenAddress) -
+            gasFeeAccumulatedByToken[tokenAddress] -
+            incentivePool[tokenAddress];
     }
 
     /**
@@ -197,7 +175,8 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
         string memory tag
     ) public tokenChecks(tokenAddress) whenNotPaused {
         require(
-            tokenManager.getTokensInfo(tokenAddress).minCap <= amount && tokenManager.getTokensInfo(tokenAddress).maxCap >= amount,
+            tokenManager.getTokensInfo(tokenAddress).minCap <= amount &&
+                tokenManager.getTokensInfo(tokenAddress).maxCap >= amount,
             "Deposit amount not in cap limits"
         );
         require(receiver != address(0), "Receiver address cannot be 0");
@@ -216,7 +195,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
 
     function getRewardAmount(uint256 amount, address tokenAddress) public view returns (uint256 rewardAmount) {
         uint256 currentLiquidity = getCurrentLiquidity(tokenAddress);
-        uint256 providedLiquidity = getSuppliedLiquidityByToken(tokenAddress);
+        uint256 providedLiquidity = liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
         if (currentLiquidity < providedLiquidity) {
             uint256 liquidityDifference = providedLiquidity - currentLiquidity;
             if (amount >= liquidityDifference) {
@@ -287,7 +266,8 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
         string memory tag
     ) external payable whenNotPaused {
         require(
-            tokenManager.getTokensInfo(NATIVE).minCap <= msg.value && tokenManager.getTokensInfo(NATIVE).maxCap >= msg.value,
+            tokenManager.getTokensInfo(NATIVE).minCap <= msg.value &&
+                tokenManager.getTokensInfo(NATIVE).maxCap >= msg.value,
             "Deposit amount not in Cap limit"
         );
         require(receiver != address(0), "Receiver address cannot be 0");
@@ -310,7 +290,8 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
     ) external nonReentrant onlyExecutor tokenChecks(tokenAddress) whenNotPaused {
         uint256 initialGas = gasleft();
         require(
-            tokenManager.getTokensInfo(tokenAddress).minCap <= amount && tokenManager.getTokensInfo(tokenAddress).maxCap >= amount,
+            tokenManager.getTokensInfo(tokenAddress).minCap <= amount &&
+                tokenManager.getTokensInfo(tokenAddress).maxCap >= amount,
             "Withdraw amnt not in Cap limits"
         );
         require(receiver != address(0), "Bad receiver address");
@@ -354,14 +335,15 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
             // Here add some fee to incentive pool also
             lpFee = (amount * tokenManager.getTokensInfo(tokenAddress).equilibriumFee) / BASE_DIVISOR;
             incentivePool[tokenAddress] =
-                (incentivePool[tokenAddress] + (amount * (transferFeePerc - tokenManager.getTokensInfo(tokenAddress).equilibriumFee))) /
+                (incentivePool[tokenAddress] +
+                    (amount * (transferFeePerc - tokenManager.getTokensInfo(tokenAddress).equilibriumFee))) /
                 BASE_DIVISOR;
         } else {
             lpFee = (amount * transferFeePerc) / BASE_DIVISOR;
         }
         uint256 transferFeeAmount = (amount * transferFeePerc) / BASE_DIVISOR;
 
-        _addLPFee(tokenAddress, lpFee);
+        liquidityProviders.addLPFee(tokenAddress, lpFee);
 
         uint256 totalGasUsed = initialGas - gasleft();
         totalGasUsed = totalGasUsed + tokenManager.getTokensInfo(tokenAddress).transferOverhead;
@@ -379,7 +361,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
 
     function getTransferFee(address tokenAddress, uint256 amount) public view returns (uint256 fee) {
         uint256 currentLiquidity = getCurrentLiquidity(tokenAddress);
-        uint256 providedLiquidity = getSuppliedLiquidityByToken(tokenAddress);
+        uint256 providedLiquidity = liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
 
         uint256 resultingLiquidity = currentLiquidity - amount;
 
@@ -426,15 +408,23 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
         emit GasFeeWithdraw(address(this), _msgSender(), _gasFeeAccumulated);
     }
 
-    function isTokenSupported(address _token) public view override returns (bool) {
-        return tokenManager.getTokensInfo(_token).supportedToken;
+    function requestFunds(address _tokenAddress, uint256 _tokenAmount) external whenNotPaused onlyLiquidityProviders {
+        if (_tokenAddress == NATIVE) {
+            require(address(this).balance >= _tokenAmount, "ERR__INSUFFICIENT_BALANCE");
+            bool success = payable(address(liquidityProviders)).send(_tokenAmount);
+            require(success, "ERR__NATIVE_TRANSFER_FAILED");
+        } else {
+            IERC20Upgradeable baseToken = IERC20Upgradeable(_tokenAddress);
+            require(baseToken.balanceOf(address(this)) >= _tokenAmount, "ERR__INSUFFICIENT_BALANCE");
+            SafeERC20Upgradeable.safeTransfer(baseToken, address(liquidityProviders), _tokenAmount);
+        }
     }
 
     function _msgSender()
         internal
         view
         virtual
-        override(ContextUpgradeable, LiquidityProviders)
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
         returns (address sender)
     {
         return ERC2771ContextUpgradeable._msgSender();
@@ -444,7 +434,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable {
         internal
         view
         virtual
-        override(ContextUpgradeable, LiquidityProviders)
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
         returns (bytes calldata)
     {
         return ERC2771ContextUpgradeable._msgData();

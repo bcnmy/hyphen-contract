@@ -7,11 +7,13 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
 import "./metatx/ERC2771ContextUpgradeable.sol";
-import "./interfaces/ILiquidityPool.sol";
+import "./interfaces/ILiquidityProviders.sol";
+import "./interfaces/ITokenManager.sol";
 import "./interfaces/ILPToken.sol";
 
 contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUpgradeable, ERC2771ContextUpgradeable {
-    ILiquidityPool public liquidityPool;
+    ILiquidityProviders private liquidityProviders;
+    ITokenManager private tokenManager;
     bool public areWhiteListRestrictionsEnabled;
 
     /* LP Status */
@@ -34,12 +36,18 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
     event WhiteListStatusUpdated(bool status);
 
     modifier onlyLiquidityPool() {
-        require(_msgSender() == address(liquidityPool), "ERR__UNAUTHORIZED");
+        require(_msgSender() == address(liquidityProviders), "ERR__UNAUTHORIZED");
         _;
     }
 
     modifier onlyLpNft() {
-        require(_msgSender() == liquidityPool.lpToken(), "ERR__UNAUTHORIZED");
+        require(_msgSender() == liquidityProviders.lpToken(), "ERR__UNAUTHORIZED");
+        _;
+    }
+
+    modifier tokenChecks(address tokenAddress) {
+        require(tokenAddress != address(0), "Token address cannot be 0");
+        require(_isSupportedToken(tokenAddress), "Token not supported");
         _;
     }
 
@@ -47,12 +55,21 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
      * @dev initalizes the contract, acts as constructor
      * @param _trustedForwarder address of trusted forwarder
      */
-    function initialize(address _trustedForwarder, address _liquidityPool) public initializer {
+    function initialize(
+        address _trustedForwarder,
+        address _liquidityProviders,
+        address _tokenManager
+    ) public initializer {
         __ERC2771Context_init(_trustedForwarder);
         __Ownable_init();
         __Pausable_init();
-        liquidityPool = ILiquidityPool(_liquidityPool);
         areWhiteListRestrictionsEnabled = true;
+        _setLiquidityProviders(_liquidityProviders);
+        _setTokenManager(_tokenManager);
+    }
+
+    function _isSupportedToken(address _token) internal view returns (bool) {
+        return tokenManager.getTokensInfo(_token).supportedToken;
     }
 
     /**
@@ -129,8 +146,26 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
         _beforeLiquidityAddition(_to, _token, _amount);
     }
 
-    function setLiquidityPool(address _liquidityPool) external onlyOwner {
-        liquidityPool = ILiquidityPool(_liquidityPool);
+    /**
+     * Public method to set TokenManager contract.
+     */
+    function setTokenManager(address _tokenManager) external onlyOwner {
+        _setTokenManager(_tokenManager);
+    }
+
+    /**
+     * Internal method to set TokenManager contract.
+     */
+    function _setTokenManager(address _tokenManager) internal {
+        tokenManager = ITokenManager(_tokenManager);
+    }
+
+    function _setLiquidityProviders(address _liquidityProviders) internal {
+        liquidityProviders = ILiquidityProviders(_liquidityProviders);
+    }
+
+    function setLiquidityProviders(address _liquidityProviders) external onlyOwner {
+        _setLiquidityProviders(_liquidityProviders);
     }
 
     function setIsExcludedAddressStatus(address[] memory _addresses, bool[] memory _status) external onlyOwner {
@@ -141,8 +176,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
         }
     }
 
-    function setTotalCap(address _token, uint256 _totalCap) public onlyOwner {
-        require(liquidityPool.isTokenSupported(_token), "ERR__TOKEN_NOT_SUPPORTED");
+    function setTotalCap(address _token, uint256 _totalCap) public tokenChecks(_token) onlyOwner {
         require(totalLiquidity[_token] <= _totalCap, "ERR__TOTAL_CAP_LESS_THAN_SL");
         require(_totalCap >= perTokenWalletCap[_token], "ERR__TOTAL_CAP_LT_PTWC");
         if (perTokenTotalCap[_token] != _totalCap) {
@@ -158,8 +192,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
      *      Checking this on chain will probably require implementing a bbst, which needs more bandwidth
      *      Call the view function getMaxCommunityLpPositon() separately before changing this value
      */
-    function setPerTokenWalletCap(address _token, uint256 _perTokenWalletCap) public onlyOwner {
-        require(liquidityPool.isTokenSupported(_token), "ERR__TOKEN_NOT_SUPPORTED");
+    function setPerTokenWalletCap(address _token, uint256 _perTokenWalletCap) public tokenChecks(_token) onlyOwner {
         require(_perTokenWalletCap <= perTokenTotalCap[_token], "ERR__PWC_GT_PTTC");
         if (perTokenWalletCap[_token] != _perTokenWalletCap) {
             perTokenWalletCap[_token] = _perTokenWalletCap;
@@ -203,7 +236,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
      * @dev Returns the maximum amount a single community LP has provided
      */
     function getMaxCommunityLpPositon(address _token) external view returns (uint256) {
-        ILPToken lpToken = ILPToken(liquidityPool.lpToken());
+        ILPToken lpToken = ILPToken(liquidityProviders.lpToken());
         uint256 totalSupply = lpToken.totalSupply();
         uint256 maxLp = 0;
         for (uint256 i = 1; i <= totalSupply; ++i) {
