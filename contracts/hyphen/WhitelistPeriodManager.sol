@@ -15,6 +15,7 @@ import "./interfaces/ILPToken.sol";
 contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, ERC2771ContextUpgradeable {
     ILiquidityProviders private liquidityProviders;
     ITokenManager private tokenManager;
+    ILPToken private lpToken;
     bool public areWhiteListRestrictionsEnabled;
 
     /* LP Status */
@@ -42,7 +43,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
     }
 
     modifier onlyLpNft() {
-        require(_msgSender() == liquidityProviders.lpToken(), "ERR__UNAUTHORIZED");
+        require(_msgSender() == address(lpToken), "ERR__UNAUTHORIZED");
         _;
     }
 
@@ -60,6 +61,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
         address _trustedForwarder,
         address _liquidityProviders,
         address _tokenManager,
+        address _lpToken,
         address _pauser
     ) public initializer {
         __ERC2771Context_init(_trustedForwarder);
@@ -68,6 +70,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
         areWhiteListRestrictionsEnabled = true;
         _setLiquidityProviders(_liquidityProviders);
         _setTokenManager(_tokenManager);
+        _setLpToken(_lpToken);
     }
 
     function _isSupportedToken(address _token) internal view returns (bool) {
@@ -148,18 +151,12 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
         _beforeLiquidityAddition(_to, _token, _amount);
     }
 
-    /**
-     * Public method to set TokenManager contract.
-     */
-    function setTokenManager(address _tokenManager) external onlyOwner {
-        _setTokenManager(_tokenManager);
-    }
-
-    /**
-     * Internal method to set TokenManager contract.
-     */
     function _setTokenManager(address _tokenManager) internal {
         tokenManager = ITokenManager(_tokenManager);
+    }
+
+    function setTokenManager(address _tokenManager) external onlyOwner {
+        _setTokenManager(_tokenManager);
     }
 
     function _setLiquidityProviders(address _liquidityProviders) internal {
@@ -168,6 +165,14 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
 
     function setLiquidityProviders(address _liquidityProviders) external onlyOwner {
         _setLiquidityProviders(_liquidityProviders);
+    }
+
+    function _setLpToken(address _lpToken) internal {
+        lpToken = ILPToken(_lpToken);
+    }
+
+    function setLpToken(address _lpToken) external onlyOwner {
+        _setLpToken(_lpToken);
     }
 
     function setIsExcludedAddressStatus(address[] memory _addresses, bool[] memory _status) external onlyOwner {
@@ -238,7 +243,6 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
      * @dev Returns the maximum amount a single community LP has provided
      */
     function getMaxCommunityLpPositon(address _token) external view returns (uint256) {
-        ILPToken lpToken = ILPToken(liquidityProviders.lpToken());
         uint256 totalSupply = lpToken.totalSupply();
         uint256 maxLp = 0;
         for (uint256 i = 1; i <= totalSupply; ++i) {

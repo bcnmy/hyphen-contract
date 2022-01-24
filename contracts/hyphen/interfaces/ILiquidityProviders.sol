@@ -30,10 +30,6 @@ interface ILiquidityProviders {
 
     function isTrustedForwarder(address forwarder) external view returns (bool);
 
-    function liquidityPool() external view returns (address);
-
-    function lpToken() external view returns (address);
-
     function owner() external view returns (address);
 
     function paused() external view returns (bool);

@@ -125,6 +125,7 @@ describe("LiquidityProviderTests", function () {
       tf.address,
       liquidityProviders.address,
       tokenManager.address,
+      lpToken.address,
       pauser.address,
     ])) as WhitelistPeriodManager;
     await wlpm.setLiquidityProviders(liquidityProviders.address);

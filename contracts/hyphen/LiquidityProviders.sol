@@ -294,7 +294,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      * @dev Function to allow LPs to remove their liquidity from an existing NFT
      *      Also automatically redeems any earned fee
      */
-    function removeLiquidity(uint256 _nftId, uint256 amount)
+    function removeLiquidity(uint256 _nftId, uint256 _amount)
         external
         onlyValidLpToken(_nftId, _msgSender())
         whenNotPaused
@@ -302,11 +302,11 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
         (address _tokenAddress, uint256 nftSuppliedLiquidity, uint256 totalNFTShares) = lpToken.tokenMetadata(_nftId);
         require(_isSupportedToken(_tokenAddress), "ERR__TOKEN_NOT_SUPPORTED");
 
-        require(amount != 0, "ERR__INVALID_AMOUNT");
-        require(nftSuppliedLiquidity >= amount, "ERR__INSUFFICIENT_LIQUIDITY");
-        whiteListPeriodManager.beforeLiquidityRemoval(_msgSender(), _tokenAddress, amount);
+        require(_amount != 0, "ERR__INVALID_AMOUNT");
+        require(nftSuppliedLiquidity >= _amount, "ERR__INSUFFICIENT_LIQUIDITY");
+        whiteListPeriodManager.beforeLiquidityRemoval(_msgSender(), _tokenAddress, _amount);
         // Claculate how much shares represent input amount
-        uint256 lpSharesForInputAmount = amount * getTokenPriceInLPShares(_tokenAddress);
+        uint256 lpSharesForInputAmount = _amount * getTokenPriceInLPShares(_tokenAddress);
 
         // Calculate rewards accumulated
         uint256 eligibleLiquidity = sharesToTokenAmount(totalNFTShares, _tokenAddress);
@@ -315,7 +315,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
         uint256 lpSharesRepresentingFee = lpFeeAccumulated * getTokenPriceInLPShares(_tokenAddress);
 
         totalLPFees[_tokenAddress] -= lpFeeAccumulated;
-        uint256 amountToWithdraw = amount + lpFeeAccumulated;
+        uint256 amountToWithdraw = _amount + lpFeeAccumulated;
         uint256 lpSharesToBurn = lpSharesForInputAmount + lpSharesRepresentingFee;
 
         // Handle round off errors to avoid dust lp token in contract
@@ -323,10 +323,10 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
             lpSharesToBurn = totalNFTShares;
         }
         totalReserve[_tokenAddress] -= amountToWithdraw;
-        totalLiquidity[_tokenAddress] -= amount;
+        totalLiquidity[_tokenAddress] -= _amount;
         totalSharesMinted[_tokenAddress] -= lpSharesToBurn;
 
-        _burnSharesFromNft(_nftId, lpSharesToBurn, amount, _tokenAddress);
+        _burnSharesFromNft(_nftId, lpSharesToBurn, _amount, _tokenAddress);
 
         _transferFromLiquidityPool(_tokenAddress, _msgSender(), amountToWithdraw);
 
