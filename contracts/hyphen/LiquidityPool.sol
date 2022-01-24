@@ -78,7 +78,6 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         uint256 reward,
         string tag
     );
-    event LiquidityAdded(address indexed from, address indexed tokenAddress, address indexed receiver, uint256 amount);
     event GasFeeWithdraw(address indexed tokenAddress, address indexed owner, uint256 indexed amount);
     event TrustedForwarderChanged(address indexed forwarderAddress);
     event LiquidityProvidersChanged(address indexed liquidityProvidersAddress);
@@ -103,7 +102,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
 
     function initialize(
         address _executorManagerAddress,
-        address pauser,
+        address _pauser,
         address _trustedForwarder,
         address _tokenManager,
         address _liquidityProviders
@@ -113,7 +112,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         require(_liquidityProviders != address(0), "LiquidityProviders cannot be 0x0");
         __ReentrancyGuard_init();
         __Ownable_init();
-        __Pausable_init(pauser);
+        __Pausable_init(_pauser);
         executorManager = IExecutorManager(_executorManagerAddress);
         tokenManager = ITokenManager(_tokenManager);
         liquidityProviders = ILiquidityProviders(_liquidityProviders);
@@ -411,7 +410,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
     function requestFunds(address _tokenAddress, uint256 _tokenAmount) external whenNotPaused onlyLiquidityProviders {
         if (_tokenAddress == NATIVE) {
             require(address(this).balance >= _tokenAmount, "ERR__INSUFFICIENT_BALANCE");
-            bool success = payable(address(liquidityProviders)).send(_tokenAmount);
+            (bool success, ) = address(liquidityProviders).call{value: _tokenAmount}("");
             require(success, "ERR__NATIVE_TRANSFER_FAILED");
         } else {
             IERC20Upgradeable baseToken = IERC20Upgradeable(_tokenAddress);

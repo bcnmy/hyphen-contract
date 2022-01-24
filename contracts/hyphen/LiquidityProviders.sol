@@ -3,30 +3,32 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "./metatx/ERC2771ContextUpgradeable.sol";
 
+import "../security/Pausable.sol";
 import "./interfaces/ILPToken.sol";
 import "./interfaces/ITokenManager.sol";
 import "./interfaces/IWhiteListPeriodManager.sol";
 import "./interfaces/ILiquidityPool.sol";
-import "./metatx/ERC2771ContextUpgradeable.sol";
 import "hardhat/console.sol";
 
-contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, OwnableUpgradeable, PausableUpgradeable {
+contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, OwnableUpgradeable, Pausable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
-    address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    address internal constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     uint256 private constant BASE_DIVISOR = 10**18;
 
-    ILPToken private lpToken;
-    ILiquidityPool private liquidityPool;
-    ITokenManager private tokenManager;
-    IWhiteListPeriodManager public whiteListPeriodManager;
+    ILPToken internal lpToken;
+    ILiquidityPool internal liquidityPool;
+    ITokenManager internal tokenManager;
+    IWhiteListPeriodManager internal whiteListPeriodManager;
 
+    event LiquidityAdded(address indexed tokenAddress, uint256 indexed amount, address indexed lp);
     event LiquidityRemoved(address indexed tokenAddress, uint256 indexed amount, address indexed lp);
     event FeeClaimed(address indexed tokenAddress, uint256 indexed fee, address indexed lp, uint256 sharesBurnt);
+    event EthReceived(address indexed sender, uint256 value);
 
     // LP Fee Distribution
     mapping(address => uint256) public totalReserve; // Include Liquidity + Fee accumulated
@@ -64,14 +66,15 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      * @dev initalizes the contract, acts as constructor
      * @param _trustedForwarder address of trusted forwarder
      */
-    function __LiquidityProviders_init(
+    function initialize(
         address _trustedForwarder,
         address _lpToken,
-        address _tokenManager
+        address _tokenManager,
+        address _pauser
     ) public initializer {
         __ERC2771Context_init(_trustedForwarder);
         __Ownable_init();
-        __Pausable_init();
+        __Pausable_init(_pauser);
         _setLPToken(_lpToken);
         _setTokenManager(_tokenManager);
     }
@@ -204,7 +207,8 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      *      record in the newly minted NFT
      */
     function addNativeLiquidity() external payable tokenChecks(NATIVE) whenNotPaused {
-        require(payable(address(liquidityPool)).send(msg.value), "ERR__NATIVE_TRANSFER_FAILED");
+        (bool success, ) = address(liquidityPool).call{value: msg.value}("");
+        require(success, "ERR__NATIVE_TRANSFER_FAILED");
         _addLiquidity(NATIVE, msg.value);
     }
 
@@ -253,6 +257,8 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
             totalShares + mintedSharesAmount
         );
         lpToken.updateTokenMetadata(_nftId, data);
+
+        emit LiquidityAdded(token, _amount, _msgSender());
     }
 
     /**
@@ -279,8 +285,9 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
         (address token, , ) = lpToken.tokenMetadata(_nftId);
         require(_isSupportedToken(NATIVE), "ERR__TOKEN_NOT_SUPPORTED");
         require(token == NATIVE, "ERR__WRONG_FUNCTION");
+        (bool success, ) = address(liquidityPool).call{value: msg.value}("");
+        require(success, "ERR__NATIVE_TRANSFER_FAILED");
         _increaseLiquidity(_nftId, msg.value);
-        require(payable(address(liquidityPool)).send(msg.value), "ERR__NATIVE_TRANSFER_FAILED");
     }
 
     /**
@@ -408,5 +415,9 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
         returns (bytes calldata)
     {
         return ERC2771ContextUpgradeable._msgData();
+    }
+
+    receive() external payable {
+        emit EthReceived(_msgSender(), msg.value);
     }
 }

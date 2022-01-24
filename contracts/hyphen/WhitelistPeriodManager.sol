@@ -6,12 +6,13 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
+import "../security/Pausable.sol";
 import "./metatx/ERC2771ContextUpgradeable.sol";
 import "./interfaces/ILiquidityProviders.sol";
 import "./interfaces/ITokenManager.sol";
 import "./interfaces/ILPToken.sol";
 
-contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUpgradeable, ERC2771ContextUpgradeable {
+contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, ERC2771ContextUpgradeable {
     ILiquidityProviders private liquidityProviders;
     ITokenManager private tokenManager;
     bool public areWhiteListRestrictionsEnabled;
@@ -58,11 +59,12 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, PausableUp
     function initialize(
         address _trustedForwarder,
         address _liquidityProviders,
-        address _tokenManager
+        address _tokenManager,
+        address _pauser
     ) public initializer {
         __ERC2771Context_init(_trustedForwarder);
         __Ownable_init();
-        __Pausable_init();
+        __Pausable_init(_pauser);
         areWhiteListRestrictionsEnabled = true;
         _setLiquidityProviders(_liquidityProviders);
         _setTokenManager(_tokenManager);

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 interface ILiquidityProviders {
-    function __LiquidityProviders_init(address _trustedForwarder, address _lpToken) external;
+    function initialize(address _trustedForwarder, address _lpToken) external;
 
     function addLPFee(address _token, uint256 _amount) external;
 
