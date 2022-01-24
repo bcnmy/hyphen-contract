@@ -2,9 +2,12 @@ import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import {
   ERC20Token,
-  LiquidityProvidersImplementation,
+  LiquidityProvidersTest,
   WhitelistPeriodManager,
   LPToken,
+  TokenManager,
+  ExecutorManager,
+  LiquidityPool,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -16,46 +19,71 @@ describe("WhiteListPeriodManager", function () {
   let dan: SignerWithAddress, elon: SignerWithAddress;
   let token: ERC20Token;
   let lpToken: LPToken;
+  let tokenManager: TokenManager;
+  let executorManager: ExecutorManager;
   let wlpm: WhitelistPeriodManager;
-  let liquidityProviders: LiquidityProvidersImplementation;
+  let liquidityProviders: LiquidityProvidersTest;
+  let liquidityPool: LiquidityPool;
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
 
   beforeEach(async function () {
-    [owner, pauser, charlie, bob, dan, elon, tf, executor] = await ethers.getSigners();
+    [owner, pauser, charlie, bob, dan, elon, tf, , executor] = await ethers.getSigners();
+
+    const tokenManagerFactory = await ethers.getContractFactory("TokenManager");
+    tokenManager = await tokenManagerFactory.deploy(tf.address);
 
     const erc20factory = await ethers.getContractFactory("ERC20Token");
     token = (await upgrades.deployProxy(erc20factory, ["USDT", "USDT"])) as ERC20Token;
-
     for (const signer of [owner, bob, charlie, dan, elon]) {
-      await token.mint(signer.address, ethers.BigNumber.from(10000000000000).mul(ethers.BigNumber.from(10).pow(18)));
+      await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
     }
+    await tokenManager.addSupportedToken(token.address, BigNumber.from(1), BigNumber.from(10).pow(30), 0, 0);
+
+    const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
+    executorManager = await executorManagerFactory.deploy();
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
     lpToken = (await upgrades.deployProxy(lpTokenFactory, ["LPToken", "LPToken", tf.address])) as LPToken;
 
-    const liquidtyProvidersFactory = await ethers.getContractFactory("LiquidityProvidersImplementation");
+    const liquidtyProvidersFactory = await ethers.getContractFactory("LiquidityProvidersTest");
     liquidityProviders = (await upgrades.deployProxy(liquidtyProvidersFactory, [
       trustedForwarder,
       lpToken.address,
-    ])) as LiquidityProvidersImplementation;
+      tokenManager.address,
+      pauser.address,
+    ])) as LiquidityProvidersTest;
     await liquidityProviders.deployed();
     await lpToken.setLiquidtyPool(liquidityProviders.address);
+    await liquidityProviders.setLpToken(lpToken.address);
 
     const wlpmFactory = await ethers.getContractFactory("WhitelistPeriodManager");
     wlpm = (await upgrades.deployProxy(wlpmFactory, [
       tf.address,
       liquidityProviders.address,
+      tokenManager.address,
+      lpToken.address,
+      pauser.address,
     ])) as WhitelistPeriodManager;
-    await wlpm.setLiquidityPool(liquidityProviders.address);
+    await wlpm.setLiquidityProviders(liquidityProviders.address);
     await liquidityProviders.setWhiteListPeriodManager(wlpm.address);
     await lpToken.setWhiteListPeriodManager(wlpm.address);
+    await wlpm.setAreWhiteListRestrictionsEnabled(true);
+
+    const lpFactory = await ethers.getContractFactory("LiquidityPool");
+    liquidityPool = (await upgrades.deployProxy(lpFactory, [
+      executorManager.address,
+      pauser.address,
+      tf.address,
+      tokenManager.address,
+      liquidityProviders.address,
+    ])) as LiquidityPool;
+    await liquidityProviders.setLiquidityPool(liquidityPool.address);
 
     for (const signer of [owner, bob, charlie, dan, elon]) {
       await token.connect(signer).approve(liquidityProviders.address, await token.balanceOf(signer.address));
     }
   });
 
-  /*
   describe("Setup", async function () {
     it("Should set Token Caps properly", async function () {
       await wlpm.setCaps([token.address], [1000], [500]);
@@ -124,7 +152,7 @@ describe("WhiteListPeriodManager", function () {
 
     it("Should allow LPs to add more liquidity within cap after removing", async function () {
       await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
-      await liquidityProviders.decreaseLiquidity(1, 5);
+      await liquidityProviders.removeLiquidity(1, 5);
       await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 5)).to.not.be.reverted;
     });
 
@@ -209,15 +237,14 @@ describe("WhiteListPeriodManager", function () {
       expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(50);
       await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(2, 25)).to.not.be.reverted;
       expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(55);
-      await expect(liquidityProviders.connect(bob).decreaseLiquidity(2, 40)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(bob).removeLiquidity(2, 40)).to.not.be.reverted;
       expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(50);
-      await expect(liquidityProviders.connect(charlie).decreaseLiquidity(3, 25)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(charlie).removeLiquidity(3, 25)).to.not.be.reverted;
       expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(25);
-      await expect(liquidityProviders.connect(charlie).decreaseLiquidity(3, 25)).to.not.be.reverted;
+      await expect(liquidityProviders.connect(charlie).removeLiquidity(3, 25)).to.not.be.reverted;
       expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(15);
     });
   });
-  */
 
   describe("Planned Scenario / Prod Dry Run", async function () {
     const f = (n: number) => BigNumber.from(n).mul(BigNumber.from(10).pow(18));
