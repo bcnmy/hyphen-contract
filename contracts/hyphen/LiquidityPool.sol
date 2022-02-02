@@ -22,8 +22,8 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
     uint256 public baseGas;
 
     IExecutorManager private executorManager;
-    ITokenManager private tokenManager;
-    ILiquidityProviders private liquidityProviders;
+    ITokenManager public tokenManager;
+    ILiquidityProviders public liquidityProviders;
 
     struct TransferConfig {
         uint256 min;
