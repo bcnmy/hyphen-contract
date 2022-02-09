@@ -68,6 +68,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         bytes depositHash,
         uint256 fromChainId
     );
+    event FeeDetails(uint256 lpFee, uint256 transferFee, uint256 gasFee);
     event Received(address indexed from, uint256 indexed amount);
     event Deposit(
         address indexed from,
@@ -349,14 +350,14 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         totalGasUsed = totalGasUsed + tokenManager.getTokensInfo(tokenAddress).transferOverhead;
         totalGasUsed = totalGasUsed + baseGas;
 
+        uint256 gasFee = totalGasUsed * tokenGasPrice;
         gasFeeAccumulatedByToken[tokenAddress] =
-            gasFeeAccumulatedByToken[tokenAddress] +
-            (totalGasUsed * tokenGasPrice);
+            gasFeeAccumulatedByToken[tokenAddress] + gasFee;
         gasFeeAccumulated[tokenAddress][_msgSender()] =
-            gasFeeAccumulated[tokenAddress][_msgSender()] +
-            (totalGasUsed * tokenGasPrice);
-
-        amountToTransfer = amount - (transferFeeAmount + (totalGasUsed * tokenGasPrice));
+            gasFeeAccumulated[tokenAddress][_msgSender()] + gasFee;
+        amountToTransfer = amount - (transferFeeAmount + gasFee);
+        
+        emit FeeDetails(lpFee, transferFeeAmount, gasFee);
     }
 
     function getTransferFee(address tokenAddress, uint256 amount) public view returns (uint256 fee) {
