@@ -15,8 +15,6 @@ const addresses = {
 const LPTokenName = "BICO Liquidity Token";
 const LPTokenSymbol = "BICOLP";
 
-console.log(process.env)
-
 async function main() {
   const { bicoOwner, trustedForwarder, pauser } = addresses;
 
