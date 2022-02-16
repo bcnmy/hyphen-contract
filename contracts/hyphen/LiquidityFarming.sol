@@ -224,17 +224,21 @@ contract BoringOwnable is BoringOwnableData {
 pragma solidity ^0.8.0;
 pragma experimental ABIEncoderV2;
 
+import "./interfaces/ILPToken.sol";
+import "./interfaces/ILiquidityProviders.sol";
+
 interface IMasterChefV2 {
     function lpToken(uint256 pid) external view returns (IERC20 _lpToken);
 }
 
 /// @author @0xKeno and @ankurdubey521
-contract HyphenLiquidityFarming is IRewarder, BoringOwnable {
+contract HyphenLiquidityFarming is BoringOwnable {
     using BoringMath for uint256;
     using BoringMath128 for uint128;
     using BoringERC20 for IERC20;
 
-    IERC20 public rewardToken;
+    ILPToken public lpToken;
+    ILiquidityProviders public liquidityProviders;
 
     /// @notice Info of each Rewarder user.
     /// `amount` LP token amount the user has provided.
@@ -247,21 +251,26 @@ contract HyphenLiquidityFarming is IRewarder, BoringOwnable {
 
     /// @notice Info of the rewarder pool
     struct PoolInfo {
-        uint128 accToken1PerShare;
+        uint128 accTokenPerShare;
         uint64 lastRewardTime;
     }
 
     /// @notice Mapping to track the rewarder pool.
-    mapping(uint256 => PoolInfo) public poolInfo;
+    mapping(address => PoolInfo) public poolInfo;
 
     /// @notice Info of each user that stakes LP tokens.
-    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
+    mapping(address => mapping(address => UserInfo)) public userInfo;
 
-    uint256 public rewardPerSecond;
-    IERC20 public masterLpToken;
+    /// @notice Reward rate per base token
+    mapping(address => uint256) public rewardPerSecond;
+
+    /// @notice Reward Token
+    mapping(address => address) public rewardTokens;
+
     uint256 private constant ACC_TOKEN_PRECISION = 1e12;
+    uint256 private constant ACC_SUSHI_PRECISION = 1e12;
 
-    address public immutable MASTERCHEF_V2;
+    // address public immutable MASTERCHEF_V2;
 
     uint256 internal unlocked;
     modifier lock() {
@@ -271,41 +280,46 @@ contract HyphenLiquidityFarming is IRewarder, BoringOwnable {
         unlocked = 1;
     }
 
-    event LogOnReward(address indexed user, uint256 indexed pid, uint256 amount, address indexed to);
-    event LogUpdatePool(uint256 indexed pid, uint64 lastRewardTime, uint256 lpSupply, uint256 accToken1PerShare);
-    event LogRewardPerSecond(uint256 rewardPerSecond);
-    event LogInit(IERC20 indexed rewardToken, address owner, uint256 rewardPerSecond, IERC20 indexed masterLpToken);
+    event Deposit(address indexed user, address indexed baseToken, uint256 nftId, address indexed to);
+    event Withdraw(address indexed user, address baseToken, uint256 nftId, address indexed to);
+    event LogOnReward(address indexed user, address indexed baseToken, uint256 amount, address indexed to);
+    event LogUpdatePool(address indexed baseToken, uint64 lastRewardTime, uint256 lpSupply, uint256 accToken1PerShare);
+    event LogRewardPerSecond(address indexed baseToken, uint256 rewardPerSecond);
+    event LogInit(IERC20 indexed rewardToken, address owner, uint256 rewardPerSecond, ILPToken indexed lpToken);
 
-    constructor(address _MASTERCHEF_V2) {
-        MASTERCHEF_V2 = _MASTERCHEF_V2;
+    // constructor(address _MASTERCHEF_V2) {
+    //     MASTERCHEF_V2 = _MASTERCHEF_V2;
+    // }
+
+    constructor(ILiquidityProviders _liquidityProviders, ILPToken _lpToken) {
+        liquidityProviders = _liquidityProviders;
+        lpToken = _lpToken;
     }
 
-    /// @notice Serves as the constructor for clones, as clones can't have a regular constructor
-    /// @dev `data` is abi encoded in the format: (IERC20 collateral, IERC20 asset, IOracle oracle, bytes oracleData)
-    function init(bytes calldata data) public payable {
-        require(rewardToken == IERC20(address(0)), "Rewarder: already initialized");
-        (rewardToken, owner, rewardPerSecond, masterLpToken) = abi.decode(data, (IERC20, address, uint256, IERC20));
-        require(rewardToken != IERC20(address(0)), "Rewarder: bad token");
-        unlocked = 1;
-        emit LogInit(rewardToken, owner, rewardPerSecond, masterLpToken);
+    function initalizeRewardPool(
+        address _baseToken,
+        address _rewardToken,
+        uint256 _rewardPerSecond
+    ) external onlyOwner {
+        rewardTokens[_baseToken] = _rewardToken;
+        rewardPerSecond[_baseToken] = _rewardPerSecond;
     }
 
     function onSushiReward(
-        uint256 pid,
+        address baseToken,
         address _user,
         address to,
         uint256,
         uint256 lpTokenAmount
-    ) external override onlyMCV2 lock {
-        require(IMasterChefV2(MASTERCHEF_V2).lpToken(pid) == masterLpToken);
-
-        PoolInfo memory pool = updatePool(pid);
-        UserInfo storage user = userInfo[pid][_user];
+    ) internal lock {
+        PoolInfo memory pool = updatePool(baseToken);
+        UserInfo storage user = userInfo[baseToken][_user];
         uint256 pending;
         if (user.amount > 0) {
-            pending = (user.amount.mul(pool.accToken1PerShare) / ACC_TOKEN_PRECISION).sub(user.rewardDebt).add(
+            pending = (user.amount.mul(pool.accTokenPerShare) / ACC_TOKEN_PRECISION).sub(user.rewardDebt).add(
                 user.unpaidRewards
             );
+            IERC20 rewardToken = IERC20(rewardTokens[baseToken]);
             uint256 balance = rewardToken.balanceOf(address(this));
             if (pending > balance) {
                 rewardToken.safeTransfer(to, balance);
@@ -316,33 +330,15 @@ contract HyphenLiquidityFarming is IRewarder, BoringOwnable {
             }
         }
         user.amount = lpTokenAmount;
-        user.rewardDebt = lpTokenAmount.mul(pool.accToken1PerShare) / ACC_TOKEN_PRECISION;
-        emit LogOnReward(_user, pid, pending - user.unpaidRewards, to);
-    }
-
-    function pendingTokens(
-        uint256 pid,
-        address user,
-        uint256
-    ) external view override returns (IERC20[] memory rewardTokens, uint256[] memory rewardAmounts) {
-        IERC20[] memory _rewardTokens = new IERC20[](1);
-        _rewardTokens[0] = (rewardToken);
-        uint256[] memory _rewardAmounts = new uint256[](1);
-        _rewardAmounts[0] = pendingToken(pid, user);
-        return (_rewardTokens, _rewardAmounts);
-    }
-
-    function rewardRates() external view returns (uint256[] memory) {
-        uint256[] memory _rewardRates = new uint256[](1);
-        _rewardRates[0] = rewardPerSecond;
-        return (_rewardRates);
+        user.rewardDebt = lpTokenAmount.mul(pool.accTokenPerShare) / ACC_TOKEN_PRECISION;
+        emit LogOnReward(_user, baseToken, pending - user.unpaidRewards, to);
     }
 
     /// @notice Sets the sushi per second to be distributed. Can only be called by the owner.
     /// @param _rewardPerSecond The amount of Sushi to be distributed per second.
-    function setRewardPerSecond(uint256 _rewardPerSecond) public onlyOwner {
-        rewardPerSecond = _rewardPerSecond;
-        emit LogRewardPerSecond(_rewardPerSecond);
+    function setRewardPerSecond(address _baseToken, uint256 _rewardPerSecond) public onlyOwner {
+        rewardPerSecond[_baseToken] = _rewardPerSecond;
+        emit LogRewardPerSecond(_baseToken, _rewardPerSecond);
     }
 
     /// @notice Allows owner to reclaim/withdraw any tokens (including reward tokens) held by this contract
@@ -363,23 +359,67 @@ contract HyphenLiquidityFarming is IRewarder, BoringOwnable {
         }
     }
 
-    modifier onlyMCV2() {
-        require(msg.sender == MASTERCHEF_V2, "Only MCV2 can call this function.");
-        _;
+    // modifier onlyMCV2() {
+    //     require(msg.sender == MASTERCHEF_V2, "Only MCV2 can call this function.");
+    //     _;
+    // }
+
+    /// @notice Deposit LP tokens to MCV2 for SUSHI allocation.
+    /// @param nftId LP token nftId to deposit.
+    /// @param to The receiver of `amount` deposit benefit.
+    function deposit(uint256 nftId, address to) public {
+        (address baseToken, , uint256 amount) = lpToken.tokenMetadata(nftId);
+        PoolInfo memory pool = updatePool(baseToken);
+        UserInfo storage user = userInfo[baseToken][to];
+
+        // Effects
+        user.amount = user.amount.add(amount);
+        user.rewardDebt = user.rewardDebt.add(amount.mul(pool.accTokenPerShare) / ACC_SUSHI_PRECISION);
+
+        // Interactions
+        //IRewarder _rewarder = rewarder[pid];
+        // if (address(_rewarder) != address(0)) {
+        // _rewarder.onSushiReward(pid, to, to, 0, user.amount);
+        onSushiReward(baseToken, to, to, 0, user.amount);
+        //}
+
+        lpToken.safeTransferFrom(msg.sender, address(this), nftId);
+
+        emit Deposit(msg.sender, baseToken, nftId, to);
+    }
+
+    function withdraw(uint256 nftId, address to) public {
+        (address baseToken, , uint256 amount) = lpToken.tokenMetadata(nftId);
+        PoolInfo memory pool = updatePool(baseToken);
+        UserInfo storage user = userInfo[baseToken][msg.sender];
+
+        // Effects
+        user.rewardDebt = user.rewardDebt.sub(amount.mul(pool.accTokenPerShare) / ACC_SUSHI_PRECISION);
+        user.amount = user.amount.sub(amount);
+
+        // Interactions
+        // IRewarder _rewarder = rewarder[pid];
+        // if (address(_rewarder) != address(0)) {
+        //     _rewarder.onSushiReward(pid, msg.sender, to, 0, user.amount);
+        onSushiReward(baseToken, to, to, 0, user.amount);
+        // }
+
+        lpToken.safeTransferFrom(address(this), to, nftId);
+
+        emit Withdraw(msg.sender, baseToken, nftId, to);
     }
 
     /// @notice View function to see pending Token
-    /// @param _pid The index of the pool. See `poolInfo`.
     /// @param _user Address of user.
     /// @return pending SUSHI reward for a given user.
-    function pendingToken(uint256 _pid, address _user) public view returns (uint256 pending) {
-        PoolInfo memory pool = poolInfo[_pid];
-        UserInfo storage user = userInfo[_pid][_user];
-        uint256 accToken1PerShare = pool.accToken1PerShare;
-        uint256 lpSupply = IMasterChefV2(MASTERCHEF_V2).lpToken(_pid).balanceOf(MASTERCHEF_V2);
+    function pendingToken(address baseToken, address _user) public view returns (uint256 pending) {
+        PoolInfo memory pool = poolInfo[baseToken];
+        UserInfo storage user = userInfo[baseToken][_user];
+        uint256 accToken1PerShare = pool.accTokenPerShare;
+        uint256 lpSupply = liquidityProviders.totalSharesMinted(baseToken);
         if (block.timestamp > pool.lastRewardTime && lpSupply != 0) {
             uint256 time = block.timestamp.sub(pool.lastRewardTime);
-            uint256 sushiReward = time.mul(rewardPerSecond);
+            uint256 sushiReward = time.mul(rewardPerSecond[baseToken]);
             accToken1PerShare = accToken1PerShare.add(sushiReward.mul(ACC_TOKEN_PRECISION) / lpSupply);
         }
         pending = (user.amount.mul(accToken1PerShare) / ACC_TOKEN_PRECISION).sub(user.rewardDebt).add(
@@ -388,23 +428,23 @@ contract HyphenLiquidityFarming is IRewarder, BoringOwnable {
     }
 
     /// @notice Update reward variables of the given pool.
-    /// @param pid The index of the pool. See `poolInfo`.
     /// @return pool Returns the pool that was updated.
-    function updatePool(uint256 pid) public returns (PoolInfo memory pool) {
-        pool = poolInfo[pid];
+    function updatePool(address baseToken) public returns (PoolInfo memory pool) {
+        pool = poolInfo[baseToken];
         if (block.timestamp > pool.lastRewardTime) {
-            uint256 lpSupply = IMasterChefV2(MASTERCHEF_V2).lpToken(pid).balanceOf(MASTERCHEF_V2);
+            // uint256 lpSupply = IMasterChefV2(MASTERCHEF_V2).lpToken(pid).balanceOf(MASTERCHEF_V2);
+            uint256 lpSupply = liquidityProviders.totalSharesMinted(baseToken);
 
             if (lpSupply > 0) {
                 uint256 time = block.timestamp.sub(pool.lastRewardTime);
-                uint256 sushiReward = time.mul(rewardPerSecond);
-                pool.accToken1PerShare = pool.accToken1PerShare.add(
+                uint256 sushiReward = time.mul(rewardPerSecond[baseToken]);
+                pool.accTokenPerShare = pool.accTokenPerShare.add(
                     (sushiReward.mul(ACC_TOKEN_PRECISION) / lpSupply).to128()
                 );
             }
             pool.lastRewardTime = block.timestamp.to64();
-            poolInfo[pid] = pool;
-            emit LogUpdatePool(pid, pool.lastRewardTime, lpSupply, pool.accToken1PerShare);
+            poolInfo[baseToken] = pool;
+            emit LogUpdatePool(baseToken, pool.lastRewardTime, lpSupply, pool.accTokenPerShare);
         }
     }
 }
