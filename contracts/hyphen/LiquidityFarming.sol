@@ -228,8 +228,8 @@ interface IMasterChefV2 {
     function lpToken(uint256 pid) external view returns (IERC20 _lpToken);
 }
 
-/// @author @0xKeno
-contract BiconomyRewarder is IRewarder, BoringOwnable {
+/// @author @0xKeno and @ankurdubey521
+contract HyphenLiquidityFarming is IRewarder, BoringOwnable {
     using BoringMath for uint256;
     using BoringMath128 for uint128;
     using BoringERC20 for IERC20;
