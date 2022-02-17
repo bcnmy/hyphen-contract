@@ -215,6 +215,7 @@ interface IMasterChefV2 {
 }
 
 /// @author @0xKeno and @ankurdubey521
+// TODO: Make contract upgradeable and add support for meta transactions
 contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
     using BoringMath for uint256;
     using BoringMath128 for uint128;
@@ -249,6 +250,9 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
 
     /// @notice Reward Token
     mapping(address => address) public rewardTokens;
+
+    /// @notice Staker => NFTs staked
+    mapping(address => uint256[]) public nftIdsStaked;
 
     uint256 private constant ACC_TOKEN_PRECISION = 1e12;
     uint256 private constant ACC_SUSHI_PRECISION = 1e12;
@@ -303,6 +307,7 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
             IERC20 rewardToken = IERC20(rewardTokens[baseToken]);
             uint256 balance = rewardToken.balanceOf(address(this));
             if (pending > balance) {
+                // TODO add support for native token
                 rewardToken.safeTransfer(to, balance);
                 user.unpaidRewards = pending - balance;
             } else {
@@ -359,11 +364,24 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
 
         onReward(baseToken, to, to, 0, user.amount);
         lpToken.safeTransferFrom(msg.sender, address(this), nftId);
+        nftIdsStaked[msg.sender].push(nftId);
 
         emit LogDeposit(msg.sender, baseToken, nftId, to);
     }
 
     function withdraw(uint256 nftId, address to) public {
+        uint256 index;
+        for (index = 0; index < nftIdsStaked[msg.sender].length; index++) {
+            if (nftIdsStaked[msg.sender][index] == nftId) {
+                break;
+            }
+        }
+        if (index == nftIdsStaked[msg.sender].length) {
+            require(false, "ERR__NFT_NOT_STAKED");
+        }
+        nftIdsStaked[msg.sender][index] = nftIdsStaked[msg.sender][nftIdsStaked[msg.sender].length - 1];
+        nftIdsStaked[msg.sender].pop();
+
         (address baseToken, , uint256 amount) = lpToken.tokenMetadata(nftId);
         amount /= liquidityProviders.BASE_DIVISOR();
 
@@ -416,6 +434,10 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
             poolInfo[baseToken] = pool;
             emit LogUpdatePool(baseToken, pool.lastRewardTime, lpSupply, pool.accTokenPerShare);
         }
+    }
+
+    function getNftIdsStaked(address _user) public view returns (uint256[] memory nftIds) {
+        nftIds = nftIdsStaked[_user];
     }
 
     function onERC721Received(

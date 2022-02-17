@@ -21,6 +21,13 @@ const advanceTime = async (secondsToAdvance: number) => {
   await ethers.provider.send("evm_mine", []);
 };
 
+const getElapsedTime = async (callable: any): Promise<number> => {
+  const { timestamp: start } = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+  await callable();
+  const { timestamp: end } = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+  return end - start;
+};
+
 describe("LiquidityFarmingTests", function () {
   let owner: SignerWithAddress, pauser: SignerWithAddress, bob: SignerWithAddress;
   let charlie: SignerWithAddress, tf: SignerWithAddress, executor: SignerWithAddress;
@@ -150,6 +157,7 @@ describe("LiquidityFarmingTests", function () {
       await farmingContract.deposit(1, owner.address);
       expect((await farmingContract.userInfo(token.address, owner.address)).amount).to.equal(10);
       expect(await farmingContract.pendingToken(token.address, owner.address)).to.equal(0);
+      expect(await farmingContract.getNftIdsStaked(owner.address)).to.deep.equal([1].map(BigNumber.from));
     });
 
     it("Should be able to deposit lp tokens and delegate to another account", async function () {
@@ -158,32 +166,66 @@ describe("LiquidityFarmingTests", function () {
       expect(await farmingContract.pendingToken(token.address, bob.address)).to.equal(0);
       expect((await farmingContract.userInfo(token.address, owner.address)).amount).to.equal(0);
       expect(await farmingContract.pendingToken(token.address, owner.address)).to.equal(0);
+      expect(await farmingContract.getNftIdsStaked(owner.address)).to.deep.equal([1].map(BigNumber.from));
     });
 
     it("Should not be able to depoit LP token of un-initialized pools", async function () {
       await expect(farmingContract.deposit(2, owner.address)).to.be.revertedWith("ERR__POOL_NOT_INITIALIZED");
+      expect(await farmingContract.getNftIdsStaked(owner.address)).to.deep.equal([]);
     });
 
     it("Should be able to accrue token rewards", async function () {
       await farmingContract.deposit(1, owner.address);
-      await advanceTime(100);
-      expect(await farmingContract.pendingToken(token.address, owner.address)).to.equal(10 * 100);
+      const time = await getElapsedTime(async () => {
+        await advanceTime(100);
+      });
+      expect(await farmingContract.pendingToken(token.address, owner.address)).to.equal(time * 10);
     });
 
     it("Should be able to create deposits in different tokens", async function () {
       await farmingContract.initalizeRewardPool(token2.address, token.address, 10);
       await farmingContract.deposit(1, owner.address);
-      const { timestamp: startTimeStamp } = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
-      await advanceTime(100);
-      await farmingContract.deposit(2, owner.address);
-      await advanceTime(100);
-      const { timestamp: endTimeStamp } = await ethers.provider.getBlock(await ethers.provider.getBlockNumber());
+      const time = await getElapsedTime(async () => {
+        await advanceTime(100);
+        await farmingContract.deposit(2, owner.address);
+        await advanceTime(100);
+      });
       expect((await farmingContract.userInfo(token.address, owner.address)).amount).to.equal(10);
-      expect(await farmingContract.pendingToken(token.address, owner.address)).to.equal(
-        (endTimeStamp - startTimeStamp) * 10
-      );
+      expect(await farmingContract.pendingToken(token.address, owner.address)).to.equal(time * 10);
       expect((await farmingContract.userInfo(token2.address, owner.address)).amount).to.equal(10);
       expect(await farmingContract.pendingToken(token2.address, owner.address)).to.equal(1000);
+      expect(await farmingContract.getNftIdsStaked(owner.address)).to.deep.equal([1, 2].map(BigNumber.from));
+    });
+  });
+
+  describe("Withdraw", async () => {
+    beforeEach(async function () {
+      await farmingContract.initalizeRewardPool(token.address, token2.address, 10);
+
+      for (const signer of [owner, bob, charlie]) {
+        await lpToken.connect(signer).setApprovalForAll(farmingContract.address, true);
+        for (const tk of [token, token2]) {
+          await tk.connect(signer).approve(farmingContract.address, ethers.constants.MaxUint256);
+          await tk.connect(signer).approve(liquidityProviders.address, ethers.constants.MaxUint256);
+        }
+      }
+
+      await liquidityProviders.addTokenLiquidity(token.address, 10);
+      await liquidityProviders.addTokenLiquidity(token2.address, 10);
+    });
+
+    it("Should be able to withdraw nft", async function () {
+      await farmingContract.deposit(1, bob.address);
+      await expect(farmingContract.withdraw(1, owner.address)).to.emit(farmingContract, "LogNftWithdrawn");
+      expect(await lpToken.ownerOf(1)).to.equal(owner.address);
+      expect(await farmingContract.getNftIdsStaked(owner.address)).to.deep.equal([]);
+      expect((await farmingContract.userInfo(token.address, owner.address)).amount).to.equal(0);
+    });
+
+    it("Should prevent non owner from withdrawing nft", async function () {
+      await farmingContract.deposit(1, bob.address);
+      await expect(farmingContract.connect(bob).withdraw(1, bob.address)).to.be.revertedWith("ERR__NFT_NOT_STAKED");
+      await expect(farmingContract.connect(owner).withdraw(2, bob.address)).to.be.revertedWith("ERR__NFT_NOT_STAKED");
     });
   });
 });
