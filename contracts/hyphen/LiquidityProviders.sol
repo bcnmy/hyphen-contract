@@ -18,7 +18,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     address internal constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    uint256 private constant BASE_DIVISOR = 10**18;
+    uint256 public constant BASE_DIVISOR = 10**18;
 
     ILPToken internal lpToken;
     ILiquidityPool internal liquidityPool;

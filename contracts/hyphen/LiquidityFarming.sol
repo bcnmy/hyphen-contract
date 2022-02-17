@@ -66,25 +66,6 @@ library BoringERC20 {
     }
 }
 
-// File contracts/interfaces/IRewarder.sol
-pragma solidity ^0.8.0;
-
-interface IRewarder {
-    function onSushiReward(
-        uint256 pid,
-        address user,
-        address recipient,
-        uint256 sushiAmount,
-        uint256 newLpAmount
-    ) external;
-
-    function pendingTokens(
-        uint256 pid,
-        address user,
-        uint256 sushiAmount
-    ) external view returns (IERC20[] memory, uint256[] memory);
-}
-
 // File @boringcrypto/boring-solidity/contracts/libraries/BoringMath.sol@v1.0.4
 
 pragma solidity ^0.8.0;
@@ -224,15 +205,17 @@ contract BoringOwnable is BoringOwnableData {
 pragma solidity ^0.8.0;
 pragma experimental ABIEncoderV2;
 
+import "@openzeppelin/contracts-upgradeable/interfaces/IERC721ReceiverUpgradeable.sol";
 import "./interfaces/ILPToken.sol";
 import "./interfaces/ILiquidityProviders.sol";
+import "hardhat/console.sol";
 
 interface IMasterChefV2 {
     function lpToken(uint256 pid) external view returns (IERC20 _lpToken);
 }
 
 /// @author @0xKeno and @ankurdubey521
-contract HyphenLiquidityFarming is BoringOwnable {
+contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
     using BoringMath for uint256;
     using BoringMath128 for uint128;
     using BoringERC20 for IERC20;
@@ -269,10 +252,8 @@ contract HyphenLiquidityFarming is BoringOwnable {
 
     uint256 private constant ACC_TOKEN_PRECISION = 1e12;
     uint256 private constant ACC_SUSHI_PRECISION = 1e12;
-
-    // address public immutable MASTERCHEF_V2;
-
     uint256 internal unlocked;
+
     modifier lock() {
         require(unlocked == 1, "LOCKED");
         unlocked = 2;
@@ -280,20 +261,17 @@ contract HyphenLiquidityFarming is BoringOwnable {
         unlocked = 1;
     }
 
-    event Deposit(address indexed user, address indexed baseToken, uint256 nftId, address indexed to);
-    event Withdraw(address indexed user, address baseToken, uint256 nftId, address indexed to);
+    event LogDeposit(address indexed user, address indexed baseToken, uint256 nftId, address indexed to);
+    event LogWithdraw(address indexed user, address baseToken, uint256 nftId, address indexed to);
     event LogOnReward(address indexed user, address indexed baseToken, uint256 amount, address indexed to);
     event LogUpdatePool(address indexed baseToken, uint64 lastRewardTime, uint256 lpSupply, uint256 accToken1PerShare);
     event LogRewardPerSecond(address indexed baseToken, uint256 rewardPerSecond);
-    event LogInit(IERC20 indexed rewardToken, address owner, uint256 rewardPerSecond, ILPToken indexed lpToken);
-
-    // constructor(address _MASTERCHEF_V2) {
-    //     MASTERCHEF_V2 = _MASTERCHEF_V2;
-    // }
+    event LogRewardPoolInitialized(address _baseToken, address _rewardToken, uint256 _rewardPerSecond);
 
     constructor(ILiquidityProviders _liquidityProviders, ILPToken _lpToken) {
         liquidityProviders = _liquidityProviders;
         lpToken = _lpToken;
+        unlocked = 1;
     }
 
     function initalizeRewardPool(
@@ -301,11 +279,14 @@ contract HyphenLiquidityFarming is BoringOwnable {
         address _rewardToken,
         uint256 _rewardPerSecond
     ) external onlyOwner {
+        require(rewardTokens[_baseToken] == address(0), "ERR__POOL_ALREADY_INITIALIZED");
+        require(rewardPerSecond[_baseToken] == 0, "ERR__POOL_ALREADY_INITIALIZED");
         rewardTokens[_baseToken] = _rewardToken;
         rewardPerSecond[_baseToken] = _rewardPerSecond;
+        emit LogRewardPoolInitialized(_baseToken, _rewardToken, _rewardPerSecond);
     }
 
-    function onSushiReward(
+    function onReward(
         address baseToken,
         address _user,
         address to,
@@ -359,67 +340,57 @@ contract HyphenLiquidityFarming is BoringOwnable {
         }
     }
 
-    // modifier onlyMCV2() {
-    //     require(msg.sender == MASTERCHEF_V2, "Only MCV2 can call this function.");
-    //     _;
-    // }
-
-    /// @notice Deposit LP tokens to MCV2 for SUSHI allocation.
+    /// @notice Deposit LP tokens
     /// @param nftId LP token nftId to deposit.
     /// @param to The receiver of `amount` deposit benefit.
     function deposit(uint256 nftId, address to) public {
+        require(lpToken.isApprovedForAll(msg.sender, address(this)), "ERR__NOT_APPROVED_FOR_ALL");
+
         (address baseToken, , uint256 amount) = lpToken.tokenMetadata(nftId);
+        require(rewardTokens[baseToken] != address(0), "ERR__POOL_NOT_INITIALIZED");
+        require(rewardPerSecond[baseToken] != 0, "ERR__POOL_NOT_INITIALIZED");
+
+        amount /= liquidityProviders.BASE_DIVISOR();
         PoolInfo memory pool = updatePool(baseToken);
         UserInfo storage user = userInfo[baseToken][to];
 
-        // Effects
         user.amount = user.amount.add(amount);
         user.rewardDebt = user.rewardDebt.add(amount.mul(pool.accTokenPerShare) / ACC_SUSHI_PRECISION);
 
-        // Interactions
-        //IRewarder _rewarder = rewarder[pid];
-        // if (address(_rewarder) != address(0)) {
-        // _rewarder.onSushiReward(pid, to, to, 0, user.amount);
-        onSushiReward(baseToken, to, to, 0, user.amount);
-        //}
-
+        onReward(baseToken, to, to, 0, user.amount);
         lpToken.safeTransferFrom(msg.sender, address(this), nftId);
 
-        emit Deposit(msg.sender, baseToken, nftId, to);
+        emit LogDeposit(msg.sender, baseToken, nftId, to);
     }
 
     function withdraw(uint256 nftId, address to) public {
         (address baseToken, , uint256 amount) = lpToken.tokenMetadata(nftId);
+        amount /= liquidityProviders.BASE_DIVISOR();
+
         PoolInfo memory pool = updatePool(baseToken);
         UserInfo storage user = userInfo[baseToken][msg.sender];
 
-        // Effects
         user.rewardDebt = user.rewardDebt.sub(amount.mul(pool.accTokenPerShare) / ACC_SUSHI_PRECISION);
         user.amount = user.amount.sub(amount);
 
-        // Interactions
-        // IRewarder _rewarder = rewarder[pid];
-        // if (address(_rewarder) != address(0)) {
-        //     _rewarder.onSushiReward(pid, msg.sender, to, 0, user.amount);
-        onSushiReward(baseToken, to, to, 0, user.amount);
-        // }
-
+        onReward(baseToken, to, to, 0, user.amount);
         lpToken.safeTransferFrom(address(this), to, nftId);
 
-        emit Withdraw(msg.sender, baseToken, nftId, to);
+        emit LogWithdraw(msg.sender, baseToken, nftId, to);
     }
 
     /// @notice View function to see pending Token
     /// @param _user Address of user.
     /// @return pending SUSHI reward for a given user.
-    function pendingToken(address baseToken, address _user) public view returns (uint256 pending) {
-        PoolInfo memory pool = poolInfo[baseToken];
-        UserInfo storage user = userInfo[baseToken][_user];
+    function pendingToken(address _baseToken, address _user) public view returns (uint256 pending) {
+        PoolInfo memory pool = poolInfo[_baseToken];
+        UserInfo storage user = userInfo[_baseToken][_user];
         uint256 accToken1PerShare = pool.accTokenPerShare;
-        uint256 lpSupply = liquidityProviders.totalSharesMinted(baseToken);
+        uint256 lpSupply = liquidityProviders.totalSharesMinted(_baseToken);
+        lpSupply /= liquidityProviders.BASE_DIVISOR();
         if (block.timestamp > pool.lastRewardTime && lpSupply != 0) {
             uint256 time = block.timestamp.sub(pool.lastRewardTime);
-            uint256 sushiReward = time.mul(rewardPerSecond[baseToken]);
+            uint256 sushiReward = time.mul(rewardPerSecond[_baseToken]);
             accToken1PerShare = accToken1PerShare.add(sushiReward.mul(ACC_TOKEN_PRECISION) / lpSupply);
         }
         pending = (user.amount.mul(accToken1PerShare) / ACC_TOKEN_PRECISION).sub(user.rewardDebt).add(
@@ -432,9 +403,8 @@ contract HyphenLiquidityFarming is BoringOwnable {
     function updatePool(address baseToken) public returns (PoolInfo memory pool) {
         pool = poolInfo[baseToken];
         if (block.timestamp > pool.lastRewardTime) {
-            // uint256 lpSupply = IMasterChefV2(MASTERCHEF_V2).lpToken(pid).balanceOf(MASTERCHEF_V2);
             uint256 lpSupply = liquidityProviders.totalSharesMinted(baseToken);
-
+            lpSupply /= liquidityProviders.BASE_DIVISOR();
             if (lpSupply > 0) {
                 uint256 time = block.timestamp.sub(pool.lastRewardTime);
                 uint256 sushiReward = time.mul(rewardPerSecond[baseToken]);
@@ -446,5 +416,14 @@ contract HyphenLiquidityFarming is BoringOwnable {
             poolInfo[baseToken] = pool;
             emit LogUpdatePool(baseToken, pool.lastRewardTime, lpSupply, pool.accTokenPerShare);
         }
+    }
+
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes calldata
+    ) external pure override returns (bytes4) {
+        return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
     }
 }

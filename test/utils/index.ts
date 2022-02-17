@@ -1,7 +1,5 @@
 function getLocaleString(amount: number) {
-    return amount.toLocaleString('fullwide', {useGrouping:false});
+  return amount.toLocaleString("fullwide", { useGrouping: false });
 }
 
-module.exports = {
-    getLocaleString
-}
+export { getLocaleString };
