@@ -60,6 +60,8 @@ contract HyphenLiquidityFarming is
 
     uint256 private constant ACC_TOKEN_PRECISION = 1e12;
     uint256 private constant ACC_SUSHI_PRECISION = 1e12;
+    address internal constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
     uint256 internal unlocked;
 
     modifier lock() {
@@ -126,15 +128,27 @@ contract HyphenLiquidityFarming is
                 ((user.amount * pool.accTokenPerShare) / ACC_TOKEN_PRECISION) -
                 user.rewardDebt +
                 user.unpaidRewards;
-            IERC20Upgradeable rewardToken = IERC20Upgradeable(rewardTokens[_baseToken]);
-            uint256 balance = rewardToken.balanceOf(address(this));
-            if (pending > balance) {
-                // TODO add support for native token
-                rewardToken.safeTransfer(_to, balance);
-                user.unpaidRewards = pending - balance;
+            if (rewardTokens[_baseToken] == NATIVE) {
+                uint256 balance = address(this).balance;
+                if (pending > balance) {
+                    user.unpaidRewards = pending - balance;
+                    (bool success, ) = payable(_to).call{value: balance}("");
+                    require(success, "ERR__NATIVE_TRANSFER_FAILED");
+                } else {
+                    user.unpaidRewards = 0;
+                    (bool success, ) = payable(_to).call{value: pending}("");
+                    require(success, "ERR__NATIVE_TRANSFER_FAILED");
+                }
             } else {
-                rewardToken.safeTransfer(_to, pending);
-                user.unpaidRewards = 0;
+                IERC20Upgradeable rewardToken = IERC20Upgradeable(rewardTokens[_baseToken]);
+                uint256 balance = rewardToken.balanceOf(address(this));
+                if (pending > balance) {
+                    rewardToken.safeTransfer(_to, balance);
+                    user.unpaidRewards = pending - balance;
+                } else {
+                    rewardToken.safeTransfer(_to, pending);
+                    user.unpaidRewards = 0;
+                }
             }
         }
         user.amount = _lpTokenAmount;

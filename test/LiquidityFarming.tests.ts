@@ -443,4 +443,87 @@ describe("LiquidityFarmingTests", function () {
       );
     });
   });
+
+  describe("Rewards - NATIVE", async () => {
+    beforeEach(async function () {
+      await farmingContract.initalizeRewardPool(token.address, NATIVE, 10);
+      await farmingContract.initalizeRewardPool(token2.address, NATIVE, 15);
+
+      for (const signer of [owner, bob, charlie]) {
+        await lpToken.connect(signer).setApprovalForAll(farmingContract.address, true);
+        for (const tk of [token, token2]) {
+          await tk.connect(signer).approve(farmingContract.address, ethers.constants.MaxUint256);
+          await tk.connect(signer).approve(liquidityProviders.address, ethers.constants.MaxUint256);
+        }
+      }
+    });
+
+    it("Should be able to send correct amount of rewards", async function () {
+      await liquidityProviders.addTokenLiquidity(token.address, 10);
+      await liquidityProviders.addTokenLiquidity(token2.address, 10);
+      await liquidityProviders.connect(bob).addTokenLiquidity(token.address, 60);
+      await liquidityProviders.connect(bob).addTokenLiquidity(token2.address, 60);
+
+      await farmingContract.deposit(1, owner.address);
+      await advanceTime(100);
+      const time1 = await getElapsedTime(async () => {
+        await farmingContract.deposit(2, owner.address);
+      });
+      await advanceTime(300);
+      const time2 = await getElapsedTime(async () => {
+        await farmingContract.connect(bob).deposit(3, bob.address);
+      });
+      await advanceTime(500);
+      const time3 = await getElapsedTime(async () => {
+        await farmingContract.connect(bob).deposit(4, bob.address);
+      });
+      await advanceTime(900);
+
+      const expectedRewards = {
+        [token.address]: {
+          [owner.address]: Math.floor(
+            100 * 10 +
+              time1 * 10 +
+              300 * 10 +
+              time2 * 10 +
+              (500 * 10) / 7 +
+              (time3 * 10) / 7 +
+              (900 * 10) / 7 +
+              (2 * 10) / 7 // Account for 2 transactions after this
+          ),
+          [bob.address]: Math.floor((500 * 10 * 6) / 7 + (time3 * 10 * 6) / 7 + (900 * 10 * 6) / 7 + (4 * 10 * 6) / 7),
+        },
+        [token2.address]: {
+          [owner.address]: Math.floor(300 * 15 + time2 * 15 + 500 * 15 + time3 * 15 + (900 * 15) / 7 + (3 * 15) / 7),
+          [bob.address]: Math.floor((900 * 15 * 6) / 7 + (5 * 15 * 6) / 7),
+        },
+      };
+
+      await owner.sendTransaction({
+        to: farmingContract.address,
+        value: ethers.BigNumber.from(10).pow(18),
+      });
+
+      await expect(() => farmingContract.extractRewards(token.address, owner.address)).to.changeEtherBalances(
+        [farmingContract, owner],
+        [-expectedRewards[token.address][owner.address], expectedRewards[token.address][owner.address]]
+      );
+      await expect(() => farmingContract.extractRewards(token2.address, owner.address)).to.changeEtherBalances(
+        [farmingContract, owner],
+        [-expectedRewards[token2.address][owner.address], expectedRewards[token2.address][owner.address]]
+      );
+      await expect(() =>
+        farmingContract.connect(bob).extractRewards(token.address, bob.address)
+      ).to.changeEtherBalances(
+        [farmingContract, bob],
+        [-expectedRewards[token.address][bob.address], expectedRewards[token.address][bob.address]]
+      );
+      await expect(() =>
+        farmingContract.connect(bob).extractRewards(token2.address, bob.address)
+      ).to.changeEtherBalances(
+        [farmingContract, bob],
+        [-expectedRewards[token2.address][bob.address], expectedRewards[token2.address][bob.address]]
+      );
+    });
+  });
 });
