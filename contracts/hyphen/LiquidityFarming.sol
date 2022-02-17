@@ -91,6 +91,10 @@ contract HyphenLiquidityFarming is
         unlocked = 1;
     }
 
+    /// @notice Initialize the rewarder pool.
+    /// @param _baseToken Base token to be used for the rewarder pool.
+    /// @param _rewardToken Reward token to be used for the rewarder pool.
+    /// @param _rewardPerSecond Reward rate per base token.
     function initalizeRewardPool(
         address _baseToken,
         address _rewardToken,
@@ -103,11 +107,15 @@ contract HyphenLiquidityFarming is
         emit LogRewardPoolInitialized(_baseToken, _rewardToken, _rewardPerSecond);
     }
 
+    /// @notice Update the reward state of a user, and if possible send reward funds to _to.
+    /// @param _baseToken Base token to be used for the rewarder pool.
+    /// @param _user User that is depositing LP tokens.
+    /// @param _to Address to which rewards will be credited.
+    /// @param _lpTokenAmount Amount LP tokens to be deposited.
     function _onReward(
         address _baseToken,
         address _user,
         address _to,
-        uint256,
         uint256 _lpTokenAmount
     ) internal lock {
         PoolInfo memory pool = updatePool(_baseToken);
@@ -173,7 +181,7 @@ contract HyphenLiquidityFarming is
         updatePool(baseToken);
         UserInfo storage user = userInfo[baseToken][_to];
 
-        _onReward(baseToken, _to, _to, 0, user.amount + amount);
+        _onReward(baseToken, _to, _to, user.amount + amount);
 
         nftIdsStaked[_msgSender()].push(_nftId);
         totalSharesStaked[baseToken] = totalSharesStaked[baseToken] + amount;
@@ -182,6 +190,9 @@ contract HyphenLiquidityFarming is
         emit LogDeposit(_msgSender(), baseToken, _nftId, _to);
     }
 
+    /// @notice Withdraw LP tokens
+    /// @param _nftId LP token nftId to withdraw.
+    /// @param _to The receiver of `amount` withdraw benefit.
     function withdraw(uint256 _nftId, address _to) public whenNotPaused {
         uint256 index;
         for (index = 0; index < nftIdsStaked[_msgSender()].length; index++) {
@@ -201,16 +212,19 @@ contract HyphenLiquidityFarming is
         updatePool(baseToken);
         UserInfo storage user = userInfo[baseToken][_msgSender()];
 
-        _onReward(baseToken, _to, _to, 0, user.amount - amount);
+        _onReward(baseToken, _to, _to, user.amount - amount);
         totalSharesStaked[baseToken] = totalSharesStaked[baseToken] - amount;
         lpToken.safeTransferFrom(address(this), _to, _nftId);
 
         emit LogWithdraw(_msgSender(), baseToken, _nftId, _to);
     }
 
+    /// @notice Extract all rewards without withdrawing LP tokens
+    /// @param _baseToken Base token to be used for the rewarder pool.
+    /// @param _to The receiver of withdraw benefit.
     function extractRewards(address _baseToken, address _to) external whenNotPaused {
         UserInfo memory user = userInfo[_baseToken][_msgSender()];
-        _onReward(_baseToken, _msgSender(), _to, 0, user.amount);
+        _onReward(_baseToken, _msgSender(), _to, user.amount);
     }
 
     /// @notice View function to see pending Token
@@ -246,6 +260,8 @@ contract HyphenLiquidityFarming is
         }
     }
 
+    /// @notice View function to see the tokens staked by a given user.
+    /// @param _user Address of user.
     function getNftIdsStaked(address _user) public view returns (uint256[] memory nftIds) {
         nftIds = nftIdsStaked[_user];
     }
