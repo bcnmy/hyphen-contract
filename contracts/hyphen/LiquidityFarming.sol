@@ -254,6 +254,9 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
     /// @notice Staker => NFTs staked
     mapping(address => uint256[]) public nftIdsStaked;
 
+    /// @notice Token => Total Shares Staked
+    mapping(address => uint256) public totalSharesStaked;
+
     uint256 private constant ACC_TOKEN_PRECISION = 1e12;
     uint256 private constant ACC_SUSHI_PRECISION = 1e12;
     uint256 internal unlocked;
@@ -290,34 +293,34 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
         emit LogRewardPoolInitialized(_baseToken, _rewardToken, _rewardPerSecond);
     }
 
-    function onReward(
-        address baseToken,
+    function _onReward(
+        address _baseToken,
         address _user,
-        address to,
+        address _to,
         uint256,
-        uint256 lpTokenAmount
+        uint256 _lpTokenAmount
     ) internal lock {
-        PoolInfo memory pool = updatePool(baseToken);
-        UserInfo storage user = userInfo[baseToken][_user];
+        PoolInfo memory pool = updatePool(_baseToken);
+        UserInfo storage user = userInfo[_baseToken][_user];
         uint256 pending;
         if (user.amount > 0) {
             pending = (user.amount.mul(pool.accTokenPerShare) / ACC_TOKEN_PRECISION).sub(user.rewardDebt).add(
                 user.unpaidRewards
             );
-            IERC20 rewardToken = IERC20(rewardTokens[baseToken]);
+            IERC20 rewardToken = IERC20(rewardTokens[_baseToken]);
             uint256 balance = rewardToken.balanceOf(address(this));
             if (pending > balance) {
                 // TODO add support for native token
-                rewardToken.safeTransfer(to, balance);
+                rewardToken.safeTransfer(_to, balance);
                 user.unpaidRewards = pending - balance;
             } else {
-                rewardToken.safeTransfer(to, pending);
+                rewardToken.safeTransfer(_to, pending);
                 user.unpaidRewards = 0;
             }
         }
-        user.amount = lpTokenAmount;
-        user.rewardDebt = lpTokenAmount.mul(pool.accTokenPerShare) / ACC_TOKEN_PRECISION;
-        emit LogOnReward(_user, baseToken, pending - user.unpaidRewards, to);
+        user.amount = _lpTokenAmount;
+        user.rewardDebt = _lpTokenAmount.mul(pool.accTokenPerShare) / ACC_TOKEN_PRECISION;
+        emit LogOnReward(_user, _baseToken, pending - user.unpaidRewards, _to);
     }
 
     /// @notice Sets the sushi per second to be distributed. Can only be called by the owner.
@@ -328,51 +331,50 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
     }
 
     /// @notice Allows owner to reclaim/withdraw any tokens (including reward tokens) held by this contract
-    /// @param token Token to reclaim, use 0x00 for Ethereum
-    /// @param amount Amount of tokens to reclaim
-    /// @param to Receiver of the tokens, first of his name, rightful heir to the lost tokens,
+    /// @param _token Token to reclaim, use 0x00 for Ethereum
+    /// @param _amount Amount of tokens to reclaim
+    /// @param _to Receiver of the tokens, first of his name, rightful heir to the lost tokens,
     /// reightful owner of the extra tokens, and ether, protector of mistaken transfers, mother of token reclaimers,
     /// the Khaleesi of the Great Token Sea, the Unburnt, the Breaker of blockchains.
     function reclaimTokens(
-        address token,
-        uint256 amount,
-        address payable to
+        address _token,
+        uint256 _amount,
+        address payable _to
     ) public onlyOwner {
-        if (token == address(0)) {
-            to.transfer(amount);
+        if (_token == address(0)) {
+            _to.transfer(_amount);
         } else {
-            IERC20(token).safeTransfer(to, amount);
+            IERC20(_token).safeTransfer(_to, _amount);
         }
     }
 
     /// @notice Deposit LP tokens
-    /// @param nftId LP token nftId to deposit.
-    /// @param to The receiver of `amount` deposit benefit.
-    function deposit(uint256 nftId, address to) public {
+    /// @param _nftId LP token nftId to deposit.
+    /// @param _to The receiver of `amount` deposit benefit.
+    function deposit(uint256 _nftId, address _to) public {
         require(lpToken.isApprovedForAll(msg.sender, address(this)), "ERR__NOT_APPROVED_FOR_ALL");
 
-        (address baseToken, , uint256 amount) = lpToken.tokenMetadata(nftId);
+        (address baseToken, , uint256 amount) = lpToken.tokenMetadata(_nftId);
         require(rewardTokens[baseToken] != address(0), "ERR__POOL_NOT_INITIALIZED");
         require(rewardPerSecond[baseToken] != 0, "ERR__POOL_NOT_INITIALIZED");
 
         amount /= liquidityProviders.BASE_DIVISOR();
-        PoolInfo memory pool = updatePool(baseToken);
-        UserInfo storage user = userInfo[baseToken][to];
+        updatePool(baseToken);
+        UserInfo storage user = userInfo[baseToken][_to];
 
-        user.amount = user.amount.add(amount);
-        user.rewardDebt = user.rewardDebt.add(amount.mul(pool.accTokenPerShare) / ACC_SUSHI_PRECISION);
+        _onReward(baseToken, _to, _to, 0, user.amount.add(amount));
 
-        onReward(baseToken, to, to, 0, user.amount);
-        lpToken.safeTransferFrom(msg.sender, address(this), nftId);
-        nftIdsStaked[msg.sender].push(nftId);
+        nftIdsStaked[msg.sender].push(_nftId);
+        totalSharesStaked[baseToken] = totalSharesStaked[baseToken].add(amount);
+        lpToken.safeTransferFrom(msg.sender, address(this), _nftId);
 
-        emit LogDeposit(msg.sender, baseToken, nftId, to);
+        emit LogDeposit(msg.sender, baseToken, _nftId, _to);
     }
 
-    function withdraw(uint256 nftId, address to) public {
+    function withdraw(uint256 _nftId, address _to) public {
         uint256 index;
         for (index = 0; index < nftIdsStaked[msg.sender].length; index++) {
-            if (nftIdsStaked[msg.sender][index] == nftId) {
+            if (nftIdsStaked[msg.sender][index] == _nftId) {
                 break;
             }
         }
@@ -382,19 +384,22 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
         nftIdsStaked[msg.sender][index] = nftIdsStaked[msg.sender][nftIdsStaked[msg.sender].length - 1];
         nftIdsStaked[msg.sender].pop();
 
-        (address baseToken, , uint256 amount) = lpToken.tokenMetadata(nftId);
+        (address baseToken, , uint256 amount) = lpToken.tokenMetadata(_nftId);
         amount /= liquidityProviders.BASE_DIVISOR();
 
-        PoolInfo memory pool = updatePool(baseToken);
+        updatePool(baseToken);
         UserInfo storage user = userInfo[baseToken][msg.sender];
 
-        user.rewardDebt = user.rewardDebt.sub(amount.mul(pool.accTokenPerShare) / ACC_SUSHI_PRECISION);
-        user.amount = user.amount.sub(amount);
+        _onReward(baseToken, _to, _to, 0, user.amount.sub(amount));
+        totalSharesStaked[baseToken] = totalSharesStaked[baseToken].sub(amount);
+        lpToken.safeTransferFrom(address(this), _to, _nftId);
 
-        onReward(baseToken, to, to, 0, user.amount);
-        lpToken.safeTransferFrom(address(this), to, nftId);
+        emit LogWithdraw(msg.sender, baseToken, _nftId, _to);
+    }
 
-        emit LogWithdraw(msg.sender, baseToken, nftId, to);
+    function extractRewards(address _baseToken, address _to) external {
+        UserInfo memory user = userInfo[_baseToken][msg.sender];
+        _onReward(_baseToken, msg.sender, _to, 0, user.amount);
     }
 
     /// @notice View function to see pending Token
@@ -404,12 +409,12 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
         PoolInfo memory pool = poolInfo[_baseToken];
         UserInfo storage user = userInfo[_baseToken][_user];
         uint256 accToken1PerShare = pool.accTokenPerShare;
-        uint256 lpSupply = liquidityProviders.totalSharesMinted(_baseToken);
-        lpSupply /= liquidityProviders.BASE_DIVISOR();
-        if (block.timestamp > pool.lastRewardTime && lpSupply != 0) {
+        if (block.timestamp > pool.lastRewardTime && totalSharesStaked[_baseToken] != 0) {
             uint256 time = block.timestamp.sub(pool.lastRewardTime);
             uint256 sushiReward = time.mul(rewardPerSecond[_baseToken]);
-            accToken1PerShare = accToken1PerShare.add(sushiReward.mul(ACC_TOKEN_PRECISION) / lpSupply);
+            accToken1PerShare = accToken1PerShare.add(
+                sushiReward.mul(ACC_TOKEN_PRECISION) / totalSharesStaked[_baseToken]
+            );
         }
         pending = (user.amount.mul(accToken1PerShare) / ACC_TOKEN_PRECISION).sub(user.rewardDebt).add(
             user.unpaidRewards
@@ -418,21 +423,19 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
 
     /// @notice Update reward variables of the given pool.
     /// @return pool Returns the pool that was updated.
-    function updatePool(address baseToken) public returns (PoolInfo memory pool) {
-        pool = poolInfo[baseToken];
+    function updatePool(address _baseToken) public returns (PoolInfo memory pool) {
+        pool = poolInfo[_baseToken];
         if (block.timestamp > pool.lastRewardTime) {
-            uint256 lpSupply = liquidityProviders.totalSharesMinted(baseToken);
-            lpSupply /= liquidityProviders.BASE_DIVISOR();
-            if (lpSupply > 0) {
+            if (totalSharesStaked[_baseToken] > 0) {
                 uint256 time = block.timestamp.sub(pool.lastRewardTime);
-                uint256 sushiReward = time.mul(rewardPerSecond[baseToken]);
+                uint256 sushiReward = time.mul(rewardPerSecond[_baseToken]);
                 pool.accTokenPerShare = pool.accTokenPerShare.add(
-                    (sushiReward.mul(ACC_TOKEN_PRECISION) / lpSupply).to128()
+                    (sushiReward.mul(ACC_TOKEN_PRECISION) / totalSharesStaked[_baseToken]).to128()
                 );
             }
             pool.lastRewardTime = block.timestamp.to64();
-            poolInfo[baseToken] = pool;
-            emit LogUpdatePool(baseToken, pool.lastRewardTime, lpSupply, pool.accTokenPerShare);
+            poolInfo[_baseToken] = pool;
+            emit LogUpdatePool(_baseToken, pool.lastRewardTime, totalSharesStaked[_baseToken], pool.accTokenPerShare);
         }
     }
 
