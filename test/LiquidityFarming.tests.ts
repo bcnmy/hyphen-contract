@@ -112,10 +112,12 @@ describe("LiquidityFarmingTests", function () {
     await liquidityProviders.setLiquidityPool(liquidityPool.address);
 
     const farmingFactory = await ethers.getContractFactory("HyphenLiquidityFarming");
-    farmingContract = (await farmingFactory.deploy(
+    farmingContract = (await upgrades.deployProxy(farmingFactory, [
+      tf.address,
+      pauser.address,
       liquidityProviders.address,
-      lpToken.address
-    )) as HyphenLiquidityFarming;
+      lpToken.address,
+    ])) as HyphenLiquidityFarming;
   });
 
   this.afterEach(async function () {

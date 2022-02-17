@@ -1,225 +1,26 @@
-// File @boringcrypto/boring-solidity/contracts/interfaces/IERC20.sol@v1.0.4
-
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface IERC20 {
-    function totalSupply() external view returns (uint256);
-
-    function balanceOf(address account) external view returns (uint256);
-
-    function allowance(address owner, address spender) external view returns (uint256);
-
-    function approve(address spender, uint256 amount) external returns (bool);
-
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
-
-    // EIP 2612
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) external;
-}
-
-// File @boringcrypto/boring-solidity/contracts/libraries/BoringERC20.sol@v1.0.4
-pragma solidity ^0.8.0;
-
-library BoringERC20 {
-    function safeSymbol(IERC20 token) internal view returns (string memory) {
-        (bool success, bytes memory data) = address(token).staticcall(abi.encodeWithSelector(0x95d89b41));
-        return success && data.length > 0 ? abi.decode(data, (string)) : "???";
-    }
-
-    function safeName(IERC20 token) internal view returns (string memory) {
-        (bool success, bytes memory data) = address(token).staticcall(abi.encodeWithSelector(0x06fdde03));
-        return success && data.length > 0 ? abi.decode(data, (string)) : "???";
-    }
-
-    function safeDecimals(IERC20 token) internal view returns (uint8) {
-        (bool success, bytes memory data) = address(token).staticcall(abi.encodeWithSelector(0x313ce567));
-        return success && data.length == 32 ? abi.decode(data, (uint8)) : 18;
-    }
-
-    function safeTransfer(
-        IERC20 token,
-        address to,
-        uint256 amount
-    ) internal {
-        (bool success, bytes memory data) = address(token).call(abi.encodeWithSelector(0xa9059cbb, to, amount));
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "BoringERC20: Transfer failed");
-    }
-
-    function safeTransferFrom(
-        IERC20 token,
-        address from,
-        address to,
-        uint256 amount
-    ) internal {
-        (bool success, bytes memory data) = address(token).call(abi.encodeWithSelector(0x23b872dd, from, to, amount));
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "BoringERC20: TransferFrom failed");
-    }
-}
-
-// File @boringcrypto/boring-solidity/contracts/libraries/BoringMath.sol@v1.0.4
-
-pragma solidity ^0.8.0;
-
-// a library for performing overflow-safe math, updated with awesomeness from of DappHub (https://github.com/dapphub/ds-math)
-library BoringMath {
-    function add(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require((c = a + b) >= b, "BoringMath: Add Overflow");
-    }
-
-    function sub(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require((c = a - b) <= a, "BoringMath: Underflow");
-    }
-
-    function mul(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        require(b == 0 || (c = a * b) / b == a, "BoringMath: Mul Overflow");
-    }
-
-    function to128(uint256 a) internal pure returns (uint128 c) {
-        require(a <= type(uint128).max, "BoringMath: uint128 Overflow");
-        c = uint128(a);
-    }
-
-    function to64(uint256 a) internal pure returns (uint64 c) {
-        require(a <= type(uint64).max, "BoringMath: uint64 Overflow");
-        c = uint64(a);
-    }
-
-    function to32(uint256 a) internal pure returns (uint32 c) {
-        require(a <= type(uint32).max, "BoringMath: uint32 Overflow");
-        c = uint32(a);
-    }
-}
-
-library BoringMath128 {
-    function add(uint128 a, uint128 b) internal pure returns (uint128 c) {
-        require((c = a + b) >= b, "BoringMath: Add Overflow");
-    }
-
-    function sub(uint128 a, uint128 b) internal pure returns (uint128 c) {
-        require((c = a - b) <= a, "BoringMath: Underflow");
-    }
-}
-
-library BoringMath64 {
-    function add(uint64 a, uint64 b) internal pure returns (uint64 c) {
-        require((c = a + b) >= b, "BoringMath: Add Overflow");
-    }
-
-    function sub(uint64 a, uint64 b) internal pure returns (uint64 c) {
-        require((c = a - b) <= a, "BoringMath: Underflow");
-    }
-}
-
-library BoringMath32 {
-    function add(uint32 a, uint32 b) internal pure returns (uint32 c) {
-        require((c = a + b) >= b, "BoringMath: Add Overflow");
-    }
-
-    function sub(uint32 a, uint32 b) internal pure returns (uint32 c) {
-        require((c = a - b) <= a, "BoringMath: Underflow");
-    }
-}
-
-// File @boringcrypto/boring-solidity/contracts/BoringOwnable.sol@v1.0.4
-// Audit on 5-Jan-2021 by Keno and BoringCrypto
-
-// P1 - P3: OK
-pragma solidity ^0.8.0;
-
-// Source: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol + Claimable.sol
-// Edited by BoringCrypto
-
-// T1 - T4: OK
-contract BoringOwnableData {
-    // V1 - V5: OK
-    address public owner;
-    // V1 - V5: OK
-    address public pendingOwner;
-}
-
-// T1 - T4: OK
-contract BoringOwnable is BoringOwnableData {
-    // E1: OK
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-
-    constructor() {
-        owner = msg.sender;
-        emit OwnershipTransferred(address(0), msg.sender);
-    }
-
-    // F1 - F9: OK
-    // C1 - C21: OK
-    function transferOwnership(
-        address newOwner,
-        bool direct,
-        bool renounce
-    ) public onlyOwner {
-        if (direct) {
-            // Checks
-            require(newOwner != address(0) || renounce, "Ownable: zero address");
-
-            // Effects
-            emit OwnershipTransferred(owner, newOwner);
-            owner = newOwner;
-            pendingOwner = address(0);
-        } else {
-            // Effects
-            pendingOwner = newOwner;
-        }
-    }
-
-    // F1 - F9: OK
-    // C1 - C21: OK
-    function claimOwnership() public {
-        address _pendingOwner = pendingOwner;
-
-        // Checks
-        require(msg.sender == _pendingOwner, "Ownable: caller != pending owner");
-
-        // Effects
-        emit OwnershipTransferred(owner, _pendingOwner);
-        owner = _pendingOwner;
-        pendingOwner = address(0);
-    }
-
-    // M1 - M5: OK
-    // C1 - C21: OK
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Ownable: caller is not the owner");
-        _;
-    }
-}
-
-// File contracts/mocks/CloneRewarderTime.sol
-
-pragma solidity ^0.8.0;
-pragma experimental ABIEncoderV2;
-
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC721ReceiverUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "./metatx/ERC2771ContextUpgradeable.sol";
+
+import "../security/Pausable.sol";
 import "./interfaces/ILPToken.sol";
 import "./interfaces/ILiquidityProviders.sol";
 import "hardhat/console.sol";
 
-interface IMasterChefV2 {
-    function lpToken(uint256 pid) external view returns (IERC20 _lpToken);
-}
-
-/// @author @0xKeno and @ankurdubey521
-// TODO: Make contract upgradeable and add support for meta transactions
-contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
-    using BoringMath for uint256;
-    using BoringMath128 for uint128;
-    using BoringERC20 for IERC20;
+contract HyphenLiquidityFarming is
+    Initializable,
+    ERC2771ContextUpgradeable,
+    OwnableUpgradeable,
+    Pausable,
+    IERC721ReceiverUpgradeable
+{
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     ILPToken public lpToken;
     ILiquidityProviders public liquidityProviders;
@@ -235,8 +36,8 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
 
     /// @notice Info of the rewarder pool
     struct PoolInfo {
-        uint128 accTokenPerShare;
-        uint64 lastRewardTime;
+        uint256 accTokenPerShare;
+        uint256 lastRewardTime;
     }
 
     /// @notice Mapping to track the rewarder pool.
@@ -271,11 +72,20 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
     event LogDeposit(address indexed user, address indexed baseToken, uint256 nftId, address indexed to);
     event LogWithdraw(address indexed user, address baseToken, uint256 nftId, address indexed to);
     event LogOnReward(address indexed user, address indexed baseToken, uint256 amount, address indexed to);
-    event LogUpdatePool(address indexed baseToken, uint64 lastRewardTime, uint256 lpSupply, uint256 accToken1PerShare);
+    event LogUpdatePool(address indexed baseToken, uint256 lastRewardTime, uint256 lpSupply, uint256 accToken1PerShare);
     event LogRewardPerSecond(address indexed baseToken, uint256 rewardPerSecond);
     event LogRewardPoolInitialized(address _baseToken, address _rewardToken, uint256 _rewardPerSecond);
+    event LogNativeReceived(address indexed sender, uint256 value);
 
-    constructor(ILiquidityProviders _liquidityProviders, ILPToken _lpToken) {
+    function initialize(
+        address _trustedForwarder,
+        address _pauser,
+        ILiquidityProviders _liquidityProviders,
+        ILPToken _lpToken
+    ) public initializer {
+        __ERC2771Context_init(_trustedForwarder);
+        __Ownable_init();
+        __Pausable_init(_pauser);
         liquidityProviders = _liquidityProviders;
         lpToken = _lpToken;
         unlocked = 1;
@@ -304,10 +114,11 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
         UserInfo storage user = userInfo[_baseToken][_user];
         uint256 pending;
         if (user.amount > 0) {
-            pending = (user.amount.mul(pool.accTokenPerShare) / ACC_TOKEN_PRECISION).sub(user.rewardDebt).add(
-                user.unpaidRewards
-            );
-            IERC20 rewardToken = IERC20(rewardTokens[_baseToken]);
+            pending =
+                ((user.amount * pool.accTokenPerShare) / ACC_TOKEN_PRECISION) -
+                user.rewardDebt +
+                user.unpaidRewards;
+            IERC20Upgradeable rewardToken = IERC20Upgradeable(rewardTokens[_baseToken]);
             uint256 balance = rewardToken.balanceOf(address(this));
             if (pending > balance) {
                 // TODO add support for native token
@@ -319,7 +130,7 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
             }
         }
         user.amount = _lpTokenAmount;
-        user.rewardDebt = _lpTokenAmount.mul(pool.accTokenPerShare) / ACC_TOKEN_PRECISION;
+        user.rewardDebt = (_lpTokenAmount * pool.accTokenPerShare) / ACC_TOKEN_PRECISION;
         emit LogOnReward(_user, _baseToken, pending - user.unpaidRewards, _to);
     }
 
@@ -344,15 +155,15 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
         if (_token == address(0)) {
             _to.transfer(_amount);
         } else {
-            IERC20(_token).safeTransfer(_to, _amount);
+            IERC20Upgradeable(_token).safeTransfer(_to, _amount);
         }
     }
 
     /// @notice Deposit LP tokens
     /// @param _nftId LP token nftId to deposit.
     /// @param _to The receiver of `amount` deposit benefit.
-    function deposit(uint256 _nftId, address _to) public {
-        require(lpToken.isApprovedForAll(msg.sender, address(this)), "ERR__NOT_APPROVED_FOR_ALL");
+    function deposit(uint256 _nftId, address _to) public whenNotPaused {
+        require(lpToken.isApprovedForAll(_msgSender(), address(this)), "ERR__NOT_APPROVED_FOR_ALL");
 
         (address baseToken, , uint256 amount) = lpToken.tokenMetadata(_nftId);
         require(rewardTokens[baseToken] != address(0), "ERR__POOL_NOT_INITIALIZED");
@@ -362,44 +173,44 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
         updatePool(baseToken);
         UserInfo storage user = userInfo[baseToken][_to];
 
-        _onReward(baseToken, _to, _to, 0, user.amount.add(amount));
+        _onReward(baseToken, _to, _to, 0, user.amount + amount);
 
-        nftIdsStaked[msg.sender].push(_nftId);
-        totalSharesStaked[baseToken] = totalSharesStaked[baseToken].add(amount);
-        lpToken.safeTransferFrom(msg.sender, address(this), _nftId);
+        nftIdsStaked[_msgSender()].push(_nftId);
+        totalSharesStaked[baseToken] = totalSharesStaked[baseToken] + amount;
+        lpToken.safeTransferFrom(_msgSender(), address(this), _nftId);
 
-        emit LogDeposit(msg.sender, baseToken, _nftId, _to);
+        emit LogDeposit(_msgSender(), baseToken, _nftId, _to);
     }
 
-    function withdraw(uint256 _nftId, address _to) public {
+    function withdraw(uint256 _nftId, address _to) public whenNotPaused {
         uint256 index;
-        for (index = 0; index < nftIdsStaked[msg.sender].length; index++) {
-            if (nftIdsStaked[msg.sender][index] == _nftId) {
+        for (index = 0; index < nftIdsStaked[_msgSender()].length; index++) {
+            if (nftIdsStaked[_msgSender()][index] == _nftId) {
                 break;
             }
         }
-        if (index == nftIdsStaked[msg.sender].length) {
+        if (index == nftIdsStaked[_msgSender()].length) {
             require(false, "ERR__NFT_NOT_STAKED");
         }
-        nftIdsStaked[msg.sender][index] = nftIdsStaked[msg.sender][nftIdsStaked[msg.sender].length - 1];
-        nftIdsStaked[msg.sender].pop();
+        nftIdsStaked[_msgSender()][index] = nftIdsStaked[_msgSender()][nftIdsStaked[_msgSender()].length - 1];
+        nftIdsStaked[_msgSender()].pop();
 
         (address baseToken, , uint256 amount) = lpToken.tokenMetadata(_nftId);
         amount /= liquidityProviders.BASE_DIVISOR();
 
         updatePool(baseToken);
-        UserInfo storage user = userInfo[baseToken][msg.sender];
+        UserInfo storage user = userInfo[baseToken][_msgSender()];
 
-        _onReward(baseToken, _to, _to, 0, user.amount.sub(amount));
-        totalSharesStaked[baseToken] = totalSharesStaked[baseToken].sub(amount);
+        _onReward(baseToken, _to, _to, 0, user.amount - amount);
+        totalSharesStaked[baseToken] = totalSharesStaked[baseToken] - amount;
         lpToken.safeTransferFrom(address(this), _to, _nftId);
 
-        emit LogWithdraw(msg.sender, baseToken, _nftId, _to);
+        emit LogWithdraw(_msgSender(), baseToken, _nftId, _to);
     }
 
-    function extractRewards(address _baseToken, address _to) external {
-        UserInfo memory user = userInfo[_baseToken][msg.sender];
-        _onReward(_baseToken, msg.sender, _to, 0, user.amount);
+    function extractRewards(address _baseToken, address _to) external whenNotPaused {
+        UserInfo memory user = userInfo[_baseToken][_msgSender()];
+        _onReward(_baseToken, _msgSender(), _to, 0, user.amount);
     }
 
     /// @notice View function to see pending Token
@@ -410,30 +221,26 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
         UserInfo storage user = userInfo[_baseToken][_user];
         uint256 accToken1PerShare = pool.accTokenPerShare;
         if (block.timestamp > pool.lastRewardTime && totalSharesStaked[_baseToken] != 0) {
-            uint256 time = block.timestamp.sub(pool.lastRewardTime);
-            uint256 sushiReward = time.mul(rewardPerSecond[_baseToken]);
-            accToken1PerShare = accToken1PerShare.add(
-                sushiReward.mul(ACC_TOKEN_PRECISION) / totalSharesStaked[_baseToken]
-            );
+            uint256 time = block.timestamp - pool.lastRewardTime;
+            uint256 sushiReward = time * rewardPerSecond[_baseToken];
+            accToken1PerShare = accToken1PerShare + (sushiReward * ACC_TOKEN_PRECISION) / totalSharesStaked[_baseToken];
         }
-        pending = (user.amount.mul(accToken1PerShare) / ACC_TOKEN_PRECISION).sub(user.rewardDebt).add(
-            user.unpaidRewards
-        );
+        pending = ((user.amount * accToken1PerShare) / ACC_TOKEN_PRECISION) - user.rewardDebt + user.unpaidRewards;
     }
 
     /// @notice Update reward variables of the given pool.
     /// @return pool Returns the pool that was updated.
-    function updatePool(address _baseToken) public returns (PoolInfo memory pool) {
+    function updatePool(address _baseToken) public whenNotPaused returns (PoolInfo memory pool) {
         pool = poolInfo[_baseToken];
         if (block.timestamp > pool.lastRewardTime) {
             if (totalSharesStaked[_baseToken] > 0) {
-                uint256 time = block.timestamp.sub(pool.lastRewardTime);
-                uint256 sushiReward = time.mul(rewardPerSecond[_baseToken]);
-                pool.accTokenPerShare = pool.accTokenPerShare.add(
-                    (sushiReward.mul(ACC_TOKEN_PRECISION) / totalSharesStaked[_baseToken]).to128()
-                );
+                uint256 time = block.timestamp - pool.lastRewardTime;
+                uint256 sushiReward = time * rewardPerSecond[_baseToken];
+                pool.accTokenPerShare =
+                    pool.accTokenPerShare +
+                    ((sushiReward * (ACC_TOKEN_PRECISION)) / totalSharesStaked[_baseToken]);
             }
-            pool.lastRewardTime = block.timestamp.to64();
+            pool.lastRewardTime = block.timestamp;
             poolInfo[_baseToken] = pool;
             emit LogUpdatePool(_baseToken, pool.lastRewardTime, totalSharesStaked[_baseToken], pool.accTokenPerShare);
         }
@@ -448,7 +255,31 @@ contract HyphenLiquidityFarming is BoringOwnable, IERC721ReceiverUpgradeable {
         address,
         uint256,
         bytes calldata
-    ) external pure override returns (bytes4) {
+    ) external pure override(IERC721ReceiverUpgradeable) returns (bytes4) {
         return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
+    }
+
+    function _msgSender()
+        internal
+        view
+        virtual
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
+        returns (address sender)
+    {
+        return ERC2771ContextUpgradeable._msgSender();
+    }
+
+    function _msgData()
+        internal
+        view
+        virtual
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
+        returns (bytes calldata)
+    {
+        return ERC2771ContextUpgradeable._msgData();
+    }
+
+    receive() external payable {
+        emit LogNativeReceived(_msgSender(), msg.value);
     }
 }
