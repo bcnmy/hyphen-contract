@@ -12,7 +12,6 @@ import "./interfaces/ILPToken.sol";
 import "./interfaces/ITokenManager.sol";
 import "./interfaces/IWhiteListPeriodManager.sol";
 import "./interfaces/ILiquidityPool.sol";
-import "hardhat/console.sol";
 
 contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, OwnableUpgradeable, Pausable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
