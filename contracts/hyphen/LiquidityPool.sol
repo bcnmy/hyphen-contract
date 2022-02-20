@@ -25,11 +25,6 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
     ITokenManager public tokenManager;
     ILiquidityProviders public liquidityProviders;
 
-    struct TransferConfig {
-        uint256 min;
-        uint256 max;
-    }
-
     struct PermitRequest {
         uint256 nonce;
         uint256 expiry;
@@ -44,18 +39,6 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
 
     // Gas fee accumulated by token address => executor address
     mapping(address => mapping(address => uint256)) public gasFeeAccumulated;
-
-    /**
-     * First key is toChainId and second key is token address being deposited on current chain
-     * TODO To be used in next version, just creating the data structure here
-     */
-    mapping(uint256 => mapping(address => TransferConfig)) public depositConfig;
-
-    /**
-     * Store min/max amount of token to transfer based on token address
-     * TODO To be used in next version, just creating the data structure here
-     */
-    mapping(address => TransferConfig) public transferConfig;
 
     // Incentive Pool amount per token address
     mapping(address => uint256) public incentivePool;
@@ -176,9 +159,9 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         string memory tag
     ) public tokenChecks(tokenAddress) whenNotPaused {
         require(
-            tokenManager.getTokensInfo(tokenAddress).minCap <= amount &&
-                tokenManager.getTokensInfo(tokenAddress).maxCap >= amount,
-            "Deposit amount not in cap limits"
+            tokenManager.getDepositConfig(toChainId, tokenAddress).min <= amount &&
+                tokenManager.getDepositConfig(toChainId, tokenAddress).max >= amount,
+            "Deposit amount not in Cap limit"
         );
         require(receiver != address(0), "Receiver address cannot be 0");
         require(amount != 0, "Amount cannot be 0");
@@ -267,8 +250,8 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         string memory tag
     ) external payable whenNotPaused {
         require(
-            tokenManager.getTokensInfo(NATIVE).minCap <= msg.value &&
-                tokenManager.getTokensInfo(NATIVE).maxCap >= msg.value,
+            tokenManager.getDepositConfig(toChainId, NATIVE).min <= msg.value &&
+                tokenManager.getDepositConfig(toChainId, NATIVE).max >= msg.value,
             "Deposit amount not in Cap limit"
         );
         require(receiver != address(0), "Receiver address cannot be 0");
@@ -291,8 +274,8 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
     ) external nonReentrant onlyExecutor tokenChecks(tokenAddress) whenNotPaused {
         uint256 initialGas = gasleft();
         require(
-            tokenManager.getTokensInfo(tokenAddress).minCap <= amount &&
-                tokenManager.getTokensInfo(tokenAddress).maxCap >= amount,
+            tokenManager.getTransferConfig(tokenAddress).min <= amount &&
+                tokenManager.getTransferConfig(tokenAddress).max >= amount,
             "Withdraw amnt not in Cap limits"
         );
         require(receiver != address(0), "Bad receiver address");
