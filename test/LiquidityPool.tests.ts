@@ -94,6 +94,16 @@ describe("LiquidityPoolTests", function () {
             maxFee
         );
 
+        let tokenDepositConfig = {
+            min: minTokenCap,
+            max: maxTokenCap
+        }
+        await tokenManager.connect(owner).setDepositConfig(
+            [1],
+            [tokenAddress],
+            [tokenDepositConfig]
+        );
+
         // Add supported Native token
         await tokenManager.connect(owner).addSupportedToken(
             NATIVE,
@@ -102,6 +112,17 @@ describe("LiquidityPoolTests", function () {
             equilibriumFee,
             maxFee
         );
+
+        let nativeDepositConfig = {
+            min: minTokenCap,
+            max: maxTokenCap
+        }
+        await tokenManager.connect(owner).setDepositConfig(
+            [1],
+            [NATIVE],
+            [nativeDepositConfig]
+        );
+
         await lpToken.setLiquidtyPool(liquidityProviders.address);
 
         const wlpmFactory = await ethers.getContractFactory("WhitelistPeriodManager");
@@ -220,12 +241,13 @@ describe("LiquidityPoolTests", function () {
             equilibriumFee,
             maxFee
         );
+        let tokenTransferConfig = await tokenManager.getTransferConfig(tokenAddress);
         let checkTokenStatus = await tokenManager.tokensInfo(
             tokenAddress
         );
         expect(checkTokenStatus.supportedToken).to.equal(true);
-        expect(checkTokenStatus.minCap).to.equal(minTokenCap);
-        expect(checkTokenStatus.maxCap).to.equal(maxTokenCap);
+        expect(tokenTransferConfig.min).to.equal(minTokenCap);
+        expect(tokenTransferConfig.max).to.equal(maxTokenCap);
     });
 
     it("Should updateTokenCap successfully", async () => {
@@ -240,10 +262,10 @@ describe("LiquidityPoolTests", function () {
         let checkTokenStatus = await tokenManager.tokensInfo(
             tokenAddress
         );
-
+        let tokenTransferConfig = await tokenManager.getTransferConfig(tokenAddress);
         expect(checkTokenStatus.supportedToken).to.equal(true);
-        expect(checkTokenStatus.minCap).to.equal(newMinTokenCap);
-        expect(checkTokenStatus.maxCap).to.equal(newMaxTokenCap);
+        expect(tokenTransferConfig.min).to.equal(newMinTokenCap);
+        expect(tokenTransferConfig.max).to.equal(newMaxTokenCap);
     });
 
     it("Should addNativeLiquidity successfully", async () => {
