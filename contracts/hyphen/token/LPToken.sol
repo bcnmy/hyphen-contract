@@ -5,15 +5,15 @@ pragma abicoder v2;
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import "../../security/Pausable.sol";
 import "../interfaces/IWhiteListPeriodManager.sol";
 import "../structures/LpTokenMetadata.sol";
 
 contract LPToken is
     OwnableUpgradeable,
+    Pausable,
     ERC721EnumerableUpgradeable,
-    ERC721PausableUpgradeable,
     ERC721URIStorageUpgradeable,
     ERC2771ContextUpgradeable
 {
@@ -27,12 +27,13 @@ contract LPToken is
     function initialize(
         string memory _name,
         string memory _symbol,
-        address _trustedForwarder
+        address _trustedForwarder,
+        address _pauser
     ) public initializer {
         __Ownable_init();
+        __Pausable_init(_pauser);
         __ERC721_init(_name, _symbol);
         __ERC721Enumerable_init();
-        __ERC721Pausable_init();
         __ERC721URIStorage_init();
         __ERC2771Context_init(_trustedForwarder);
     }
@@ -127,7 +128,7 @@ contract LPToken is
         address from,
         address to,
         uint256 tokenId
-    ) internal virtual override(ERC721EnumerableUpgradeable, ERC721PausableUpgradeable, ERC721Upgradeable) {
+    ) internal virtual override(ERC721EnumerableUpgradeable, ERC721Upgradeable) whenNotPaused {
         super._beforeTokenTransfer(from, to, tokenId);
 
         // Only call whitelist period manager for NFT Transfers, not mint and burns

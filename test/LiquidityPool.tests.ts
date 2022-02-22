@@ -62,7 +62,7 @@ describe("LiquidityPoolTests", function () {
         await executorManager.deployed();
 
         const lpTokenFactory = await ethers.getContractFactory("LPToken");
-        lpToken = (await upgrades.deployProxy(lpTokenFactory, ["Hyphen LP Token", "HPT", trustedForwarder])) as LPToken;
+        lpToken = (await upgrades.deployProxy(lpTokenFactory, ["Hyphen LP Token", "HPT", trustedForwarder, pauser.address])) as LPToken;
 
         
         const liquidtyProvidersFactory = await ethers.getContractFactory("LiquidityProvidersTest");
@@ -397,8 +397,6 @@ describe("LiquidityPoolTests", function () {
 
     // (node:219241) UnhandledPromiseRejectionWarning: Error: VM Exception while processing transaction: revert SafeMath: subtraction overflow
     it("Should send ERC20 funds to user successfully", async () => {
-        console.log("minTokenCap ",minTokenCap);
-        console.log("tokenAddress ",tokenAddress);
         await addTokenLiquidity(tokenAddress, minTokenCap, owner);
         const amount = minTokenCap;
         const usdtBalanceBefore = await token.balanceOf(liquidityPool.address);

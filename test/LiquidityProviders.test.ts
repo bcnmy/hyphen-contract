@@ -107,7 +107,12 @@ describe("LiquidityProviderTests", function () {
     executorManager = await executorManagerFactory.deploy();
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
-    lpToken = (await upgrades.deployProxy(lpTokenFactory, ["LPToken", "LPToken", tf.address])) as LPToken;
+    lpToken = (await upgrades.deployProxy(lpTokenFactory, [
+      "LPToken",
+      "LPToken",
+      tf.address,
+      pauser.address,
+    ])) as LPToken;
 
     const liquidtyProvidersFactory = await ethers.getContractFactory("LiquidityProvidersTest");
     liquidityProviders = (await upgrades.deployProxy(liquidtyProvidersFactory, [
