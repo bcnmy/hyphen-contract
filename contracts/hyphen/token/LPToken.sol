@@ -5,18 +5,15 @@ pragma abicoder v2;
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
+import "base64-sol/base64.sol";
 import "../../security/Pausable.sol";
 import "../interfaces/IWhiteListPeriodManager.sol";
 import "../structures/LpTokenMetadata.sol";
 
-contract LPToken is
-    OwnableUpgradeable,
-    Pausable,
-    ERC721EnumerableUpgradeable,
-    ERC721URIStorageUpgradeable,
-    ERC2771ContextUpgradeable
-{
+contract LPToken is OwnableUpgradeable, Pausable, ERC721EnumerableUpgradeable, ERC2771ContextUpgradeable {
+    using StringsUpgradeable for uint256;
+
     address public liquidityPoolAddress;
     IWhiteListPeriodManager public whiteListPeriodManager;
     mapping(uint256 => LpTokenMetadata) public tokenMetadata;
@@ -34,7 +31,6 @@ contract LPToken is
         __Pausable_init(_pauser);
         __ERC721_init(_name, _symbol);
         __ERC721Enumerable_init();
-        __ERC721URIStorage_init();
         __ERC2771Context_init(_trustedForwarder);
     }
 
@@ -80,21 +76,54 @@ contract LPToken is
         return _exists(_tokenId);
     }
 
-    function tokenURI(uint256 tokenId)
-        public
-        view
-        virtual
-        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
-        returns (string memory)
-    {
-        return ERC721URIStorageUpgradeable.tokenURI(tokenId);
+    function tokenURI(uint256 tokenId) public view virtual override(ERC721Upgradeable) returns (string memory) {
+        string memory svgData = getTokenSvg(tokenId);
+
+        string memory json = Base64.encode(
+            bytes(
+                string(
+                    abi.encodePacked(
+                        '{"name": "',
+                        name(),
+                        '", "description": "", "image_data": "',
+                        bytes(svgData),
+                        '"}'
+                    )
+                )
+            )
+        );
+        return string(abi.encodePacked("data:application/json;base64,", json));
+    }
+
+    function getTokenSvg(uint256 tokenId) public view returns (string memory) {
+        require(exists(tokenId), "ERR__TOKEN_DOES_NOT_EXIST");
+        string[6] memory lines;
+        lines[0] = "<svg height='90' width='200'>";
+        lines[1] = "<text x='10' y='20' style='fill:red;'>";
+        lines[2] = string(
+            abi.encodePacked(
+                "<tspan x='10' y='45'>Total Supplied Liquidity: ",
+                tokenMetadata[tokenId].suppliedLiquidity.toString(),
+                "</tspan>"
+            )
+        );
+        lines[3] = string(
+            abi.encodePacked(
+                "<tspan x='10' y='45'>Total Shares: ",
+                tokenMetadata[tokenId].shares.toString(),
+                "</tspan>"
+            )
+        );
+        lines[4] = "</text>";
+        lines[5] = "</svg>";
+        return string(abi.encodePacked(lines[0], lines[1], lines[2], lines[3], lines[4], lines[5]));
     }
 
     function supportsInterface(bytes4 interfaceId)
         public
         view
         virtual
-        override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
+        override(ERC721EnumerableUpgradeable)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
@@ -128,7 +157,7 @@ contract LPToken is
         address from,
         address to,
         uint256 tokenId
-    ) internal virtual override(ERC721EnumerableUpgradeable, ERC721Upgradeable) whenNotPaused {
+    ) internal virtual override(ERC721EnumerableUpgradeable) whenNotPaused {
         super._beforeTokenTransfer(from, to, tokenId);
 
         // Only call whitelist period manager for NFT Transfers, not mint and burns
@@ -142,7 +171,7 @@ contract LPToken is
         }
     }
 
-    function _burn(uint256 tokenId) internal virtual override(ERC721URIStorageUpgradeable, ERC721Upgradeable) {
-        ERC721URIStorageUpgradeable._burn(tokenId);
+    function _burn(uint256 tokenId) internal virtual override(ERC721Upgradeable) {
+        super._burn(tokenId);
     }
 }

@@ -114,4 +114,9 @@ describe("LPTokenTests", function () {
     await lpToken.connect(pauser).pause();
     await expect(lpToken.transferFrom(owner.address, bob.address, 1)).to.be.revertedWith("Pausable: paused");
   });
+
+  it("Should return correct svg data", async function () {
+    await liquidityProviders.addNativeLiquidity({ value: 100 });
+    console.log(await lpToken.tokenURI(1));
+  });
 });
