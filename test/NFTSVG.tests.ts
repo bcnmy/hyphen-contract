@@ -8,14 +8,15 @@ import {
   LPToken,
   ExecutorManager,
   TokenManager,
+  EthereumEthSVG,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BigNumber, ContractTransaction } from "ethers";
+import { BigNumber } from "ethers";
 
 let { getLocaleString } = require("./utils");
 
-describe("LPTokenTests", function () {
+describe("NftSvgTests", function () {
   let owner: SignerWithAddress, pauser: SignerWithAddress, bob: SignerWithAddress;
   let charlie: SignerWithAddress, tf: SignerWithAddress, executor: SignerWithAddress;
   let token: ERC20Token, token2: ERC20Token;
@@ -25,6 +26,7 @@ describe("LPTokenTests", function () {
   let liquidityPool: LiquidityPool;
   let executorManager: ExecutorManager;
   let tokenManager: TokenManager;
+  let ethereumEthSvg: EthereumEthSVG;
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   let BASE: BigNumber = BigNumber.from(10).pow(18);
@@ -101,8 +103,13 @@ describe("LPTokenTests", function () {
       liquidityProviders.address,
     ])) as LiquidityPool;
     await liquidityProviders.setLiquidityPool(liquidityPool.address);
-
     await lpToken.setLiquidtyProviders(liquidityProviders.address);
+
+    const ethereumEthSvgFactory = await ethers.getContractFactory("EthereumEthSVG");
+    ethereumEthSvg = (await upgrades.deployProxy(ethereumEthSvgFactory, [
+      18,
+      "https://gateway.pinata.cloud/ipfs/QmXKVXRM3PJLo19v74f925Mj7eb1Q3hNbHKkqr1hhNrEfH",
+    ])) as EthereumEthSVG;
   });
 
   this.afterEach(async function () {
@@ -111,14 +118,17 @@ describe("LPTokenTests", function () {
     expect(await ethers.provider.getBalance(liquidityProviders.address)).to.equal(0);
   });
 
-  it("Should pause nft transfer when nft contract is paused", async function () {
-    await liquidityProviders.addNativeLiquidity({ value: 100 });
-    await lpToken.connect(pauser).pause();
-    await expect(lpToken.transferFrom(owner.address, bob.address, 1)).to.be.revertedWith("Pausable: paused");
+  it("Should divide by 100 correctly", async function () {
+    for (let i = 0; i < 1000; i++) {
+      expect(await ethereumEthSvg.divideByPowerOf10(i, 2, 2)).to.equal(
+        (i / 100).toLocaleString("en-us", { maximumFractionDigits: 2 })
+      );
+    }
   });
 
-  it("Should return correct svg data", async function () {
-    await liquidityProviders.addNativeLiquidity({ value: 100 });
-    console.log(await lpToken.tokenURI(1));
+  it("Should divide by 100000 correctly", async function () {
+    for (let i = 1000; i < 5000; i++) {
+      expect(await ethereumEthSvg.divideByPowerOf10(i, 5, 4)).to.equal(ethers.utils.formatUnits(i, 5));
+    }
   });
 });

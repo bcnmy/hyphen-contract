@@ -5,21 +5,30 @@ pragma abicoder v2;
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
 import "base64-sol/base64.sol";
 import "../../security/Pausable.sol";
 import "../interfaces/IWhiteListPeriodManager.sol";
+import "../interfaces/ILiquidityProviders.sol";
+import "../interfaces/INFTSVG.sol";
 import "../structures/LpTokenMetadata.sol";
 
 contract LPToken is OwnableUpgradeable, Pausable, ERC721EnumerableUpgradeable, ERC2771ContextUpgradeable {
     using StringsUpgradeable for uint256;
 
+    address internal constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
     address public liquidityPoolAddress;
+    ILiquidityProviders public liquidityProviders;
     IWhiteListPeriodManager public whiteListPeriodManager;
     mapping(uint256 => LpTokenMetadata) public tokenMetadata;
+    mapping(address => ISVGNFT) public svgHelpers;
 
     event LiquidityPoolUpdated(address indexed lpm);
+    event LiquidityProvidersUpdated(address indexed lpm);
     event WhiteListPeriodManagerUpdated(address indexed manager);
+    event SvgHelperUpdated(address indexed tokenAddress, ISVGNFT indexed svgHelper);
 
     function initialize(
         string memory _name,
@@ -34,6 +43,11 @@ contract LPToken is OwnableUpgradeable, Pausable, ERC721EnumerableUpgradeable, E
         __ERC2771Context_init(_trustedForwarder);
     }
 
+    function setSvgHelper(address _tokenAddress, ISVGNFT _svgHelper) public onlyOwner {
+        svgHelpers[_tokenAddress] = _svgHelper;
+        emit SvgHelperUpdated(_tokenAddress, _svgHelper);
+    }
+
     modifier onlyHyphenPools() {
         require(_msgSender() == liquidityPoolAddress, "ERR_UNAUTHORIZED");
         _;
@@ -42,6 +56,11 @@ contract LPToken is OwnableUpgradeable, Pausable, ERC721EnumerableUpgradeable, E
     function setLiquidtyPool(address _lpm) external onlyOwner {
         liquidityPoolAddress = _lpm;
         emit LiquidityPoolUpdated(_lpm);
+    }
+
+    function setLiquidtyProviders(address _lp) external onlyOwner {
+        liquidityProviders = ILiquidityProviders(_lp);
+        emit LiquidityProvidersUpdated(_lp);
     }
 
     function setWhiteListPeriodManager(address _whiteListPeriodManager) external onlyOwner {
@@ -77,7 +96,14 @@ contract LPToken is OwnableUpgradeable, Pausable, ERC721EnumerableUpgradeable, E
     }
 
     function tokenURI(uint256 tokenId) public view virtual override(ERC721Upgradeable) returns (string memory) {
-        string memory svgData = getTokenSvg(tokenId);
+        address tokenAddress = tokenMetadata[tokenId].token;
+        require(svgHelpers[tokenAddress] != ISVGNFT(address(0)), "ERR__SVG_HELPER_NOT_REGISTERED");
+
+        string memory svgData = svgHelpers[tokenAddress].getTokenSvg(
+            tokenId,
+            tokenMetadata[tokenId].suppliedLiquidity,
+            liquidityProviders.totalReserve(tokenAddress)
+        );
 
         string memory json = Base64.encode(
             bytes(
@@ -93,30 +119,6 @@ contract LPToken is OwnableUpgradeable, Pausable, ERC721EnumerableUpgradeable, E
             )
         );
         return string(abi.encodePacked("data:application/json;base64,", json));
-    }
-
-    function getTokenSvg(uint256 tokenId) public view returns (string memory) {
-        require(exists(tokenId), "ERR__TOKEN_DOES_NOT_EXIST");
-        string[6] memory lines;
-        lines[0] = "<svg height='90' width='200'>";
-        lines[1] = "<text x='10' y='20' style='fill:red;'>";
-        lines[2] = string(
-            abi.encodePacked(
-                "<tspan x='10' y='45'>Total Supplied Liquidity: ",
-                tokenMetadata[tokenId].suppliedLiquidity.toString(),
-                "</tspan>"
-            )
-        );
-        lines[3] = string(
-            abi.encodePacked(
-                "<tspan x='10' y='45'>Total Shares: ",
-                tokenMetadata[tokenId].shares.toString(),
-                "</tspan>"
-            )
-        );
-        lines[4] = "</text>";
-        lines[5] = "</svg>";
-        return string(abi.encodePacked(lines[0], lines[1], lines[2], lines[3], lines[4], lines[5]));
     }
 
     function supportsInterface(bytes4 interfaceId)

@@ -152,6 +152,8 @@ describe("LiquidityProviderTests", function () {
       liquidityProviders.address,
     ])) as LiquidityPool;
     await liquidityProviders.setLiquidityPool(liquidityPool.address);
+
+    await lpToken.setLiquidtyProviders(liquidityProviders.address);
   });
 
   this.afterEach(async function () {
