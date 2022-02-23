@@ -31,7 +31,7 @@ abstract contract NFTSVG is OwnableUpgradeable {
         emit TokenDecimalsUpdated(_tokenDecimals);
     }
 
-    function getDigitsCount(uint256 _number) internal pure returns (uint256) {
+    function _getDigitsCount(uint256 _number) internal pure returns (uint256) {
         uint256 count = 0;
         while (_number > 0) {
             ++count;
@@ -40,7 +40,7 @@ abstract contract NFTSVG is OwnableUpgradeable {
         return count;
     }
 
-    function getZeroString(uint256 _length) internal pure returns (string memory) {
+    function _getZeroString(uint256 _length) internal pure returns (string memory) {
         if (_length == 0) {
             return "";
         }
@@ -51,15 +51,20 @@ abstract contract NFTSVG is OwnableUpgradeable {
         return result;
     }
 
-    function truncateDigitsFromRight(uint256 _number, uint256 _digitsCount) internal pure returns (uint256) {
-        return _number /= (10**_digitsCount);
+    function _truncateDigitsFromRight(uint256 _number, uint256 _digitsCount) internal pure returns (uint256) {
+        uint256 result = _number /= (10**_digitsCount);
+        // Remove Leading Zeroes
+        while (result != 0 && result % 10 == 0) {
+            result /= 10;
+        }
+        return result;
     }
 
-    function divideByPowerOf10(
+    function _divideByPowerOf10(
         uint256 _value,
         uint256 _power,
         uint256 _maxDigitsAfterDecimal
-    ) public pure returns (string memory) {
+    ) internal pure returns (string memory) {
         uint256 integerPart = _value / 10**_power;
         uint256 leadingZeroesToAddBeforeDecimal = 0;
         uint256 fractionalPartTemp = _value % (10**_power);
@@ -75,26 +80,31 @@ abstract contract NFTSVG is OwnableUpgradeable {
             }
 
             uint256 expectedFractionalDigits = powerRemaining;
-            if (getDigitsCount(fractionalPartTemp) < expectedFractionalDigits) {
-                leadingZeroesToAddBeforeDecimal = expectedFractionalDigits - getDigitsCount(fractionalPartTemp);
+            if (_getDigitsCount(fractionalPartTemp) < expectedFractionalDigits) {
+                leadingZeroesToAddBeforeDecimal = expectedFractionalDigits - _getDigitsCount(fractionalPartTemp);
             }
         }
 
         if (fractionalPartTemp == 0) {
             return integerPart.toString();
         }
-        uint256 digitsToTruncateCount = getDigitsCount(fractionalPartTemp) > _maxDigitsAfterDecimal
-            ? getDigitsCount(fractionalPartTemp) - _maxDigitsAfterDecimal
+        uint256 digitsToTruncateCount = _getDigitsCount(fractionalPartTemp) + leadingZeroesToAddBeforeDecimal >
+            _maxDigitsAfterDecimal
+            ? _getDigitsCount(fractionalPartTemp) + leadingZeroesToAddBeforeDecimal - _maxDigitsAfterDecimal
             : 0;
         return
             string(
                 abi.encodePacked(
                     integerPart.toString(),
                     ".",
-                    getZeroString(leadingZeroesToAddBeforeDecimal),
-                    truncateDigitsFromRight(fractionalPartTemp, digitsToTruncateCount).toString()
+                    _getZeroString(leadingZeroesToAddBeforeDecimal),
+                    _truncateDigitsFromRight(fractionalPartTemp, digitsToTruncateCount).toString()
                 )
             );
+    }
+
+    function _calculatePercentage(uint256 _num, uint256 _denom) internal pure returns (string memory) {
+        return _divideByPowerOf10((_num * 10**(18 + 2)) / _denom, 18, 2);
     }
 
     function getTokenSvg(

@@ -16,12 +16,8 @@ contract EthereumEthSVG is NFTSVG {
         uint256 _totalSuppliedLiquidity
     ) public view virtual override returns (string memory) {
         string memory tokenId = _tokenId.toString();
-        string memory suppliedLiquidity = divideByPowerOf10(_suppliedLiquidity, tokenDecimals, 3);
-        string memory sharePercent = divideByPowerOf10(
-            (_suppliedLiquidity * 10**(18 + 2)) / _totalSuppliedLiquidity,
-            tokenDecimals + 18,
-            3
-        );
+        string memory suppliedLiquidity = _divideByPowerOf10(_suppliedLiquidity, tokenDecimals, 3);
+        string memory sharePercent = _calculatePercentage(_suppliedLiquidity, _totalSuppliedLiquidity);
         return
             string(
                 abi.encodePacked(

@@ -8,9 +8,10 @@ import {
   LPToken,
   ExecutorManager,
   TokenManager,
-  EthereumEthSVG,
+  NFTSVGTest,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
+import { Decimal } from "decimal.js";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber } from "ethers";
 
@@ -26,7 +27,7 @@ describe("NftSvgTests", function () {
   let liquidityPool: LiquidityPool;
   let executorManager: ExecutorManager;
   let tokenManager: TokenManager;
-  let ethereumEthSvg: EthereumEthSVG;
+  let svg: NFTSVGTest;
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   let BASE: BigNumber = BigNumber.from(10).pow(18);
@@ -105,11 +106,11 @@ describe("NftSvgTests", function () {
     await liquidityProviders.setLiquidityPool(liquidityPool.address);
     await lpToken.setLiquidtyProviders(liquidityProviders.address);
 
-    const ethereumEthSvgFactory = await ethers.getContractFactory("EthereumEthSVG");
-    ethereumEthSvg = (await upgrades.deployProxy(ethereumEthSvgFactory, [
+    const ethereumEthSvgFactory = await ethers.getContractFactory("NFTSVGTest");
+    svg = (await upgrades.deployProxy(ethereumEthSvgFactory, [
       18,
       "https://gateway.pinata.cloud/ipfs/QmXKVXRM3PJLo19v74f925Mj7eb1Q3hNbHKkqr1hhNrEfH",
-    ])) as EthereumEthSVG;
+    ])) as NFTSVGTest;
   });
 
   this.afterEach(async function () {
@@ -120,15 +121,43 @@ describe("NftSvgTests", function () {
 
   it("Should divide by 100 correctly", async function () {
     for (let i = 0; i < 1000; i++) {
-      expect(await ethereumEthSvg.divideByPowerOf10(i, 2, 2)).to.equal(
-        (i / 100).toLocaleString("en-us", { maximumFractionDigits: 2 })
+      expect(await svg.divideByPowerOf10(i, 2, 2)).to.equal(
+        new Decimal(i)
+          .div(100)
+          .mul(10 ** 2)
+          .floor()
+          .div(10 ** 2)
+          .toString()
       );
     }
   });
 
   it("Should divide by 100000 correctly", async function () {
-    for (let i = 1000; i < 5000; i++) {
-      expect(await ethereumEthSvg.divideByPowerOf10(i, 5, 4)).to.equal(ethers.utils.formatUnits(i, 5));
+    for (let i = 4000; i < 5000; i++) {
+      expect(await svg.divideByPowerOf10(i, 5, 4)).to.equal(
+        new Decimal(i)
+          .div(10 ** 5)
+          .mul(10 ** 4)
+          .floor()
+          .div(10 ** 4)
+          .toString()
+      );
+    }
+  });
+
+  it("Should calculate percentage correctly", async function () {
+    for (let i = 1; i < 10; i++) {
+      for (let j = 100; j > 1; --j) {
+        expect(await svg.calculatePercentage(i, j)).to.equal(
+          new Decimal(i)
+            .div(j)
+            .mul(100)
+            .mul(10 ** 2)
+            .floor()
+            .div(10 ** 2)
+            .toString()
+        );
+      }
     }
   });
 });

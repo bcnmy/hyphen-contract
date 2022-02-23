@@ -4,12 +4,6 @@ pragma solidity ^0.8.0;
 interface ISVGNFT {
     function backgroundUrl() external view returns (string memory);
 
-    function divideByPowerOf10(
-        uint256 _value,
-        uint256 _power,
-        uint256 _maxDigitsAfterDecimal
-    ) external pure returns (string memory);
-
     function getTokenSvg(
         uint256 _tokenId,
         uint256 _suppliedLiquidity,
