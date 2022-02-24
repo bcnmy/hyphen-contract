@@ -9,6 +9,7 @@ import {
   ExecutorManager,
   TokenManager,
   NFTSVGTest,
+  EthereumEthSVG,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { Decimal } from "decimal.js";
@@ -27,7 +28,7 @@ describe("NftSvgTests", function () {
   let liquidityPool: LiquidityPool;
   let executorManager: ExecutorManager;
   let tokenManager: TokenManager;
-  let svg: NFTSVGTest;
+  let svg: NFTSVGTest, ethSvg: EthereumEthSVG;
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   let BASE: BigNumber = BigNumber.from(10).pow(18);
@@ -38,8 +39,8 @@ describe("NftSvgTests", function () {
   const perWalletNativeMaxCap = getLocaleString(1 * 1e18);
   const tokenNativeMaxCap = getLocaleString(200 * 1e18);
 
-  beforeEach(async function () {
-    [owner, pauser, charlie, bob, tf, , executor] = await ethers.getSigners();
+  before(async function () {
+    [owner, pauser, charlie, bob, tf, executor] = await ethers.getSigners();
 
     const tokenManagerFactory = await ethers.getContractFactory("TokenManager");
     tokenManager = await tokenManagerFactory.deploy(tf.address);
@@ -62,6 +63,7 @@ describe("NftSvgTests", function () {
     lpToken = (await upgrades.deployProxy(lpTokenFactory, [
       "LPToken",
       "LPToken",
+      "",
       tf.address,
       pauser.address,
     ])) as LPToken;
@@ -106,17 +108,26 @@ describe("NftSvgTests", function () {
     await liquidityProviders.setLiquidityPool(liquidityPool.address);
     await lpToken.setLiquidtyProviders(liquidityProviders.address);
 
-    const ethereumEthSvgFactory = await ethers.getContractFactory("NFTSVGTest");
-    svg = (await upgrades.deployProxy(ethereumEthSvgFactory, [
+    const testSvgFactory = await ethers.getContractFactory("NFTSVGTest");
+    svg = (await upgrades.deployProxy(testSvgFactory, [
       18,
       "https://gateway.pinata.cloud/ipfs/QmXKVXRM3PJLo19v74f925Mj7eb1Q3hNbHKkqr1hhNrEfH",
     ])) as NFTSVGTest;
+
+    const ethSvgFactory = await ethers.getContractFactory("EthereumEthSVG");
+    ethSvg = (await upgrades.deployProxy(ethSvgFactory, [
+      18,
+      "https://gateway.pinata.cloud/ipfs/QmXKVXRM3PJLo19v74f925Mj7eb1Q3hNbHKkqr1hhNrEfH",
+    ])) as EthereumEthSVG;
+
+    await lpToken.setSvgHelper(NATIVE, ethSvg.address);
   });
 
-  this.afterEach(async function () {
-    expect(await token.balanceOf(liquidityProviders.address)).to.equal(0);
-    expect(await token2.balanceOf(liquidityProviders.address)).to.equal(0);
-    expect(await ethers.provider.getBalance(liquidityProviders.address)).to.equal(0);
+  it("Should return a non empty svg in tokenuri", async function () {
+    await liquidityProviders.addNativeLiquidity({ value: ethers.utils.parseEther("0.0001") });
+    await liquidityProviders.addNativeLiquidity({ value: ethers.utils.parseEther("0.001") });
+    expect(await lpToken.tokenURI(1)).to.not.equal("");
+    expect(await lpToken.tokenURI(2)).to.not.equal("");
   });
 
   it("Should divide by 100 correctly", async function () {

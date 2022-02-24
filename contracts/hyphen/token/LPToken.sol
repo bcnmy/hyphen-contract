@@ -20,6 +20,7 @@ contract LPToken is OwnableUpgradeable, Pausable, ERC721EnumerableUpgradeable, E
     address internal constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     address public liquidityPoolAddress;
+    string public description;
     ILiquidityProviders public liquidityProviders;
     IWhiteListPeriodManager public whiteListPeriodManager;
     mapping(uint256 => LpTokenMetadata) public tokenMetadata;
@@ -28,11 +29,13 @@ contract LPToken is OwnableUpgradeable, Pausable, ERC721EnumerableUpgradeable, E
     event LiquidityPoolUpdated(address indexed lpm);
     event LiquidityProvidersUpdated(address indexed lpm);
     event WhiteListPeriodManagerUpdated(address indexed manager);
+    event DescriptionUpdated(string indexed description);
     event SvgHelperUpdated(address indexed tokenAddress, ISVGNFT indexed svgHelper);
 
     function initialize(
         string memory _name,
         string memory _symbol,
+        string memory _description,
         address _trustedForwarder,
         address _pauser
     ) public initializer {
@@ -41,6 +44,7 @@ contract LPToken is OwnableUpgradeable, Pausable, ERC721EnumerableUpgradeable, E
         __ERC721_init(_name, _symbol);
         __ERC721Enumerable_init();
         __ERC2771Context_init(_trustedForwarder);
+        description = _description;
     }
 
     function setSvgHelper(address _tokenAddress, ISVGNFT _svgHelper) public onlyOwner {
@@ -66,6 +70,11 @@ contract LPToken is OwnableUpgradeable, Pausable, ERC721EnumerableUpgradeable, E
     function setWhiteListPeriodManager(address _whiteListPeriodManager) external onlyOwner {
         whiteListPeriodManager = IWhiteListPeriodManager(_whiteListPeriodManager);
         emit WhiteListPeriodManagerUpdated(_whiteListPeriodManager);
+    }
+
+    function setDescription(string memory _description) external onlyOwner {
+        description = _description;
+        emit DescriptionUpdated(_description);
     }
 
     function getAllNftIdsByUser(address _owner) public view returns (uint256[] memory) {
@@ -111,8 +120,10 @@ contract LPToken is OwnableUpgradeable, Pausable, ERC721EnumerableUpgradeable, E
                     abi.encodePacked(
                         '{"name": "',
                         name(),
-                        '", "description": "", "image_data": "',
-                        bytes(svgData),
+                        '", "description": "',
+                        description,
+                        '", "image": "data:image/svg+xml;base64,',
+                        Base64.encode(bytes(svgData)),
                         '"}'
                     )
                 )

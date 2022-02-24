@@ -5,17 +5,24 @@ import {
   LiquidityPool,
   LiquidityPoolProxy,
   ExecutorManager,
-  LPToken
+  LPToken,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 describe("LiquidityPoolProxyTests", function () {
-  let alice: SignerWithAddress, pauser: SignerWithAddress, bob: SignerWithAddress, charlie: SignerWithAddress, tf: SignerWithAddress;
+  let alice: SignerWithAddress,
+    pauser: SignerWithAddress,
+    bob: SignerWithAddress,
+    charlie: SignerWithAddress,
+    tf: SignerWithAddress;
   let proxyAdmin: SignerWithAddress;
   let tokenManager: SignerWithAddress, liquidityProviders: SignerWithAddress;
   let executorManager: ExecutorManager;
-  let token: ERC20Token, liquidityPool: LiquidityPool, liquidityPoolImpl: LiquidityPool, liquidityPoolProxy: LiquidityPoolProxy;
+  let token: ERC20Token,
+    liquidityPool: LiquidityPool,
+    liquidityPoolImpl: LiquidityPool,
+    liquidityPoolProxy: LiquidityPoolProxy;
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   let lpToken: LPToken;
 
@@ -23,8 +30,14 @@ describe("LiquidityPoolProxyTests", function () {
     [alice, pauser, bob, charlie, tf, proxyAdmin, tokenManager, liquidityProviders] = await ethers.getSigners();
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
-    lpToken = (await upgrades.deployProxy(lpTokenFactory, ["Hyphen LP Token","HPT",trustedForwarder, pauser.address])) as LPToken;
-    
+    lpToken = (await upgrades.deployProxy(lpTokenFactory, [
+      "Hyphen LP Token",
+      "LPT",
+      "",
+      trustedForwarder,
+      pauser.address,
+    ])) as LPToken;
+
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
     executorManager = await executorManagerFactory.deploy();
     await executorManager.deployed();
@@ -36,12 +49,18 @@ describe("LiquidityPoolProxyTests", function () {
     const liquidityPoolProxyFactory = await ethers.getContractFactory("LiquidityPoolProxy");
     liquidityPoolProxy = await liquidityPoolProxyFactory.deploy(liquidityPoolImpl.address, proxyAdmin.address);
 
-    liquidityPool = await ethers.getContractAt("contracts/hyphen/LiquidityPool.sol:LiquidityPool", 
-      liquidityPoolProxy.address) as LiquidityPool;
+    liquidityPool = (await ethers.getContractAt(
+      "contracts/hyphen/LiquidityPool.sol:LiquidityPool",
+      liquidityPoolProxy.address
+    )) as LiquidityPool;
 
-    await liquidityPool.initialize(executorManager.address, await pauser.getAddress(), 
-    trustedForwarder, tokenManager.address, liquidityProviders.address);
-    
+    await liquidityPool.initialize(
+      executorManager.address,
+      await pauser.getAddress(),
+      trustedForwarder,
+      tokenManager.address,
+      liquidityProviders.address
+    );
   });
 
   async function checkStorage() {
@@ -58,8 +77,13 @@ describe("LiquidityPoolProxyTests", function () {
 
   it("Liquidity Pool Should not be initialised twice", async function () {
     await expect(
-      liquidityPool.initialize(executorManager.address, await pauser.getAddress(), trustedForwarder, 
-        tokenManager.address, liquidityProviders.address)
+      liquidityPool.initialize(
+        executorManager.address,
+        await pauser.getAddress(),
+        trustedForwarder,
+        tokenManager.address,
+        liquidityProviders.address
+      )
     ).to.be.reverted;
   });
 

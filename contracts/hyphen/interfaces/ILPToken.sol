@@ -17,7 +17,9 @@ interface ILPToken {
     function initialize(
         string memory _name,
         string memory _symbol,
-        address _trustedForwarder
+        string memory _description,
+        address _trustedForwarder,
+        address _pauser
     ) external;
 
     function isApprovedForAll(address _owner, address operator) external view returns (bool);

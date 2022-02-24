@@ -54,9 +54,21 @@ const config: HardhatUserConfig = {
       //   url: `https://mainnet.infura.io/v3/${process.env.INFURA_KEY}`,
       // },
     },
+    rinkeby: {
+      url: process.env.RINKEBY_URL || "",
+      accounts: process.env.PRIVATE_KEYS !== undefined ? [...process.env.PRIVATE_KEYS.split(",")] : [],
+    },
     ropsten: {
       url: process.env.ROPSTEN_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEYS !== undefined ? [...process.env.PRIVATE_KEYS.split(",")] : [],
+    },
+    goerli: {
+      url: process.env.GOERLI_URL || "",
+      accounts: process.env.PRIVATE_KEYS !== undefined ? [...process.env.PRIVATE_KEYS.split(",")] : [],
+    },
+    local: {
+      url: "http://127.0.0.1:8545",
+      accounts: process.env.PRIVATE_KEYS !== undefined ? [...process.env.PRIVATE_KEYS.split(",")] : [],
     },
   },
   gasReporter: {

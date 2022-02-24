@@ -46,6 +46,7 @@ describe("WhiteListPeriodManager", function () {
     lpToken = (await upgrades.deployProxy(lpTokenFactory, [
       "LPToken",
       "LPToken",
+      "",
       tf.address,
       pauser.address,
     ])) as LPToken;
