@@ -106,19 +106,37 @@
 		}
 	</style>
 	<g>
+		<g filter="url(#filter0_i_1_41)">
+			<rect width="405" height="405" rx="30" fill="url(#paint0_angular_1_41)" />
+		</g>
 		<defs>
 			<path id="SVGID_00000074418840961101728720000006510697231418485664_" d="M375,405H30c-16.57,0-30-13.43-30-30V30
 			C0,13.43,13.43,0,30,0h345c16.57,0,30,13.43,30,30v345C405,391.57,391.57,405,375,405z" />
+
+			<filter id="filter0_i_1_41" x="0" y="0" width="405" height="405" filterUnits="userSpaceOnUse"
+				color-interpolation-filters="sRGB">
+				<feFlood flood-opacity="0" result="BackgroundImageFix" />
+				<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+				<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+					result="hardAlpha" />
+				<feOffset />
+				<feGaussianBlur stdDeviation="97" />
+				<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
+				<feColorMatrix type="matrix" values="0 0 0 0 0.509804 0 0 0 0 0.278431 0 0 0 0 0.898039 0 0 0 1 0" />
+				<feBlend mode="normal" in2="shape" result="effect1_innerShadow_1_41" />
+			</filter>
+
+			<radialGradient id="paint0_angular_1_41" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse"
+				gradientTransform="translate(202.5 202.5) rotate(90) scale(202.5)">
+				<stop stop-color="#2775CA" />
+				<stop offset="1" />
+			</radialGradient>
 		</defs>
 		<clipPath id="SVGID_00000030459153954695895010000004746707538603410062_">
 			<use xlink:href="#SVGID_00000074418840961101728720000006510697231418485664_" style="overflow:visible;" />
 		</clipPath>
 		<g style="clip-path:url(#SVGID_00000030459153954695895010000004746707538603410062_);">
 
-			<image style="overflow:visible;" width="406" height="406"
-				xlink:href="https://gateway.pinata.cloud/ipfs/QmZ51HpMS5nRybFLrX69hyHF1SZzmoyohMPGHxLsiWQCCa"
-				transform="matrix(1 0 0 1 -0.8785 -0.7759)">
-			</image>
 			<text transform="matrix(1 0 0 1 73.699 75.2964)" class="st2 st16 st17">0.235 ETH</text>
 			<text transform="matrix(0 -1 1 0 70.5311 364.9956)" class="st2 st16 st17">0.02%</text>
 			<g>
