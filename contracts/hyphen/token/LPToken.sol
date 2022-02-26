@@ -4,6 +4,7 @@ pragma abicoder v2;
 
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
@@ -12,6 +13,7 @@ import "../structures/LpTokenMetadata.sol";
 
 contract LPToken is
     OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
     ERC721EnumerableUpgradeable,
     ERC721PausableUpgradeable,
     ERC721URIStorageUpgradeable,
@@ -34,6 +36,7 @@ contract LPToken is
         __ERC721Enumerable_init();
         __ERC721Pausable_init();
         __ERC721URIStorage_init();
+        __ReentrancyGuard_init();
         __ERC2771Context_init(_trustedForwarder);
     }
 
@@ -60,7 +63,7 @@ contract LPToken is
         return nftIds;
     }
 
-    function mint(address _to) external onlyHyphenPools whenNotPaused returns (uint256) {
+    function mint(address _to) external onlyHyphenPools whenNotPaused nonReentrant returns (uint256) {
         uint256 tokenId = totalSupply() + 1;
         _safeMint(_to, tokenId);
         return tokenId;

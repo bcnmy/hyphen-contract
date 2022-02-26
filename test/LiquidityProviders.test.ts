@@ -155,6 +155,20 @@ describe("LiquidityProviderTests", function () {
     expect(await ethers.provider.getBalance(liquidityProviders.address)).to.equal(0);
   });
 
+  it("Should revert on re-entant calls to token minting", async function () {
+    const attacker = await (
+      await ethers.getContractFactory("TokenMintingReentrancy")
+    ).deploy(liquidityProviders.address);
+    await owner.sendTransaction({
+      to: attacker.address,
+      value: ethers.BigNumber.from(10).pow(20),
+    });
+
+    await expect(attacker.attack({ value: ethers.BigNumber.from(10).pow(18) })).to.be.revertedWith(
+      "ReentrancyGuard: reentrant call"
+    );
+  });
+
   describe("Liquidity Addition", async function () {
     this.beforeEach(async () => {
       for (const tk of [token, token2]) {
