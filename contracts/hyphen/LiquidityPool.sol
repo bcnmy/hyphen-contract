@@ -288,7 +288,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         uint256 amountToTransfer = getAmountToTransfer(initialGas, tokenAddress, amount, tokenGasPrice);
         if (tokenAddress == NATIVE) {
             require(address(this).balance >= amountToTransfer, "Not Enough Balance");
-            bool success = receiver.send(amountToTransfer);
+            (bool success, ) = receiver.call{value: amountToTransfer}("");
             require(success, "Native Transfer Failed");
         } else {
             require(IERC20Upgradeable(tokenAddress).balanceOf(address(this)) >= amountToTransfer, "Not Enough Balance");
@@ -383,7 +383,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         require(_gasFeeAccumulated != 0, "Gas Fee earned is 0");
         gasFeeAccumulatedByToken[NATIVE] = gasFeeAccumulatedByToken[NATIVE] - _gasFeeAccumulated;
         gasFeeAccumulated[NATIVE][_msgSender()] = 0;
-        bool success = payable(_msgSender()).send(_gasFeeAccumulated);
+        (bool success, ) = payable(_msgSender()).call{value: _gasFeeAccumulated}("");
         require(success, "Native Transfer Failed");
 
         emit GasFeeWithdraw(address(this), _msgSender(), _gasFeeAccumulated);
