@@ -86,8 +86,6 @@ interface ILPToken {
 
     function transferOwnership(address newOwner) external;
 
-    function updateLiquidityPoolAddress(address _liquidityPoolAddress) external;
-
     function updateTokenMetadata(uint256 _tokenId, LpTokenMetadata memory _lpTokenMetadata) external;
 
     function whiteListPeriodManager() external view returns (address);

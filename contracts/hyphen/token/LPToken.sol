@@ -46,11 +46,13 @@ contract LPToken is
     }
 
     function setLiquidtyPool(address _lpm) external onlyOwner {
+        require(_lpm != address(0), "ERR_INVALID_LPM");
         liquidityPoolAddress = _lpm;
         emit LiquidityPoolUpdated(_lpm);
     }
 
     function setWhiteListPeriodManager(address _whiteListPeriodManager) external onlyOwner {
+        require(_whiteListPeriodManager != address(0), "ERR_INVALID_WHITELIST_PERIOD_MANAGER");
         whiteListPeriodManager = IWhiteListPeriodManager(_whiteListPeriodManager);
         emit WhiteListPeriodManagerUpdated(_whiteListPeriodManager);
     }
@@ -100,10 +102,6 @@ contract LPToken is
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
-    }
-
-    function updateLiquidityPoolAddress(address _liquidityPoolAddress) external onlyOwner {
-        liquidityPoolAddress = _liquidityPoolAddress;
     }
 
     function _msgSender()

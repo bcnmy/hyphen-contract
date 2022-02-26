@@ -394,6 +394,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         address receiver,
         uint256 _tokenAmount
     ) external whenNotPaused onlyLiquidityProviders nonReentrant {
+        require(receiver != address(0), "Invalid receiver");
         if (_tokenAddress == NATIVE) {
             require(address(this).balance >= _tokenAmount, "ERR__INSUFFICIENT_BALANCE");
             (bool success, ) = receiver.call{value: _tokenAmount}("");
