@@ -11,7 +11,7 @@ import {
     // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BigNumber } from "@ethersproject/bignumber";
+import { BigNumber } from "ethers";
 
 let { getLocaleString } = require('./utils');
 
@@ -419,8 +419,6 @@ describe("LiquidityPoolTests", function () {
 
     // (node:219241) UnhandledPromiseRejectionWarning: Error: VM Exception while processing transaction: revert SafeMath: subtraction overflow
     it("Should send ERC20 funds to user successfully", async () => {
-        console.log("minTokenCap ",minTokenCap);
-        console.log("tokenAddress ",tokenAddress);
         await addTokenLiquidity(tokenAddress, minTokenCap, owner);
         const amount = minTokenCap;
         const usdtBalanceBefore = await token.balanceOf(liquidityPool.address);
@@ -661,5 +659,40 @@ describe("LiquidityPoolTests", function () {
         expect(checkTokenStatus.supportedToken).to.equal(false);
     });
 
+    it("Should allow withdrawl of token gas fee", async () => {
+      await addTokenLiquidity(tokenAddress, minTokenCap, owner);
+      const amount = minTokenCap;
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
 
+      await liquidityPool
+        .connect(executor)
+        .sendFundsToUser(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash, 1, 137);
+
+      const gasFeeAccumulated = await liquidityPool.gasFeeAccumulated(token.address, executor.address);
+      expect(gasFeeAccumulated.gt(0)).to.be.true;
+
+      await expect(() => liquidityPool.connect(executor).withdrawErc20GasFee(token.address)).to.changeTokenBalances(
+        token,
+        [liquidityPool, executor],
+        [-gasFeeAccumulated, gasFeeAccumulated]
+      );
+    });
+
+    it("Should allow withdrawl of native gas fee", async () => {
+      await addNativeLiquidity(minTokenCap, owner);
+      const amount = minTokenCap;
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+
+      await liquidityPool
+        .connect(executor)
+        .sendFundsToUser(NATIVE, amount.toString(), await getReceiverAddress(), dummyDepositHash, 1, 137);
+
+      const gasFeeAccumulated = await liquidityPool.gasFeeAccumulated(NATIVE, executor.address);
+      expect(gasFeeAccumulated.gt(0)).to.be.true;
+
+      await expect(() => liquidityPool.connect(executor).withdrawNativeGasFee()).to.changeEtherBalances(
+        [liquidityPool, executor],
+        [-gasFeeAccumulated, gasFeeAccumulated]
+      );
+    });
 });

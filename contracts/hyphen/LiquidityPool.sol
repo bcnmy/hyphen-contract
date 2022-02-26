@@ -334,12 +334,10 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         totalGasUsed = totalGasUsed + baseGas;
 
         uint256 gasFee = totalGasUsed * tokenGasPrice;
-        gasFeeAccumulatedByToken[tokenAddress] =
-            gasFeeAccumulatedByToken[tokenAddress] + gasFee;
-        gasFeeAccumulated[tokenAddress][_msgSender()] =
-            gasFeeAccumulated[tokenAddress][_msgSender()] + gasFee;
+        gasFeeAccumulatedByToken[tokenAddress] = gasFeeAccumulatedByToken[tokenAddress] + gasFee;
+        gasFeeAccumulated[tokenAddress][_msgSender()] = gasFeeAccumulated[tokenAddress][_msgSender()] + gasFee;
         amountToTransfer = amount - (transferFeeAmount + gasFee);
-        
+
         emit FeeDetails(lpFee, transferFeeAmount, gasFee);
     }
 
@@ -380,10 +378,9 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         emit GasFeeWithdraw(tokenAddress, _msgSender(), _gasFeeAccumulated);
     }
 
-    function withdrawNativeGasFee() external onlyOwner whenNotPaused {
+    function withdrawNativeGasFee() external onlyExecutor whenNotPaused {
         uint256 _gasFeeAccumulated = gasFeeAccumulated[NATIVE][_msgSender()];
         require(_gasFeeAccumulated != 0, "Gas Fee earned is 0");
-        gasFeeAccumulatedByToken[NATIVE] = 0;
         gasFeeAccumulatedByToken[NATIVE] = gasFeeAccumulatedByToken[NATIVE] - _gasFeeAccumulated;
         gasFeeAccumulated[NATIVE][_msgSender()] = 0;
         bool success = payable(_msgSender()).send(_gasFeeAccumulated);
@@ -392,7 +389,11 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         emit GasFeeWithdraw(address(this), _msgSender(), _gasFeeAccumulated);
     }
 
-    function transfer(address _tokenAddress, address receiver, uint256 _tokenAmount) external whenNotPaused onlyLiquidityProviders {
+    function transfer(
+        address _tokenAddress,
+        address receiver,
+        uint256 _tokenAmount
+    ) external whenNotPaused onlyLiquidityProviders {
         if (_tokenAddress == NATIVE) {
             require(address(this).balance >= _tokenAmount, "ERR__INSUFFICIENT_BALANCE");
             (bool success, ) = receiver.call{value: _tokenAmount}("");
