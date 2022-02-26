@@ -36,6 +36,7 @@ contract ExecutorManager is IExecutorManager, Ownable {
     // Register single executor
     function addExecutor(address executorAddress) public override onlyOwner {
         require(executorAddress != address(0), "executor address can not be 0");
+        require(!executorStatus[executorAddress], "Executor already registered");
         executors.push(executorAddress);
         executorStatus[executorAddress] = true;
         emit ExecutorAdded(executorAddress, msg.sender);

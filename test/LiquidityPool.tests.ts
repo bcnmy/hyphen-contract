@@ -141,10 +141,6 @@ describe("LiquidityPoolTests", function () {
         for (const signer of [owner, bob, charlie]) {
             await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
         }
-
-        // Add Executor
-        await executorManager.connect(owner).addExecutor(await executor.getAddress());
-
     });
 
     async function addTokenLiquidity(tokenAddress: string, tokenValue: string, sender: SignerWithAddress) {
@@ -341,6 +337,7 @@ describe("LiquidityPoolTests", function () {
             let toChainId = 1;
 
             await addTokenLiquidity(tokenAddress, liquidityToBeAdded, owner);
+            await executorManager.addExecutor(executor.address);
             // Send funds to put pool into deficit state so current liquidity < provided liquidity
             let tx = await sendFundsToUser(tokenAddress, amountToWithdraw, receiver, "0");
             await tx.wait();
@@ -371,6 +368,7 @@ describe("LiquidityPoolTests", function () {
             let toChainId = 1;
 
             await addTokenLiquidity(tokenAddress, liquidityToBeAdded, owner);
+            await executorManager.addExecutor(executor.address);
             
             // Send funds to put pool into deficit state so current liquidity < provided liquidity
             let tx = await sendFundsToUser(tokenAddress, amountToWithdraw, receiver, "0");
