@@ -157,7 +157,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         address receiver,
         uint256 amount,
         string memory tag
-    ) public tokenChecks(tokenAddress) whenNotPaused {
+    ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
         require(
             tokenManager.getDepositConfig(toChainId, tokenAddress).min <= amount &&
                 tokenManager.getDepositConfig(toChainId, tokenAddress).max >= amount,
@@ -248,7 +248,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         address receiver,
         uint256 toChainId,
         string memory tag
-    ) external payable whenNotPaused {
+    ) external payable whenNotPaused nonReentrant {
         require(
             tokenManager.getDepositConfig(toChainId, NATIVE).min <= msg.value &&
                 tokenManager.getDepositConfig(toChainId, NATIVE).max >= msg.value,
@@ -367,7 +367,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         status = processedHash[hashSendTransaction];
     }
 
-    function withdrawErc20GasFee(address tokenAddress) external onlyExecutor whenNotPaused {
+    function withdrawErc20GasFee(address tokenAddress) external onlyExecutor whenNotPaused nonReentrant {
         require(tokenAddress != NATIVE, "Can't withdraw native token fee");
         // uint256 gasFeeAccumulated = gasFeeAccumulatedByToken[tokenAddress];
         uint256 _gasFeeAccumulated = gasFeeAccumulated[tokenAddress][_msgSender()];
@@ -378,7 +378,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         emit GasFeeWithdraw(tokenAddress, _msgSender(), _gasFeeAccumulated);
     }
 
-    function withdrawNativeGasFee() external onlyExecutor whenNotPaused {
+    function withdrawNativeGasFee() external onlyExecutor whenNotPaused nonReentrant {
         uint256 _gasFeeAccumulated = gasFeeAccumulated[NATIVE][_msgSender()];
         require(_gasFeeAccumulated != 0, "Gas Fee earned is 0");
         gasFeeAccumulatedByToken[NATIVE] = gasFeeAccumulatedByToken[NATIVE] - _gasFeeAccumulated;

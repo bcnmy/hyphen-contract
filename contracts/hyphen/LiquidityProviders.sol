@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
@@ -13,7 +14,13 @@ import "./interfaces/ITokenManager.sol";
 import "./interfaces/IWhiteListPeriodManager.sol";
 import "./interfaces/ILiquidityPool.sol";
 
-contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, OwnableUpgradeable, Pausable {
+contract LiquidityProviders is
+    Initializable,
+    ReentrancyGuardUpgradeable,
+    ERC2771ContextUpgradeable,
+    OwnableUpgradeable,
+    Pausable
+{
     using SafeERC20Upgradeable for IERC20Upgradeable;
 
     address internal constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
@@ -74,6 +81,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
         __ERC2771Context_init(_trustedForwarder);
         __Ownable_init();
         __Pausable_init(_pauser);
+        __ReentrancyGuard_init();
         _setLPToken(_lpToken);
         _setTokenManager(_tokenManager);
     }
@@ -205,7 +213,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      * @dev Function to mint a new NFT for a user, add native liquidity and store the
      *      record in the newly minted NFT
      */
-    function addNativeLiquidity() external payable tokenChecks(NATIVE) whenNotPaused {
+    function addNativeLiquidity() external payable nonReentrant tokenChecks(NATIVE) whenNotPaused {
         (bool success, ) = address(liquidityPool).call{value: msg.value}("");
         require(success, "ERR__NATIVE_TRANSFER_FAILED");
         _addLiquidity(NATIVE, msg.value);
@@ -217,7 +225,12 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      * @param _token Address of token for which liquidity is to be added
      * @param _amount Amount of liquidity added
      */
-    function addTokenLiquidity(address _token, uint256 _amount) external tokenChecks(_token) whenNotPaused {
+    function addTokenLiquidity(address _token, uint256 _amount)
+        external
+        nonReentrant
+        tokenChecks(_token)
+        whenNotPaused
+    {
         require(_token != NATIVE, "ERR__WRONG_FUNCTION");
         require(
             IERC20Upgradeable(_token).allowance(_msgSender(), address(this)) >= _amount,
@@ -265,7 +278,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      * @param _nftId ID of NFT for updating the balances
      * @param _amount Token amount to be added
      */
-    function increaseTokenLiquidity(uint256 _nftId, uint256 _amount) external whenNotPaused {
+    function increaseTokenLiquidity(uint256 _nftId, uint256 _amount) external nonReentrant whenNotPaused {
         (address token, , ) = lpToken.tokenMetadata(_nftId);
         require(_isSupportedToken(token), "ERR__TOKEN_NOT_SUPPORTED");
         require(token != NATIVE, "ERR__WRONG_FUNCTION");
@@ -280,7 +293,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
     /**
      * @dev Function to allow LPs to add native token liquidity to existing NFT
      */
-    function increaseNativeLiquidity(uint256 _nftId) external payable whenNotPaused {
+    function increaseNativeLiquidity(uint256 _nftId) external payable nonReentrant whenNotPaused {
         (address token, , ) = lpToken.tokenMetadata(_nftId);
         require(_isSupportedToken(NATIVE), "ERR__TOKEN_NOT_SUPPORTED");
         require(token == NATIVE, "ERR__WRONG_FUNCTION");
@@ -295,6 +308,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      */
     function removeLiquidity(uint256 _nftId, uint256 _amount)
         external
+        nonReentrant
         onlyValidLpToken(_nftId, _msgSender())
         whenNotPaused
     {
@@ -336,7 +350,7 @@ contract LiquidityProviders is Initializable, ERC2771ContextUpgradeable, Ownable
      * @dev Function to allow LPs to claim the fee earned on their NFT
      * @param _nftId ID of NFT where liquidity is recorded
      */
-    function claimFee(uint256 _nftId) external onlyValidLpToken(_nftId, _msgSender()) whenNotPaused {
+    function claimFee(uint256 _nftId) external onlyValidLpToken(_nftId, _msgSender()) whenNotPaused nonReentrant {
         (address _tokenAddress, uint256 nftSuppliedLiquidity, uint256 totalNFTShares) = lpToken.tokenMetadata(_nftId);
         require(_isSupportedToken(_tokenAddress), "ERR__TOKEN_NOT_SUPPORTED");
 
