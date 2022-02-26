@@ -15,6 +15,8 @@ import "./interfaces/ILiquidityProviders.sol";
 import "../interfaces/IERC20Permit.sol";
 import "./interfaces/ITokenManager.sol";
 
+import "hardhat/console.sol";
+
 contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeable, ERC2771ContextUpgradeable {
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     uint256 private constant BASE_DIVISOR = 10000000000; // Basis Points * 100 for better accuracy
@@ -393,7 +395,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         address _tokenAddress,
         address receiver,
         uint256 _tokenAmount
-    ) external whenNotPaused onlyLiquidityProviders {
+    ) external whenNotPaused onlyLiquidityProviders nonReentrant {
         if (_tokenAddress == NATIVE) {
             require(address(this).balance >= _tokenAmount, "ERR__INSUFFICIENT_BALANCE");
             (bool success, ) = receiver.call{value: _tokenAmount}("");

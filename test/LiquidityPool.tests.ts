@@ -695,4 +695,19 @@ describe("LiquidityPoolTests", function () {
         [-gasFeeAccumulated, gasFeeAccumulated]
       );
     });
+
+    it("Should revert on re-entrant calls to transfer", async function () {
+      const maliciousContract = await (
+        await ethers.getContractFactory("LiquidityProvidersMaliciousReentrant")
+      ).deploy(liquidityPool.address);
+      await addNativeLiquidity(ethers.BigNumber.from(10).pow(20).toString(), owner);
+      await liquidityPool.setLiquidityProviders(maliciousContract.address);
+
+      await expect(
+        owner.sendTransaction({
+          to: maliciousContract.address,
+          value: 1,
+        })
+      ).to.be.reverted;
+    });
 });
