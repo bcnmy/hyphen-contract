@@ -28,7 +28,7 @@ contract ExecutorManager is IExecutorManager, Ownable {
 
     //Register new Executors
     function addExecutors(address[] calldata executorArray) external override onlyOwner {
-        for (uint256 i = 0; i < executorArray.length; i++) {
+        for (uint256 i = 0; i < executorArray.length; ++i) {
             addExecutor(executorArray[i]);
         }
     }
@@ -44,7 +44,7 @@ contract ExecutorManager is IExecutorManager, Ownable {
 
     //Remove registered Executors
     function removeExecutors(address[] calldata executorArray) external override onlyOwner {
-        for (uint256 i = 0; i < executorArray.length; i++) {
+        for (uint256 i = 0; i < executorArray.length; ++i) {
             removeExecutor(executorArray[i]);
         }
     }
