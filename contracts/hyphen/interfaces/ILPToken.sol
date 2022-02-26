@@ -53,7 +53,7 @@ interface ILPToken {
 
     function setApprovalForAll(address operator, bool approved) external;
 
-    function setLiquidtyPool(address _lpm) external;
+    function setLiquidityPool(address _lpm) external;
 
     function setWhiteListPeriodManager(address _whiteListPeriodManager) external;
 
@@ -78,7 +78,7 @@ interface ILPToken {
 
     function totalSupply() external view returns (uint256);
 
-    function transferFrom(
+    function abitransferFrom(
         address from,
         address to,
         uint256 tokenId

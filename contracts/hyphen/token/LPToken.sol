@@ -45,7 +45,7 @@ contract LPToken is
         _;
     }
 
-    function setLiquidtyPool(address _lpm) external onlyOwner {
+    function setLiquidityPool(address _lpm) external onlyOwner {
         require(_lpm != address(0), "ERR_INVALID_LPM");
         liquidityPoolAddress = _lpm;
         emit LiquidityPoolUpdated(_lpm);
