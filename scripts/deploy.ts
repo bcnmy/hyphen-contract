@@ -29,7 +29,12 @@ async function deploy(bicoOwner: string, trustedForwarder: string, pauser: strin
   delay(5000);
   const LPToken = await ethers.getContractFactory("LPToken");
   console.log("Deploying LPToken...");
-  const lpToken = (await upgrades.deployProxy(LPToken, [LPTokenName, LPTokenSymbol, trustedForwarder])) as LPToken;
+  const lpToken = (await upgrades.deployProxy(LPToken, [
+    LPTokenName,
+    LPTokenSymbol,
+    trustedForwarder,
+    pauser,
+  ])) as LPToken;
   await lpToken.deployed();
   console.log("LPToken Proxy deployed to:", lpToken.address);
   delay(5000);
@@ -110,6 +115,6 @@ async function deploy(bicoOwner: string, trustedForwarder: string, pauser: strin
   };
 }
 
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 export { deploy };
