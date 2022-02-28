@@ -353,7 +353,11 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         uint256 numerator = providedLiquidity * equilibriumFee * maxFee; // F(max) * F(e) * L(e)
         uint256 denominator = equilibriumFee * providedLiquidity + (maxFee - equilibriumFee) * resultingLiquidity; // F(e) * L(e) + (F(max) - F(e)) * L(r)
 
-        fee = numerator / denominator;
+        if (denominator == 0) {
+            fee = 0;
+        } else {
+            fee = numerator / denominator;
+        }
     }
 
     function checkHashStatus(
