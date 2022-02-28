@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.12;
 pragma abicoder v2;
 
 import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
@@ -12,6 +13,7 @@ import "../structures/LpTokenMetadata.sol";
 
 contract LPToken is
     OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
     ERC721EnumerableUpgradeable,
     ERC721PausableUpgradeable,
     ERC721URIStorageUpgradeable,
@@ -34,6 +36,7 @@ contract LPToken is
         __ERC721Enumerable_init();
         __ERC721Pausable_init();
         __ERC721URIStorage_init();
+        __ReentrancyGuard_init();
         __ERC2771Context_init(_trustedForwarder);
     }
 
@@ -42,12 +45,14 @@ contract LPToken is
         _;
     }
 
-    function setLiquidtyPool(address _lpm) external onlyOwner {
+    function setLiquidityPool(address _lpm) external onlyOwner {
+        require(_lpm != address(0), "ERR_INVALID_LPM");
         liquidityPoolAddress = _lpm;
         emit LiquidityPoolUpdated(_lpm);
     }
 
     function setWhiteListPeriodManager(address _whiteListPeriodManager) external onlyOwner {
+        require(_whiteListPeriodManager != address(0), "ERR_INVALID_WHITELIST_PERIOD_MANAGER");
         whiteListPeriodManager = IWhiteListPeriodManager(_whiteListPeriodManager);
         emit WhiteListPeriodManagerUpdated(_whiteListPeriodManager);
     }
@@ -60,7 +65,7 @@ contract LPToken is
         return nftIds;
     }
 
-    function mint(address _to) external onlyHyphenPools whenNotPaused returns (uint256) {
+    function mint(address _to) external onlyHyphenPools whenNotPaused nonReentrant returns (uint256) {
         uint256 tokenId = totalSupply() + 1;
         _safeMint(_to, tokenId);
         return tokenId;
@@ -97,10 +102,6 @@ contract LPToken is
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
-    }
-
-    function updateLiquidityPoolAddress(address _liquidityPoolAddress) external onlyOwner {
-        liquidityPoolAddress = _liquidityPoolAddress;
     }
 
     function _msgSender()

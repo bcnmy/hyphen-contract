@@ -11,7 +11,7 @@ import {
     // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BigNumber } from "@ethersproject/bignumber";
+import { BigNumber } from "ethers";
 
 let { getLocaleString } = require('./utils');
 
@@ -94,6 +94,16 @@ describe("LiquidityPoolTests", function () {
             maxFee
         );
 
+        let tokenDepositConfig = {
+            min: minTokenCap,
+            max: maxTokenCap
+        }
+        await tokenManager.connect(owner).setDepositConfig(
+            [1],
+            [tokenAddress],
+            [tokenDepositConfig]
+        );
+
         // Add supported Native token
         await tokenManager.connect(owner).addSupportedToken(
             NATIVE,
@@ -102,7 +112,18 @@ describe("LiquidityPoolTests", function () {
             equilibriumFee,
             maxFee
         );
-        await lpToken.setLiquidtyPool(liquidityProviders.address);
+
+        let nativeDepositConfig = {
+            min: minTokenCap,
+            max: maxTokenCap
+        }
+        await tokenManager.connect(owner).setDepositConfig(
+            [1],
+            [NATIVE],
+            [nativeDepositConfig]
+        );
+
+        await lpToken.setLiquidityPool(liquidityProviders.address);
 
         const wlpmFactory = await ethers.getContractFactory("WhitelistPeriodManager");
         wlpm = (await upgrades.deployProxy(wlpmFactory, [
@@ -120,10 +141,6 @@ describe("LiquidityPoolTests", function () {
         for (const signer of [owner, bob, charlie]) {
             await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
         }
-
-        // Add Executor
-        await executorManager.connect(owner).addExecutor(await executor.getAddress());
-
     });
 
     async function addTokenLiquidity(tokenAddress: string, tokenValue: string, sender: SignerWithAddress) {
@@ -220,12 +237,13 @@ describe("LiquidityPoolTests", function () {
             equilibriumFee,
             maxFee
         );
+        let tokenTransferConfig = await tokenManager.getTransferConfig(tokenAddress);
         let checkTokenStatus = await tokenManager.tokensInfo(
             tokenAddress
         );
         expect(checkTokenStatus.supportedToken).to.equal(true);
-        expect(checkTokenStatus.minCap).to.equal(minTokenCap);
-        expect(checkTokenStatus.maxCap).to.equal(maxTokenCap);
+        expect(tokenTransferConfig.min).to.equal(minTokenCap);
+        expect(tokenTransferConfig.max).to.equal(maxTokenCap);
     });
 
     it("Should updateTokenCap successfully", async () => {
@@ -240,10 +258,10 @@ describe("LiquidityPoolTests", function () {
         let checkTokenStatus = await tokenManager.tokensInfo(
             tokenAddress
         );
-
+        let tokenTransferConfig = await tokenManager.getTransferConfig(tokenAddress);
         expect(checkTokenStatus.supportedToken).to.equal(true);
-        expect(checkTokenStatus.minCap).to.equal(newMinTokenCap);
-        expect(checkTokenStatus.maxCap).to.equal(newMaxTokenCap);
+        expect(tokenTransferConfig.min).to.equal(newMinTokenCap);
+        expect(tokenTransferConfig.max).to.equal(newMaxTokenCap);
     });
 
     it("Should addNativeLiquidity successfully", async () => {
@@ -319,6 +337,7 @@ describe("LiquidityPoolTests", function () {
             let toChainId = 1;
 
             await addTokenLiquidity(tokenAddress, liquidityToBeAdded, owner);
+            await executorManager.addExecutor(executor.address);
             // Send funds to put pool into deficit state so current liquidity < provided liquidity
             let tx = await sendFundsToUser(tokenAddress, amountToWithdraw, receiver, "0");
             await tx.wait();
@@ -349,6 +368,7 @@ describe("LiquidityPoolTests", function () {
             let toChainId = 1;
 
             await addTokenLiquidity(tokenAddress, liquidityToBeAdded, owner);
+            await executorManager.addExecutor(executor.address);
             
             // Send funds to put pool into deficit state so current liquidity < provided liquidity
             let tx = await sendFundsToUser(tokenAddress, amountToWithdraw, receiver, "0");
@@ -397,8 +417,6 @@ describe("LiquidityPoolTests", function () {
 
     // (node:219241) UnhandledPromiseRejectionWarning: Error: VM Exception while processing transaction: revert SafeMath: subtraction overflow
     it("Should send ERC20 funds to user successfully", async () => {
-        console.log("minTokenCap ",minTokenCap);
-        console.log("tokenAddress ",tokenAddress);
         await addTokenLiquidity(tokenAddress, minTokenCap, owner);
         const amount = minTokenCap;
         const usdtBalanceBefore = await token.balanceOf(liquidityPool.address);
@@ -639,5 +657,55 @@ describe("LiquidityPoolTests", function () {
         expect(checkTokenStatus.supportedToken).to.equal(false);
     });
 
+    it("Should allow withdrawl of token gas fee", async () => {
+      await addTokenLiquidity(tokenAddress, minTokenCap, owner);
+      const amount = minTokenCap;
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
 
+      await liquidityPool
+        .connect(executor)
+        .sendFundsToUser(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash, 1, 137);
+
+      const gasFeeAccumulated = await liquidityPool.gasFeeAccumulated(token.address, executor.address);
+      expect(gasFeeAccumulated.gt(0)).to.be.true;
+
+      await expect(() => liquidityPool.connect(executor).withdrawErc20GasFee(token.address)).to.changeTokenBalances(
+        token,
+        [liquidityPool, executor],
+        [-gasFeeAccumulated, gasFeeAccumulated]
+      );
+    });
+
+    it("Should allow withdrawl of native gas fee", async () => {
+      await addNativeLiquidity(minTokenCap, owner);
+      const amount = minTokenCap;
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+
+      await liquidityPool
+        .connect(executor)
+        .sendFundsToUser(NATIVE, amount.toString(), await getReceiverAddress(), dummyDepositHash, 1, 137);
+
+      const gasFeeAccumulated = await liquidityPool.gasFeeAccumulated(NATIVE, executor.address);
+      expect(gasFeeAccumulated.gt(0)).to.be.true;
+
+      await expect(() => liquidityPool.connect(executor).withdrawNativeGasFee()).to.changeEtherBalances(
+        [liquidityPool, executor],
+        [-gasFeeAccumulated, gasFeeAccumulated]
+      );
+    });
+
+    it("Should revert on re-entrant calls to transfer", async function () {
+      const maliciousContract = await (
+        await ethers.getContractFactory("LiquidityProvidersMaliciousReentrant")
+      ).deploy(liquidityPool.address);
+      await addNativeLiquidity(ethers.BigNumber.from(10).pow(20).toString(), owner);
+      await liquidityPool.setLiquidityProviders(maliciousContract.address);
+
+      await expect(
+        owner.sendTransaction({
+          to: maliciousContract.address,
+          value: 1,
+        })
+      ).to.be.reverted;
+    });
 });

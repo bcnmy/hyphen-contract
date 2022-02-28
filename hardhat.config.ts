@@ -44,6 +44,13 @@ const config: HardhatUserConfig = {
           optimizer: { enabled: true, runs: 200 },
         },
       },
+      {
+        version: "0.8.12",
+        settings: {
+          evmVersion: "istanbul",
+          optimizer: { enabled: true, runs: 200 },
+        },
+      },
     ],
   },
   networks: {
@@ -58,6 +65,18 @@ const config: HardhatUserConfig = {
       url: process.env.ROPSTEN_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
+    goerli: {
+      url: process.env.GOERLI_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+    rinkeby: {
+      url: process.env.RINKEBY_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+    mumbai: {
+      url: process.env.MUMBAI_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
@@ -69,7 +88,7 @@ const config: HardhatUserConfig = {
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
-    runOnCompile: true,
+    runOnCompile: false,
   },
 };
 

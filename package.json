@@ -40,5 +40,9 @@
   "dependencies": {
     "@openzeppelin/contracts": "4.3.0",
     "abdk-libraries-solidity": "^3.0.0"
+  },
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test"
   }
 }

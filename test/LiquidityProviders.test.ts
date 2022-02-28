@@ -117,7 +117,7 @@ describe("LiquidityProviderTests", function () {
       pauser.address,
     ])) as LiquidityProvidersTest;
     await liquidityProviders.deployed();
-    await lpToken.setLiquidtyPool(liquidityProviders.address);
+    await lpToken.setLiquidityPool(liquidityProviders.address);
     await liquidityProviders.setLpToken(lpToken.address);
 
     const wlpmFactory = await ethers.getContractFactory("WhitelistPeriodManager");
@@ -153,6 +153,20 @@ describe("LiquidityProviderTests", function () {
     expect(await token.balanceOf(liquidityProviders.address)).to.equal(0);
     expect(await token2.balanceOf(liquidityProviders.address)).to.equal(0);
     expect(await ethers.provider.getBalance(liquidityProviders.address)).to.equal(0);
+  });
+
+  it("Should revert on re-entant calls to token minting", async function () {
+    const attacker = await (
+      await ethers.getContractFactory("TokenMintingReentrancy")
+    ).deploy(liquidityProviders.address);
+    await owner.sendTransaction({
+      to: attacker.address,
+      value: ethers.BigNumber.from(10).pow(20),
+    });
+
+    await expect(attacker.attack({ value: ethers.BigNumber.from(10).pow(18) })).to.be.revertedWith(
+      "ReentrancyGuard: reentrant call"
+    );
   });
 
   describe("Liquidity Addition", async function () {

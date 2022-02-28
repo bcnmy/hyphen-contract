@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.12;
 
 import "../structures/LpTokenMetadata.sol";
 
@@ -53,7 +53,7 @@ interface ILPToken {
 
     function setApprovalForAll(address operator, bool approved) external;
 
-    function setLiquidtyPool(address _lpm) external;
+    function setLiquidityPool(address _lpm) external;
 
     function setWhiteListPeriodManager(address _whiteListPeriodManager) external;
 
@@ -78,15 +78,13 @@ interface ILPToken {
 
     function totalSupply() external view returns (uint256);
 
-    function transferFrom(
+    function abitransferFrom(
         address from,
         address to,
         uint256 tokenId
     ) external;
 
     function transferOwnership(address newOwner) external;
-
-    function updateLiquidityPoolAddress(address _liquidityPoolAddress) external;
 
     function updateTokenMetadata(uint256 _tokenId, LpTokenMetadata memory _lpTokenMetadata) external;
 
