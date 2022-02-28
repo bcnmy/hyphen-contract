@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.0;
+pragma solidity 0.8.12;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
@@ -71,8 +71,10 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
         address[] memory tokenAddresses,
         TokenConfig[] memory tokenConfig
     ) external onlyOwner {
-        require(toChainId.length == tokenAddresses.length, "ERR_ARRAY_LENGTH_MISMATCH");
-        require(tokenAddresses.length == tokenConfig.length, "ERR_ARRAY_LENGTH_MISMATCH");
+        require(
+            (toChainId.length == tokenAddresses.length) && (tokenAddresses.length == tokenConfig.length),
+            " ERR_ARRAY_LENGTH_MISMATCH"
+        );
         for (uint256 index = 0; index < tokenConfig.length; index++) {
             depositConfig[toChainId[index]][tokenAddresses[index]].min = tokenConfig[index].min;
             depositConfig[toChainId[index]][tokenAddresses[index]].max = tokenConfig[index].max;
@@ -121,11 +123,16 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
         return tokenInfo;
     }
 
-    function getDepositConfig(uint256 toChainId, address tokenAddress) public override view returns (TokenConfig memory) {
+    function getDepositConfig(uint256 toChainId, address tokenAddress)
+        public
+        view
+        override
+        returns (TokenConfig memory)
+    {
         return depositConfig[toChainId][tokenAddress];
     }
 
-    function getTransferConfig(address tokenAddress) public override view returns (TokenConfig memory) {
+    function getTransferConfig(address tokenAddress) public view override returns (TokenConfig memory) {
         return transferConfig[tokenAddress];
     }
 

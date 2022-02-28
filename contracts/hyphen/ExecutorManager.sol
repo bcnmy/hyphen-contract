@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.0;
+pragma solidity 0.8.12;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./interfaces/IExecutorManager.sol";
@@ -28,7 +28,7 @@ contract ExecutorManager is IExecutorManager, Ownable {
 
     //Register new Executors
     function addExecutors(address[] calldata executorArray) external override onlyOwner {
-        for (uint256 i = 0; i < executorArray.length; i++) {
+        for (uint256 i = 0; i < executorArray.length; ++i) {
             addExecutor(executorArray[i]);
         }
     }
@@ -36,6 +36,7 @@ contract ExecutorManager is IExecutorManager, Ownable {
     // Register single executor
     function addExecutor(address executorAddress) public override onlyOwner {
         require(executorAddress != address(0), "executor address can not be 0");
+        require(!executorStatus[executorAddress], "Executor already registered");
         executors.push(executorAddress);
         executorStatus[executorAddress] = true;
         emit ExecutorAdded(executorAddress, msg.sender);
@@ -43,7 +44,7 @@ contract ExecutorManager is IExecutorManager, Ownable {
 
     //Remove registered Executors
     function removeExecutors(address[] calldata executorArray) external override onlyOwner {
-        for (uint256 i = 0; i < executorArray.length; i++) {
+        for (uint256 i = 0; i < executorArray.length; ++i) {
             removeExecutor(executorArray[i]);
         }
     }
