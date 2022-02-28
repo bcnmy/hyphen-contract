@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.0;
+pragma solidity 0.8.12;
 pragma abicoder v2;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -157,7 +157,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         address receiver,
         uint256 amount,
         string memory tag
-    ) public tokenChecks(tokenAddress) whenNotPaused {
+    ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
         require(
             tokenManager.getDepositConfig(toChainId, tokenAddress).min <= amount &&
                 tokenManager.getDepositConfig(toChainId, tokenAddress).max >= amount,
@@ -248,7 +248,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         address receiver,
         uint256 toChainId,
         string memory tag
-    ) external payable whenNotPaused {
+    ) external payable whenNotPaused nonReentrant {
         require(
             tokenManager.getDepositConfig(toChainId, NATIVE).min <= msg.value &&
                 tokenManager.getDepositConfig(toChainId, NATIVE).max >= msg.value,
@@ -288,7 +288,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         uint256 amountToTransfer = getAmountToTransfer(initialGas, tokenAddress, amount, tokenGasPrice);
         if (tokenAddress == NATIVE) {
             require(address(this).balance >= amountToTransfer, "Not Enough Balance");
-            bool success = receiver.send(amountToTransfer);
+            (bool success, ) = receiver.call{value: amountToTransfer}("");
             require(success, "Native Transfer Failed");
         } else {
             require(IERC20Upgradeable(tokenAddress).balanceOf(address(this)) >= amountToTransfer, "Not Enough Balance");
@@ -334,12 +334,10 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         totalGasUsed = totalGasUsed + baseGas;
 
         uint256 gasFee = totalGasUsed * tokenGasPrice;
-        gasFeeAccumulatedByToken[tokenAddress] =
-            gasFeeAccumulatedByToken[tokenAddress] + gasFee;
-        gasFeeAccumulated[tokenAddress][_msgSender()] =
-            gasFeeAccumulated[tokenAddress][_msgSender()] + gasFee;
+        gasFeeAccumulatedByToken[tokenAddress] = gasFeeAccumulatedByToken[tokenAddress] + gasFee;
+        gasFeeAccumulated[tokenAddress][_msgSender()] = gasFeeAccumulated[tokenAddress][_msgSender()] + gasFee;
         amountToTransfer = amount - (transferFeeAmount + gasFee);
-        
+
         emit FeeDetails(lpFee, transferFeeAmount, gasFee);
     }
 
@@ -355,7 +353,11 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         uint256 numerator = providedLiquidity * equilibriumFee * maxFee; // F(max) * F(e) * L(e)
         uint256 denominator = equilibriumFee * providedLiquidity + (maxFee - equilibriumFee) * resultingLiquidity; // F(e) * L(e) + (F(max) - F(e)) * L(r)
 
-        fee = numerator / denominator;
+        if (denominator == 0) {
+            fee = 0;
+        } else {
+            fee = numerator / denominator;
+        }
     }
 
     function checkHashStatus(
@@ -369,7 +371,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         status = processedHash[hashSendTransaction];
     }
 
-    function withdrawErc20GasFee(address tokenAddress) external onlyExecutor whenNotPaused {
+    function withdrawErc20GasFee(address tokenAddress) external onlyExecutor whenNotPaused nonReentrant {
         require(tokenAddress != NATIVE, "Can't withdraw native token fee");
         // uint256 gasFeeAccumulated = gasFeeAccumulatedByToken[tokenAddress];
         uint256 _gasFeeAccumulated = gasFeeAccumulated[tokenAddress][_msgSender()];
@@ -380,19 +382,23 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         emit GasFeeWithdraw(tokenAddress, _msgSender(), _gasFeeAccumulated);
     }
 
-    function withdrawNativeGasFee() external onlyOwner whenNotPaused {
+    function withdrawNativeGasFee() external onlyExecutor whenNotPaused nonReentrant {
         uint256 _gasFeeAccumulated = gasFeeAccumulated[NATIVE][_msgSender()];
         require(_gasFeeAccumulated != 0, "Gas Fee earned is 0");
-        gasFeeAccumulatedByToken[NATIVE] = 0;
         gasFeeAccumulatedByToken[NATIVE] = gasFeeAccumulatedByToken[NATIVE] - _gasFeeAccumulated;
         gasFeeAccumulated[NATIVE][_msgSender()] = 0;
-        bool success = payable(_msgSender()).send(_gasFeeAccumulated);
+        (bool success, ) = payable(_msgSender()).call{value: _gasFeeAccumulated}("");
         require(success, "Native Transfer Failed");
 
         emit GasFeeWithdraw(address(this), _msgSender(), _gasFeeAccumulated);
     }
 
-    function transfer(address _tokenAddress, address receiver, uint256 _tokenAmount) external whenNotPaused onlyLiquidityProviders {
+    function transfer(
+        address _tokenAddress,
+        address receiver,
+        uint256 _tokenAmount
+    ) external whenNotPaused onlyLiquidityProviders nonReentrant {
+        require(receiver != address(0), "Invalid receiver");
         if (_tokenAddress == NATIVE) {
             require(address(this).balance >= _tokenAmount, "ERR__INSUFFICIENT_BALANCE");
             (bool success, ) = receiver.call{value: _tokenAmount}("");
