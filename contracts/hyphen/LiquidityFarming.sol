@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.12;
 
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC721ReceiverUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
@@ -18,6 +19,7 @@ contract HyphenLiquidityFarming is
     ERC2771ContextUpgradeable,
     OwnableUpgradeable,
     Pausable,
+    ReentrancyGuardUpgradeable,
     IERC721ReceiverUpgradeable
 {
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -64,13 +66,6 @@ contract HyphenLiquidityFarming is
 
     uint256 internal unlocked;
 
-    modifier lock() {
-        require(unlocked == 1, "LOCKED");
-        unlocked = 2;
-        _;
-        unlocked = 1;
-    }
-
     event LogDeposit(address indexed user, address indexed baseToken, uint256 nftId, address indexed to);
     event LogWithdraw(address indexed user, address baseToken, uint256 nftId, address indexed to);
     event LogOnReward(address indexed user, address indexed baseToken, uint256 amount, address indexed to);
@@ -88,6 +83,7 @@ contract HyphenLiquidityFarming is
         __ERC2771Context_init(_trustedForwarder);
         __Ownable_init();
         __Pausable_init(_pauser);
+        __ReentrancyGuard_init();
         liquidityProviders = _liquidityProviders;
         lpToken = _lpToken;
         unlocked = 1;
@@ -119,7 +115,7 @@ contract HyphenLiquidityFarming is
         address _user,
         address _to,
         uint256 _lpTokenAmount
-    ) internal lock {
+    ) internal {
         PoolInfo memory pool = updatePool(_baseToken);
         UserInfo storage user = userInfo[_baseToken][_user];
         uint256 pending;
@@ -173,9 +169,10 @@ contract HyphenLiquidityFarming is
         address _token,
         uint256 _amount,
         address payable _to
-    ) public onlyOwner {
-        if (_token == address(0)) {
-            _to.transfer(_amount);
+    ) public nonReentrant onlyOwner {
+        if (_token == NATIVE) {
+            (bool success, ) = payable(_to).call{value: _amount}("");
+            require(success, "ERR__NATIVE_TRANSFER_FAILED");
         } else {
             IERC20Upgradeable(_token).safeTransfer(_to, _amount);
         }
@@ -184,7 +181,7 @@ contract HyphenLiquidityFarming is
     /// @notice Deposit LP tokens
     /// @param _nftId LP token nftId to deposit.
     /// @param _to The receiver of `amount` deposit benefit.
-    function deposit(uint256 _nftId, address _to) public whenNotPaused {
+    function deposit(uint256 _nftId, address _to) public whenNotPaused nonReentrant {
         require(lpToken.isApprovedForAll(_msgSender(), address(this)), "ERR__NOT_APPROVED_FOR_ALL");
 
         (address baseToken, , uint256 amount) = lpToken.tokenMetadata(_nftId);
@@ -207,7 +204,7 @@ contract HyphenLiquidityFarming is
     /// @notice Withdraw LP tokens
     /// @param _nftId LP token nftId to withdraw.
     /// @param _to The receiver of `amount` withdraw benefit.
-    function withdraw(uint256 _nftId, address _to) public whenNotPaused {
+    function withdraw(uint256 _nftId, address _to) public whenNotPaused nonReentrant {
         uint256 index;
         for (index = 0; index < nftIdsStaked[_msgSender()].length; index++) {
             if (nftIdsStaked[_msgSender()][index] == _nftId) {
@@ -236,7 +233,7 @@ contract HyphenLiquidityFarming is
     /// @notice Extract all rewards without withdrawing LP tokens
     /// @param _baseToken Base token to be used for the rewarder pool.
     /// @param _to The receiver of withdraw benefit.
-    function extractRewards(address _baseToken, address _to) external whenNotPaused {
+    function extractRewards(address _baseToken, address _to) external whenNotPaused nonReentrant {
         UserInfo memory user = userInfo[_baseToken][_msgSender()];
         _onReward(_baseToken, _msgSender(), _to, user.amount);
     }
