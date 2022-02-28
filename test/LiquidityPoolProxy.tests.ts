@@ -23,7 +23,7 @@ describe("LiquidityPoolProxyTests", function () {
     [alice, pauser, bob, charlie, tf, proxyAdmin, tokenManager, liquidityProviders] = await ethers.getSigners();
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
-    lpToken = (await upgrades.deployProxy(lpTokenFactory, ["Hyphen LP Token","HPT",trustedForwarder])) as LPToken;
+    lpToken = (await upgrades.deployProxy(lpTokenFactory, ["Hyphen LP Token","HPT",trustedForwarder,pauser.address])) as LPToken;
     
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
     executorManager = await executorManagerFactory.deploy();
