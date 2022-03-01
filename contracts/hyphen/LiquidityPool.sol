@@ -51,7 +51,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         bytes depositHash,
         uint256 fromChainId
     );
-    event FeeDetails(uint256 lpFee, uint256 transferFee, uint256 gasFee);
+    event FeeDetails(uint256 indexed lpFee, uint256 indexed transferFee, uint256 indexed gasFee);
     event Received(address indexed from, uint256 indexed amount);
     event Deposit(
         address indexed from,

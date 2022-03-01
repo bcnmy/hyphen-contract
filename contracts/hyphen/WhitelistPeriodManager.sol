@@ -24,7 +24,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
     // Token -> TVL
     mapping(address => uint256) private totalLiquidity;
     // Token -> TVL
-    mapping(address => mapping(address => uint256)) private totalLiquidityByLp;
+    mapping(address => mapping(address => uint256)) public totalLiquidityByLp;
 
     /* Caps */
     // Token Address -> Limit
