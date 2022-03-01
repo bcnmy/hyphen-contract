@@ -14,7 +14,15 @@ const addresses = {
       maxCap: ethers.BigNumber.from(10).pow(18 + 4),
       equilibriumFee: 0,
       maxFee: 100,
-      toChainIds: [5, 80001],
+      toChainIds: [5, 43113],
+    },
+    {
+      tokenAddress: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+      minCap: ethers.BigNumber.from(10).pow(18 - 2),
+      maxCap: ethers.BigNumber.from(10).pow(18 + 2),
+      equilibriumFee: 0,
+      maxFee: 100,
+      toChainIds: [5, 43113],
     },
   ],
 };
