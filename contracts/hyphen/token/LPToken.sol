@@ -19,11 +19,11 @@ contract LPToken is
     ERC2771ContextUpgradeable,
     Pausable
 {
-    address public liquidityPoolAddress;
+    address public liquidityProvidersAddress;
     IWhiteListPeriodManager public whiteListPeriodManager;
     mapping(uint256 => LpTokenMetadata) public tokenMetadata;
 
-    event LiquidityPoolUpdated(address indexed lpm);
+    event LiquidityProvidersUpdated(address indexed lpm);
     event WhiteListPeriodManagerUpdated(address indexed manager);
 
     function initialize(
@@ -42,14 +42,14 @@ contract LPToken is
     }
 
     modifier onlyHyphenPools() {
-        require(_msgSender() == liquidityPoolAddress, "ERR_UNAUTHORIZED");
+        require(_msgSender() == liquidityProvidersAddress, "ERR_UNAUTHORIZED");
         _;
     }
 
-    function setLiquidityPool(address _lpm) external onlyOwner {
-        require(_lpm != address(0), "ERR_INVALID_LPM");
-        liquidityPoolAddress = _lpm;
-        emit LiquidityPoolUpdated(_lpm);
+    function setLiquidityProviders(address _liquidityProviders) external onlyOwner {
+        require(_liquidityProviders != address(0), "ERR_INVALID_LIQUIDITY_PROVIDERS");
+        liquidityProvidersAddress = _liquidityProviders;
+        emit LiquidityProvidersUpdated(_liquidityProviders);
     }
 
     function setWhiteListPeriodManager(address _whiteListPeriodManager) external onlyOwner {

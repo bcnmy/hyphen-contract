@@ -81,7 +81,7 @@ async function deploy(bicoOwner: string, trustedForwarder: string, pauser: strin
   delay(5000);
   console.log("Configured LiquidityProviders");
 
-  await lpToken.setLiquidtyPool(liquidityProviders.address);
+  await lpToken.setLiquidityProviders(liquidityProviders.address);
   delay(5000);
   await lpToken.setWhiteListPeriodManager(whitelistPeriodManager.address);
   delay(5000);
