@@ -80,7 +80,6 @@ async function deploy(bicoOwner: string, trustedForwarder: string, pauser: strin
 
   await (await lpToken.setLiquidityPool(liquidityProviders.address)).wait();
   await (await lpToken.setWhiteListPeriodManager(whitelistPeriodManager.address)).wait();
-
   console.log("Configured LPToken");
 
   await (await whitelistPeriodManager.setAreWhiteListRestrictionsEnabled(false)).wait();
