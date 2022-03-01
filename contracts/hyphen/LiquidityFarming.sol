@@ -12,7 +12,6 @@ import "./metatx/ERC2771ContextUpgradeable.sol";
 import "../security/Pausable.sol";
 import "./interfaces/ILPToken.sol";
 import "./interfaces/ILiquidityProviders.sol";
-import "hardhat/console.sol";
 
 contract HyphenLiquidityFarming is
     Initializable,
@@ -64,8 +63,6 @@ contract HyphenLiquidityFarming is
     uint256 private constant ACC_SUSHI_PRECISION = 1e12;
     address internal constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
-    uint256 internal unlocked;
-
     event LogDeposit(address indexed user, address indexed baseToken, uint256 nftId, address indexed to);
     event LogWithdraw(address indexed user, address baseToken, uint256 nftId, address indexed to);
     event LogOnReward(address indexed user, address indexed baseToken, uint256 amount, address indexed to);
@@ -86,7 +83,6 @@ contract HyphenLiquidityFarming is
         __ReentrancyGuard_init();
         liquidityProviders = _liquidityProviders;
         lpToken = _lpToken;
-        unlocked = 1;
     }
 
     /// @notice Initialize the rewarder pool.
