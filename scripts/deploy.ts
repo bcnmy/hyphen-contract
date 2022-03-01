@@ -20,13 +20,13 @@ async function deploy(bicoOwner: string, trustedForwarder: string, pauser: strin
   const executorManager = await ExecutorManager.deploy();
   await executorManager.deployed();
   console.log("ExecutorManager deployed to:", executorManager.address);
-  delay(5000);
+
   const TokenManager = await ethers.getContractFactory("TokenManager");
   console.log("Deploying TokenManager...");
   const tokenManager = await TokenManager.deploy(trustedForwarder);
   await tokenManager.deployed();
   console.log("TokenManager deployed to:", tokenManager.address);
-  delay(5000);
+
   const LPToken = await ethers.getContractFactory("LPToken");
   console.log("Deploying LPToken...");
   const lpToken = (await upgrades.deployProxy(LPToken, [
@@ -37,7 +37,7 @@ async function deploy(bicoOwner: string, trustedForwarder: string, pauser: strin
   ])) as LPToken;
   await lpToken.deployed();
   console.log("LPToken Proxy deployed to:", lpToken.address);
-  delay(5000);
+
   const LiquidityProviders = await ethers.getContractFactory("LiquidityProviders");
   console.log("Deploying LiquidityProviders...");
   const liquidityProviders = (await upgrades.deployProxy(LiquidityProviders, [
@@ -48,7 +48,7 @@ async function deploy(bicoOwner: string, trustedForwarder: string, pauser: strin
   ])) as LiquidityProviders;
   await liquidityProviders.deployed();
   console.log("LiquidityProviders Proxy deployed to:", liquidityProviders.address);
-  delay(5000);
+
   const LiquidityPool = await ethers.getContractFactory("LiquidityPool");
   console.log("Deploying LiquidityPool...");
   const liquidityPool = (await upgrades.deployProxy(LiquidityPool, [
@@ -60,7 +60,7 @@ async function deploy(bicoOwner: string, trustedForwarder: string, pauser: strin
   ])) as LiquidityPool;
   await liquidityPool.deployed();
   console.log("LiquidityPool Proxy deployed to:", liquidityPool.address);
-  delay(5000);
+
   const WhitelistPeriodManager = await ethers.getContractFactory("WhitelistPeriodManager");
   console.log("Deploying WhitelistPeriodManager...");
   const whitelistPeriodManager = (await upgrades.deployProxy(WhitelistPeriodManager, [
@@ -72,37 +72,25 @@ async function deploy(bicoOwner: string, trustedForwarder: string, pauser: strin
   ])) as WhitelistPeriodManager;
   await whitelistPeriodManager.deployed();
   console.log("WhitelistPeriodManager Proxy deployed to:", whitelistPeriodManager.address);
-  delay(5000);
-  await liquidityProviders.setTokenManager(tokenManager.address);
-  delay(5000);
-  await liquidityProviders.setLiquidityPool(liquidityPool.address);
-  delay(5000);
-  await liquidityProviders.setWhiteListPeriodManager(whitelistPeriodManager.address);
-  delay(5000);
+
+  await (await liquidityProviders.setTokenManager(tokenManager.address)).wait();
+  await (await liquidityProviders.setLiquidityPool(liquidityPool.address)).wait();
+  await (await liquidityProviders.setWhiteListPeriodManager(whitelistPeriodManager.address)).wait();
   console.log("Configured LiquidityProviders");
 
-  await lpToken.setLiquidtyPool(liquidityProviders.address);
-  delay(5000);
-  await lpToken.setWhiteListPeriodManager(whitelistPeriodManager.address);
-  delay(5000);
+  await (await lpToken.setLiquidityPool(liquidityProviders.address)).wait();
+  await (await lpToken.setWhiteListPeriodManager(whitelistPeriodManager.address)).wait();
   console.log("Configured LPToken");
 
-  await whitelistPeriodManager.setAreWhiteListRestrictionsEnabled(false);
-  delay(5000);
+  await (await whitelistPeriodManager.setAreWhiteListRestrictionsEnabled(false)).wait();
   console.log("Configured WhitelistPeriodManager");
 
-  await tokenManager.transferOwnership(bicoOwner);
-  delay(5000);
-  await lpToken.transferOwnership(bicoOwner);
-  delay(5000);
-  await executorManager.transferOwnership(bicoOwner);
-  delay(5000);
-  await liquidityProviders.transferOwnership(bicoOwner);
-  delay(5000);
-  await liquidityPool.transferOwnership(bicoOwner);
-  delay(5000);
-  await whitelistPeriodManager.transferOwnership(bicoOwner);
-  delay(5000);
+  await (await tokenManager.transferOwnership(bicoOwner)).wait();
+  await (await lpToken.transferOwnership(bicoOwner)).wait();
+  await (await executorManager.transferOwnership(bicoOwner)).wait();
+  await (await liquidityProviders.transferOwnership(bicoOwner)).wait();
+  await (await liquidityPool.transferOwnership(bicoOwner)).wait();
+  await (await whitelistPeriodManager.transferOwnership(bicoOwner)).wait();
   console.log(`Transferred Ownership to ${bicoOwner}`);
 
   return {
@@ -114,7 +102,5 @@ async function deploy(bicoOwner: string, trustedForwarder: string, pauser: strin
     whitelistPeriodManagerAddress: whitelistPeriodManager.address,
   };
 }
-
-const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 export { deploy };

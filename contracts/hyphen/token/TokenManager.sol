@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.12;
+pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
@@ -75,7 +75,7 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
             (toChainId.length == tokenAddresses.length) && (tokenAddresses.length == tokenConfig.length),
             " ERR_ARRAY_LENGTH_MISMATCH"
         );
-        for (uint256 index = 0; index < tokenConfig.length; index++) {
+        for (uint256 index = 0; index < tokenConfig.length; ++index) {
             depositConfig[toChainId[index]][tokenAddresses[index]].min = tokenConfig[index].min;
             depositConfig[toChainId[index]][tokenAddresses[index]].max = tokenConfig[index].max;
         }

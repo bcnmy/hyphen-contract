@@ -117,7 +117,7 @@ describe("LiquidityProviderTests", function () {
       pauser.address,
     ])) as LiquidityProvidersTest;
     await liquidityProviders.deployed();
-    await lpToken.setLiquidityPool(liquidityProviders.address);
+    await lpToken.setLiquidityProviders(liquidityProviders.address);
     await liquidityProviders.setLpToken(lpToken.address);
 
     const wlpmFactory = await ethers.getContractFactory("WhitelistPeriodManager");
