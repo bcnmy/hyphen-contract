@@ -123,7 +123,7 @@ describe("LiquidityPoolTests", function () {
             [nativeDepositConfig]
         );
 
-        await lpToken.setLiquidityPool(liquidityProviders.address);
+        await lpToken.setLiquidityProviders(liquidityProviders.address);
 
         const wlpmFactory = await ethers.getContractFactory("WhitelistPeriodManager");
         wlpm = (await upgrades.deployProxy(wlpmFactory, [

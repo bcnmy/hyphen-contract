@@ -1,10 +1,9 @@
 // contracts/bico-token/bico/BicoToken.sol
 
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.12;
+pragma solidity 0.8.2;
 
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-
 
 /**
  * @dev This contract implements a proxy that is upgradeable by an admin.
@@ -28,15 +27,15 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
  * you should think of the `ProxyAdmin` instance as the real administrative interface of your proxy.
  */
 contract LiquidityPoolProxy is TransparentUpgradeableProxy {
-    constructor (address _implementation, address _admin)
-        TransparentUpgradeableProxy(_implementation,_admin,bytes("")) {
-    }
+    constructor(address _implementation, address _admin)
+        TransparentUpgradeableProxy(_implementation, _admin, bytes(""))
+    {}
 
     function getAdmin() external view returns (address adm) {
-      adm = _admin();
+        adm = _admin();
     }
 
     function getImplementation() external view returns (address impl) {
-      impl = _implementation();
-    }    
-} 
+        impl = _implementation();
+    }
+}
