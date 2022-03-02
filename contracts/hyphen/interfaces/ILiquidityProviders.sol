@@ -2,6 +2,8 @@
 pragma solidity 0.8.0;
 
 interface ILiquidityProviders {
+    function BASE_DIVISOR() external view returns (uint256);
+
     function initialize(address _trustedForwarder, address _lpToken) external;
 
     function addLPFee(address _token, uint256 _amount) external;
