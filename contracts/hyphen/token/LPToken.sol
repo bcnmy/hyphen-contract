@@ -7,7 +7,10 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import "base64-sol/base64.sol";
+import "../interfaces/ISvgHelper.sol";
 import "../interfaces/IWhiteListPeriodManager.sol";
+import "../interfaces/ILiquidityProviders.sol";
 import "../../security/Pausable.sol";
 import "../structures/LpTokenMetadata.sol";
 
@@ -19,12 +22,16 @@ contract LPToken is
     ERC2771ContextUpgradeable,
     Pausable
 {
+    address internal constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
     address public liquidityProvidersAddress;
     IWhiteListPeriodManager public whiteListPeriodManager;
     mapping(uint256 => LpTokenMetadata) public tokenMetadata;
+    mapping(address => ISvgHelper) public svgHelpers;
 
     event LiquidityProvidersUpdated(address indexed lpm);
     event WhiteListPeriodManagerUpdated(address indexed manager);
+    event SvgHelperUpdated(address indexed tokenAddress, ISvgHelper indexed svgHelper);
 
     function initialize(
         string memory _name,
@@ -44,6 +51,13 @@ contract LPToken is
     modifier onlyHyphenPools() {
         require(_msgSender() == liquidityProvidersAddress, "ERR_UNAUTHORIZED");
         _;
+    }
+
+    function setSvgHelper(address _tokenAddress, ISvgHelper _svgHelper) public onlyOwner {
+        require(_svgHelper != ISvgHelper(address(0)), "ERR_INVALID_SVG_HELPER");
+        require(_tokenAddress != address(0), "ERR_INVALID_TOKEN_ADDRESS");
+        svgHelpers[_tokenAddress] = _svgHelper;
+        emit SvgHelperUpdated(_tokenAddress, _svgHelper);
     }
 
     function setLiquidityProviders(address _liquidityProviders) external onlyOwner {
@@ -85,16 +99,6 @@ contract LPToken is
         return _exists(_tokenId);
     }
 
-    function tokenURI(uint256 tokenId)
-        public
-        view
-        virtual
-        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
-        returns (string memory)
-    {
-        return ERC721URIStorageUpgradeable.tokenURI(tokenId);
-    }
-
     function supportsInterface(bytes4 interfaceId)
         public
         view
@@ -103,6 +107,41 @@ contract LPToken is
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
+    }
+
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        virtual
+        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
+        returns (string memory)
+    {
+        address tokenAddress = tokenMetadata[tokenId].token;
+        require(svgHelpers[tokenAddress] != ISvgHelper(address(0)), "ERR__SVG_HELPER_NOT_REGISTERED");
+
+        string memory svgData = svgHelpers[tokenAddress].getTokenSvg(
+            tokenId,
+            tokenMetadata[tokenId].suppliedLiquidity,
+            ILiquidityProviders(liquidityProvidersAddress).totalReserve(tokenAddress)
+        );
+
+        string memory json = Base64.encode(
+            bytes(
+                string(
+                    abi.encodePacked(
+                        '{"name": "',
+                        name(),
+                        '", "description": "',
+                        // TODO: Check description and opensea attributes
+                        "",
+                        '", "image": "data:image/svg+xml;base64,',
+                        Base64.encode(bytes(svgData)),
+                        '"}'
+                    )
+                )
+            )
+        );
+        return string(abi.encodePacked("data:application/json;base64,", json));
     }
 
     function _msgSender()

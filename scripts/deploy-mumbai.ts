@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 import { deploy } from "./helpers";
 
-const addresses = {
+const config = {
   trustedForwarder: "0x9399BB24DBB5C4b782C70c2969F58716Ebbd6a3b",
   bicoOwner: "0x817377683A2899A6879eA12AaC60e68032D3748F",
   pauser: "0x817377683A2899A6879eA12AaC60e68032D3748F",
@@ -29,4 +29,4 @@ const addresses = {
   ],
 };
 
-deploy(addresses);
+deploy(config);

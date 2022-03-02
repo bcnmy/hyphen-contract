@@ -6,6 +6,8 @@ import {
   LiquidityProviders,
   TokenManager,
   ExecutorManager,
+  SvgHelperBase,
+  SvgHelperBase__factory,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import type { BigNumberish } from "ethers";
@@ -22,6 +24,7 @@ interface IAddTokenParameters {
   maxFee: BigNumberish;
   maxWalletLiquidityCap: BigNumberish;
   maxLiquidityCap: BigNumberish;
+  svgHelper: SvgHelperBase__factory;
 }
 
 interface IContracts {
