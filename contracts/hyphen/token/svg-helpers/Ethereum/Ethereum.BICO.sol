@@ -4,11 +4,9 @@ pragma solidity 0.8.0;
 import "../SvgHelperBase.sol";
 
 contract EthereumBICO is SvgHelperBase {
-    using StringsUpgradeable for uint256;
+    using Strings for uint256;
 
-    function initialize(uint256 _decimals) public initializer {
-        __NFTSVG_init(_decimals);
-    }
+    constructor(uint256 _decimals) SvgHelperBase(_decimals) {}
 
     function getTokenSvg(
         uint256 _tokenId,

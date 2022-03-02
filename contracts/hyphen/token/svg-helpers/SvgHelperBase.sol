@@ -1,20 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.0;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "base64-sol/base64.sol";
 
-abstract contract SvgHelperBase is OwnableUpgradeable {
-    using StringsUpgradeable for uint256;
+abstract contract SvgHelperBase is Ownable {
+    using Strings for uint256;
 
     uint256 public tokenDecimals;
 
     event BackgroundUrlUpdated(string newBackgroundUrl);
     event TokenDecimalsUpdated(uint256 newTokenDecimals);
 
-    function __NFTSVG_init(uint256 _tokenDecimals) internal initializer {
-        __Ownable_init();
+    constructor(uint256 _tokenDecimals) Ownable() {
         tokenDecimals = _tokenDecimals;
     }
 

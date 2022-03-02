@@ -7,10 +7,10 @@ import {
   TokenManager,
   ExecutorManager,
   SvgHelperBase,
-  SvgHelperBase__factory,
+  HyphenLiquidityFarming,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
-import type { BigNumberish } from "ethers";
+import type { BigNumberish, ContractFactory } from "ethers";
 
 const LPTokenName = "BICO Liquidity Token";
 const LPTokenSymbol = "BICOLP";
@@ -24,7 +24,8 @@ interface IAddTokenParameters {
   maxFee: BigNumberish;
   maxWalletLiquidityCap: BigNumberish;
   maxLiquidityCap: BigNumberish;
-  svgHelper: SvgHelperBase__factory;
+  svgHelper: ContractFactory;
+  decimals: number;
 }
 
 interface IContracts {
@@ -34,6 +35,8 @@ interface IContracts {
   liquidityPool: LiquidityPool;
   whitelistPeriodManager: WhitelistPeriodManager;
   executorManager: ExecutorManager;
+  liquidityFarming: HyphenLiquidityFarming;
+  svgHelperMap: Record<string, SvgHelperBase>;
 }
 
 const deploy = async (deployConfig: {
@@ -42,15 +45,38 @@ const deploy = async (deployConfig: {
   pauser: string;
   tokens: IAddTokenParameters[];
 }) => {
-  const contracts = await deployContracts(deployConfig.bicoOwner, deployConfig.trustedForwarder, deployConfig.pauser);
+  const contracts = await deployCoreContracts(deployConfig.trustedForwarder, deployConfig.pauser);
   for (const token of deployConfig.tokens) {
     await addTokenSupport(contracts, token);
+    contracts.svgHelperMap[token.tokenAddress] = await deploySvgHelper(
+      contracts.lpToken,
+      token,
+      deployConfig.bicoOwner
+    );
   }
   await configure(contracts, deployConfig.bicoOwner);
   await verify(contracts, deployConfig);
+
+  console.log(
+    "Deployed contracts:",
+    JSON.stringify(
+      {
+        ...Object.fromEntries(
+          Object.entries(contracts)
+            .filter(([name]) => name !== "svgHelperMap")
+            .map(([name, contract]) => [name, contract.address])
+        ),
+        svgHelpers: Object.fromEntries(
+          Object.entries(contracts.svgHelperMap).map(([name, contract]) => [name, contract.address])
+        ),
+      },
+      null,
+      2
+    )
+  );
 };
 
-async function deployContracts(bicoOwner: string, trustedForwarder: string, pauser: string): Promise<IContracts> {
+async function deployCoreContracts(trustedForwarder: string, pauser: string): Promise<IContracts> {
   const [deployer] = await ethers.getSigners();
 
   console.log("Deployer:", deployer.address);
@@ -113,6 +139,18 @@ async function deployContracts(bicoOwner: string, trustedForwarder: string, paus
   await whitelistPeriodManager.deployed();
   console.log("WhitelistPeriodManager Proxy deployed to:", whitelistPeriodManager.address);
 
+  const LiquidityFarmingFactory = await ethers.getContractFactory("HyphenLiquidityFarming");
+  console.log("Deploying LiquidityFarmingFactory...");
+  const liquidityFarming = (await upgrades.deployProxy(LiquidityFarmingFactory, [
+    trustedForwarder,
+    pauser,
+    liquidityProviders.address,
+    lpToken.address,
+  ])) as HyphenLiquidityFarming;
+  await liquidityFarming.deployed();
+  console.log("LiquidityFarmingFactory Proxy deployed to:", liquidityFarming.address);
+  await (await whitelistPeriodManager.setIsExcludedAddressStatus([liquidityFarming.address], [true])).wait();
+
   return {
     executorManager,
     tokenManager,
@@ -120,8 +158,24 @@ async function deployContracts(bicoOwner: string, trustedForwarder: string, paus
     liquidityProviders,
     liquidityPool,
     whitelistPeriodManager,
+    liquidityFarming,
+    svgHelperMap: {},
   };
 }
+
+const deploySvgHelper = async (
+  lpToken: LPToken,
+  token: IAddTokenParameters,
+  bicoOwner: string
+): Promise<SvgHelperBase> => {
+  console.log(`Deploying SVG helper for token ${token.tokenAddress}...`);
+  const svgHelper = (await token.svgHelper.deploy([token.decimals])) as SvgHelperBase;
+  await svgHelper.deployed();
+  await (await lpToken.setSvgHelper(token.tokenAddress, svgHelper.address)).wait();
+  await (await svgHelper.transferOwnership(bicoOwner)).wait();
+  console.log("SvgHelper deployed to:", svgHelper.address);
+  return svgHelper;
+};
 
 const configure = async (contracts: IContracts, bicoOwner: string) => {
   await (await contracts.liquidityProviders.setTokenManager(contracts.tokenManager.address)).wait();
@@ -203,16 +257,23 @@ const verifyImplementation = async (address: string) => {
   }
 };
 
-const verify = async (contracts: IContracts, config: { trustedForwarder: string; pauser: string }) => {
+const verify = async (
+  contracts: IContracts,
+  config: { trustedForwarder: string; pauser: string; tokens: IAddTokenParameters[] }
+) => {
   console.log("Verifying Contracts...");
   await Promise.all([
+    ...config.tokens.map((token) =>
+      verifyContract(contracts.svgHelperMap[token.tokenAddress].address, [token.decimals])
+    ),
     verifyContract(contracts.executorManager.address, []),
     verifyContract(contracts.tokenManager.address, [config.trustedForwarder]),
     verifyImplementation(contracts.lpToken.address),
     verifyImplementation(contracts.liquidityProviders.address),
     verifyImplementation(contracts.liquidityPool.address),
     verifyImplementation(contracts.whitelistPeriodManager.address),
+    verifyImplementation(contracts.liquidityFarming.address),
   ]);
 };
 
-export { deployContracts, configure, addTokenSupport, verify, deploy };
+export { deployCoreContracts as deployContracts, configure, addTokenSupport, verify, deploy };
