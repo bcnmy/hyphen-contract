@@ -43,7 +43,7 @@ describe("WhiteListPeriodManager", function () {
     executorManager = await executorManagerFactory.deploy();
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
-    lpToken = (await upgrades.deployProxy(lpTokenFactory, ["LPToken", "LPToken", tf.address])) as LPToken;
+    lpToken = (await upgrades.deployProxy(lpTokenFactory, ["LPToken", "LPToken", tf.address, pauser.address])) as LPToken;
 
     const liquidtyProvidersFactory = await ethers.getContractFactory("LiquidityProvidersTest");
     liquidityProviders = (await upgrades.deployProxy(liquidtyProvidersFactory, [
@@ -53,7 +53,7 @@ describe("WhiteListPeriodManager", function () {
       pauser.address,
     ])) as LiquidityProvidersTest;
     await liquidityProviders.deployed();
-    await lpToken.setLiquidityPool(liquidityProviders.address);
+    await lpToken.setLiquidityProviders(liquidityProviders.address);
     await liquidityProviders.setLpToken(lpToken.address);
 
     const wlpmFactory = await ethers.getContractFactory("WhitelistPeriodManager");

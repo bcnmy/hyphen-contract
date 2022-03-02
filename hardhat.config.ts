@@ -73,8 +73,12 @@ const config: HardhatUserConfig = {
       url: process.env.RINKEBY_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
-    mumbai: {
+    polygonMumbai: {
       url: process.env.MUMBAI_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+    fuji: {
+      url: process.env.FUJI_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
   },
@@ -83,7 +87,11 @@ const config: HardhatUserConfig = {
     currency: "USD",
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY,
+    apiKey: {
+      goerli: process.env.ETHERSCAN_API_KEY,
+      polygonMumbai: process.env.POLYGONSCAN_API_KEY,
+      avalancheFujiTestnet: process.env.SNOWTRACE_API_KEY,
+    },
   },
   contractSizer: {
     alphaSort: true,

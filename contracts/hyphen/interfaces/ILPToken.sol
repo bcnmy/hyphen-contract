@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.12;
+pragma solidity 0.8.0;
 
 import "../structures/LpTokenMetadata.sol";
 
@@ -78,7 +78,7 @@ interface ILPToken {
 
     function totalSupply() external view returns (uint256);
 
-    function abitransferFrom(
+    function transferFrom(
         address from,
         address to,
         uint256 tokenId

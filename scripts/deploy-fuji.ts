@@ -4,17 +4,17 @@ import { verify } from "./verify";
 import { addTokenSupport } from "./add-token-support";
 
 const addresses = {
-  trustedForwarder: "0xE041608922d06a4F26C0d4c27d8bCD01daf1f792",
+  trustedForwarder: "0x6271Ca63D30507f2Dcbf99B52787032506D75BBF",
   bicoOwner: "0xe0E67a6F478D7ED604Cf528bDE6C3f5aB034b59D",
   pauser: "0xe0E67a6F478D7ED604Cf528bDE6C3f5aB034b59D",
   tokens: [
     {
-      tokenAddress: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716",
+      tokenAddress: "0xB4E0F6FEF81BdFea0856bB846789985c9CFf7e85",
       minCap: ethers.BigNumber.from(10).pow(18 + 2),
       maxCap: ethers.BigNumber.from(10).pow(18 + 4),
       equilibriumFee: 0,
       maxFee: 100,
-      toChainIds: [43113, 80001],
+      toChainIds: [5, 80001],
     },
     {
       tokenAddress: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
@@ -22,7 +22,7 @@ const addresses = {
       maxCap: ethers.BigNumber.from(10).pow(18 + 2),
       equilibriumFee: 0,
       maxFee: 100,
-      toChainIds: [43113, 80001],
+      toChainIds: [5, 80001],
     },
   ],
 };

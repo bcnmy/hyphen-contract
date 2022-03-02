@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.12;
+pragma solidity 0.8.0;
 pragma abicoder v2;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -51,7 +51,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         bytes depositHash,
         uint256 fromChainId
     );
-    event FeeDetails(uint256 lpFee, uint256 transferFee, uint256 gasFee);
+    event FeeDetails(uint256 indexed lpFee, uint256 indexed transferFee, uint256 indexed gasFee);
     event Received(address indexed from, uint256 indexed amount);
     event Deposit(
         address indexed from,
@@ -353,7 +353,11 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         uint256 numerator = providedLiquidity * equilibriumFee * maxFee; // F(max) * F(e) * L(e)
         uint256 denominator = equilibriumFee * providedLiquidity + (maxFee - equilibriumFee) * resultingLiquidity; // F(e) * L(e) + (F(max) - F(e)) * L(r)
 
-        fee = numerator / denominator;
+        if (denominator == 0) {
+            fee = 0;
+        } else {
+            fee = numerator / denominator;
+        }
     }
 
     function checkHashStatus(

@@ -62,7 +62,7 @@ describe("LiquidityPoolTests", function () {
         await executorManager.deployed();
 
         const lpTokenFactory = await ethers.getContractFactory("LPToken");
-        lpToken = (await upgrades.deployProxy(lpTokenFactory, ["Hyphen LP Token", "HPT", trustedForwarder])) as LPToken;
+        lpToken = (await upgrades.deployProxy(lpTokenFactory, ["Hyphen LP Token", "HPT", trustedForwarder, pauser.address])) as LPToken;
 
         
         const liquidtyProvidersFactory = await ethers.getContractFactory("LiquidityProvidersTest");
@@ -123,7 +123,7 @@ describe("LiquidityPoolTests", function () {
             [nativeDepositConfig]
         );
 
-        await lpToken.setLiquidityPool(liquidityProviders.address);
+        await lpToken.setLiquidityProviders(liquidityProviders.address);
 
         const wlpmFactory = await ethers.getContractFactory("WhitelistPeriodManager");
         wlpm = (await upgrades.deployProxy(wlpmFactory, [

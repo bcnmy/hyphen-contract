@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.12;
+pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -24,7 +24,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
     // Token -> TVL
     mapping(address => uint256) private totalLiquidity;
     // Token -> TVL
-    mapping(address => mapping(address => uint256)) private totalLiquidityByLp;
+    mapping(address => mapping(address => uint256)) public totalLiquidityByLp;
 
     /* Caps */
     // Token Address -> Limit
