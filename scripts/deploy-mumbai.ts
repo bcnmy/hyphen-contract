@@ -4,8 +4,8 @@ import { deploy } from "./helpers";
 (async () => {
   const config = {
     trustedForwarder: "0x9399BB24DBB5C4b782C70c2969F58716Ebbd6a3b",
-    bicoOwner: "0x817377683A2899A6879eA12AaC60e68032D3748F",
-    pauser: "0x817377683A2899A6879eA12AaC60e68032D3748F",
+    bicoOwner: "0x46b65ae065341D034fEA45D76c6fA936EAfBfdeb",
+    pauser: "0x46b65ae065341D034fEA45D76c6fA936EAfBfdeb",
     tokens: [
       {
         tokenAddress: "0xeabc4b91d9375796aa4f69cc764a4ab509080a58",

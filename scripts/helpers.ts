@@ -262,18 +262,16 @@ const verify = async (
   config: { trustedForwarder: string; pauser: string; tokens: IAddTokenParameters[] }
 ) => {
   console.log("Verifying Contracts...");
-  await Promise.all([
-    ...config.tokens.map((token) =>
-      verifyContract(contracts.svgHelperMap[token.tokenAddress].address, [token.decimals])
-    ),
-    verifyContract(contracts.executorManager.address, []),
-    verifyContract(contracts.tokenManager.address, [config.trustedForwarder]),
-    verifyImplementation(contracts.lpToken.address),
-    verifyImplementation(contracts.liquidityProviders.address),
-    verifyImplementation(contracts.liquidityPool.address),
-    verifyImplementation(contracts.whitelistPeriodManager.address),
-    verifyImplementation(contracts.liquidityFarming.address),
-  ]);
+  for (const token of config.tokens) {
+    await verifyContract(contracts.svgHelperMap[token.tokenAddress].address, [token.decimals]);
+  }
+  await verifyContract(contracts.executorManager.address, []);
+  await verifyContract(contracts.tokenManager.address, [config.trustedForwarder]);
+  await verifyImplementation(contracts.lpToken.address);
+  await verifyImplementation(contracts.liquidityProviders.address);
+  await verifyImplementation(contracts.liquidityPool.address);
+  await verifyImplementation(contracts.whitelistPeriodManager.address);
+  await verifyImplementation(contracts.liquidityFarming.address);
 };
 
 export { deployCoreContracts as deployContracts, configure, addTokenSupport, verify, deploy };
