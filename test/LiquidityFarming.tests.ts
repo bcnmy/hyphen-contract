@@ -70,7 +70,12 @@ describe("LiquidityFarmingTests", function () {
     executorManager = (await executorManagerFactory.deploy()) as ExecutorManager;
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
-    lpToken = (await upgrades.deployProxy(lpTokenFactory, ["LPToken", "LPToken", tf.address])) as LPToken;
+    lpToken = (await upgrades.deployProxy(lpTokenFactory, [
+      "LPToken",
+      "LPToken",
+      tf.address,
+      pauser.address,
+    ])) as LPToken;
 
     const liquidtyProvidersFactory = await ethers.getContractFactory("LiquidityProvidersTest");
     liquidityProviders = (await upgrades.deployProxy(liquidtyProvidersFactory, [
@@ -80,7 +85,7 @@ describe("LiquidityFarmingTests", function () {
       pauser.address,
     ])) as LiquidityProvidersTest;
     await liquidityProviders.deployed();
-    await lpToken.setLiquidityPool(liquidityProviders.address);
+    await lpToken.setLiquidityProviders(liquidityProviders.address);
     await liquidityProviders.setLpToken(lpToken.address);
 
     const wlpmFactory = await ethers.getContractFactory("WhitelistPeriodManager");
@@ -162,11 +167,11 @@ describe("LiquidityFarmingTests", function () {
       expect(await farmingContract.getNftIdsStaked(owner.address)).to.deep.equal([1].map(BigNumber.from));
     });
 
-    it("Should be able to deposit lp tokens and delegate to another account", async function () {
+    it("Should be able to deposit lp tokens and delegate reward to another account", async function () {
       await farmingContract.deposit(1, bob.address);
-      expect((await farmingContract.userInfo(token.address, bob.address)).amount).to.equal(10);
+      expect((await farmingContract.userInfo(token.address, bob.address)).amount).to.equal(0);
       expect(await farmingContract.pendingToken(token.address, bob.address)).to.equal(0);
-      expect((await farmingContract.userInfo(token.address, owner.address)).amount).to.equal(0);
+      expect((await farmingContract.userInfo(token.address, owner.address)).amount).to.equal(10);
       expect(await farmingContract.pendingToken(token.address, owner.address)).to.equal(0);
       expect(await farmingContract.getNftIdsStaked(owner.address)).to.deep.equal([1].map(BigNumber.from));
     });
@@ -429,6 +434,21 @@ describe("LiquidityFarmingTests", function () {
       );
     });
 
+    it("Should be able to send correct amount of rewards to delegatee while adding lp token immediately if available", async function () {
+      await liquidityProviders.addTokenLiquidity(token.address, 10);
+      await liquidityProviders.addTokenLiquidity(token.address, 10);
+
+      await token2.transfer(farmingContract.address, ethers.BigNumber.from(10).pow(18));
+
+      await farmingContract.deposit(1, owner.address);
+      await advanceTime(100);
+      await expect(() => farmingContract.deposit(2, bob.address)).to.changeTokenBalances(
+        token2,
+        [farmingContract, bob],
+        [-1010, 1010]
+      );
+    });
+
     it("Should be able to send correct amount of rewards while withdrawing lp token immediately if available", async function () {
       await liquidityProviders.addTokenLiquidity(token.address, 10);
 
@@ -441,6 +461,22 @@ describe("LiquidityFarmingTests", function () {
         [farmingContract, owner],
         [-1010, 1010]
       );
+    });
+
+    it("Should be able to send correct amount to delegatee of rewards while withdrawing lp token immediately if available", async function () {
+      await liquidityProviders.addTokenLiquidity(token.address, 10);
+
+      await token2.transfer(farmingContract.address, ethers.BigNumber.from(10).pow(18));
+
+      await farmingContract.deposit(1, bob.address);
+      await advanceTime(100);
+      await expect(() => farmingContract.withdraw(1, bob.address)).to.changeTokenBalances(
+        token2,
+        [farmingContract, bob],
+        [-1010, 1010]
+      );
+
+      expect(await lpToken.ownerOf(1)).to.equal(owner.address);
     });
   });
 

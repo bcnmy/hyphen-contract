@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.12;
+pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/interfaces/IERC721ReceiverUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
@@ -95,6 +95,8 @@ contract HyphenLiquidityFarming is
         uint256 _rewardPerSecond
     ) external onlyOwner {
         require(rewardTokens[_baseToken] == address(0), "ERR__POOL_ALREADY_INITIALIZED");
+        require(_baseToken != address(0), "ERR__BASE_TOKEN_IS_ZERO");
+        require(_rewardToken != address(0), "ERR__REWARD_TOKEN_IS_ZERO");
         require(rewardPerSecond[_baseToken] == 0, "ERR__POOL_ALREADY_INITIALIZED");
         rewardTokens[_baseToken] = _rewardToken;
         rewardPerSecond[_baseToken] = _rewardPerSecond;
@@ -185,10 +187,9 @@ contract HyphenLiquidityFarming is
         require(rewardPerSecond[baseToken] != 0, "ERR__POOL_NOT_INITIALIZED");
 
         amount /= liquidityProviders.BASE_DIVISOR();
-        updatePool(baseToken);
-        UserInfo storage user = userInfo[baseToken][_to];
+        UserInfo storage user = userInfo[baseToken][_msgSender()];
 
-        _onReward(baseToken, _to, _to, user.amount + amount);
+        _onReward(baseToken, _msgSender(), _to, user.amount + amount);
 
         nftIdsStaked[_msgSender()].push(_nftId);
         totalSharesStaked[baseToken] = totalSharesStaked[baseToken] + amount;
@@ -216,12 +217,11 @@ contract HyphenLiquidityFarming is
         (address baseToken, , uint256 amount) = lpToken.tokenMetadata(_nftId);
         amount /= liquidityProviders.BASE_DIVISOR();
 
-        updatePool(baseToken);
         UserInfo storage user = userInfo[baseToken][_msgSender()];
 
-        _onReward(baseToken, _to, _to, user.amount - amount);
+        _onReward(baseToken, _msgSender(), _to, user.amount - amount);
         totalSharesStaked[baseToken] = totalSharesStaked[baseToken] - amount;
-        lpToken.safeTransferFrom(address(this), _to, _nftId);
+        lpToken.safeTransferFrom(address(this), _msgSender(), _nftId);
 
         emit LogWithdraw(_msgSender(), baseToken, _nftId, _to);
     }
