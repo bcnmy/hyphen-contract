@@ -19,7 +19,7 @@ interface IAddTokenParameters {
   tokenAddress: string;
   minCap: BigNumberish;
   maxCap: BigNumberish;
-  toChainIds: number[];
+  toChainIds: {chainId: number, minCap: BigNumberish, maxCap: BigNumberish}[];
   equilibriumFee: BigNumberish;
   maxFee: BigNumberish;
   maxWalletLiquidityCap: BigNumberish;
@@ -207,11 +207,20 @@ const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters
       token.maxFee
     )
   ).wait();
+
+  let chainIdArray = [];
+  let minMaxArray = [];
+  for(let index=0; index<token.toChainIds.length; index++) {
+    let entry = token.toChainIds[index];
+    chainIdArray.push(entry.chainId);
+    minMaxArray.push({ min: entry.minCap, max: entry.maxCap });
+  }
+
   await (
     await contracts.tokenManager.setDepositConfig(
-      token.toChainIds,
-      new Array(token.toChainIds.length).fill(token.tokenAddress),
-      new Array(token.toChainIds.length).fill({ min: token.minCap, max: token.maxCap })
+      chainIdArray,
+      new Array(chainIdArray.length).fill(token.tokenAddress),
+      minMaxArray
     )
   ).wait();
   await (

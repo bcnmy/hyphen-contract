@@ -36,10 +36,12 @@ contract LiquidityProviders is
     event FeeClaimed(address indexed tokenAddress, uint256 indexed fee, address indexed lp, uint256 sharesBurnt);
     event FeeAdded(address indexed tokenAddress, uint256 indexed fee);
     event EthReceived(address indexed sender, uint256 value);
+    event CurrentLiquidityChanged(address indexed token, uint256 indexed oldValue, uint256 indexed newValue);
 
     // LP Fee Distribution
     mapping(address => uint256) public totalReserve; // Include Liquidity + Fee accumulated
     mapping(address => uint256) public totalLiquidity; // Include Liquidity only
+    mapping(address => uint256) public currentLiquidity; // Include current liquidity, updated on every in and out transfer
     mapping(address => uint256) public totalLPFees;
     mapping(address => uint256) public totalSharesMinted;
 
@@ -103,6 +105,10 @@ contract LiquidityProviders is
         return totalLPFees[tokenAddress];
     }
 
+    function getCurrentLiquidity(address tokenAddress) public view returns (uint256) {
+        return currentLiquidity[tokenAddress];
+    }
+
     /**
      * @dev To be called post initialization, used to set address of NFT Contract
      * @param _lpToken address of lpToken
@@ -116,6 +122,24 @@ contract LiquidityProviders is
      */
     function _setLPToken(address _lpToken) internal {
         lpToken = ILPToken(_lpToken);
+    }
+
+    function increaseCurrentLiquidity(address tokenAddress, uint256 amount) public onlyLiquidityPool {
+        _increaseCurrentLiquidity(tokenAddress, amount);
+    }
+
+    function decreaseCurrentLiquidity(address tokenAddress, uint256 amount) public onlyLiquidityPool {
+        _decreaseCurrentLiquidity(tokenAddress, amount);
+    }
+
+    function _increaseCurrentLiquidity(address tokenAddress, uint256 amount) private {
+        currentLiquidity[tokenAddress] += amount;
+        emit CurrentLiquidityChanged(tokenAddress, currentLiquidity[tokenAddress]-amount, currentLiquidity[tokenAddress]);
+    }
+
+    function _decreaseCurrentLiquidity(address tokenAddress, uint256 amount) private {
+        currentLiquidity[tokenAddress] -= amount;
+        emit CurrentLiquidityChanged(tokenAddress, currentLiquidity[tokenAddress]+amount, currentLiquidity[tokenAddress]);
     }
 
     /**
@@ -272,6 +296,8 @@ contract LiquidityProviders is
         );
         lpToken.updateTokenMetadata(_nftId, data);
 
+        // Increase the current liquidity
+        _increaseCurrentLiquidity(token, _amount);
         emit LiquidityAdded(token, _amount, _msgSender());
     }
 
@@ -340,6 +366,8 @@ contract LiquidityProviders is
         totalReserve[_tokenAddress] -= amountToWithdraw;
         totalLiquidity[_tokenAddress] -= _amount;
         totalSharesMinted[_tokenAddress] -= lpSharesToBurn;
+
+        _decreaseCurrentLiquidity(_tokenAddress, _amount);
 
         _burnSharesFromNft(_nftId, lpSharesToBurn, _amount, _tokenAddress);
 
