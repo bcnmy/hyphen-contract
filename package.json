@@ -44,6 +44,9 @@
   },
   "scripts": {
     "compile": "hardhat compile",
-    "test": "hardhat test"
+    "test": "hardhat test",
+    "deploy:goerli": "hardhat run scripts/deploy-goerli --network goerli",
+    "deploy:mumbai": "hardhat run scripts/deploy-mumbai --network polygonMumbai",
+    "deploy:fuji": "hardhat run scripts/deploy-fuji --network fuji"
   }
 }
