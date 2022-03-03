@@ -18,5 +18,7 @@ module.exports = {
       "error",
       { ignores: ["modules"] },
     ],
-  },
+  }, "engines": {
+    "node": ">=10.0.0"
+  }
 };

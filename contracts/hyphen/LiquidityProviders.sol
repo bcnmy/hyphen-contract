@@ -34,6 +34,7 @@ contract LiquidityProviders is
     event LiquidityAdded(address indexed tokenAddress, uint256 indexed amount, address indexed lp);
     event LiquidityRemoved(address indexed tokenAddress, uint256 indexed amount, address indexed lp);
     event FeeClaimed(address indexed tokenAddress, uint256 indexed fee, address indexed lp, uint256 sharesBurnt);
+    event FeeAdded(address indexed tokenAddress, uint256 indexed fee);
     event EthReceived(address indexed sender, uint256 value);
 
     // LP Fee Distribution
@@ -196,6 +197,7 @@ contract LiquidityProviders is
     function addLPFee(address _token, uint256 _amount) external onlyLiquidityPool tokenChecks(_token) whenNotPaused {
         totalReserve[_token] += _amount;
         totalLPFees[_token] += _amount;
+        emit FeeAdded(_token, _amount);
     }
 
     /**
