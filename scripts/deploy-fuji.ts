@@ -11,7 +11,20 @@ import { deploy } from "./helpers";
         tokenAddress: "0xB4E0F6FEF81BdFea0856bB846789985c9CFf7e85",
         minCap: ethers.BigNumber.from(10).pow(18 + 2),
         maxCap: ethers.BigNumber.from(10).pow(18 + 4),
-        toChainIds: [5, 80001],
+        toChainIds: [
+          {
+            chainId: 5,
+            minCap: ethers.BigNumber.from(10).pow(18 + 2),
+            // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
+            maxCap: ethers.BigNumber.from(9).mul(ethers.BigNumber.from(10).pow(18 + 3))
+          },
+          {
+            chainId: 80001,
+            minCap: ethers.BigNumber.from(10).pow(18 + 2),
+            // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
+            maxCap: ethers.BigNumber.from(9).mul(ethers.BigNumber.from(10).pow(18 + 3))
+          }
+        ],
         equilibriumFee: 10000000,
         maxFee: 200000000,
         maxWalletLiquidityCap: ethers.BigNumber.from(10).pow(18 + 4),
@@ -23,7 +36,20 @@ import { deploy } from "./helpers";
         tokenAddress: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         minCap: ethers.BigNumber.from(10).pow(18 - 2),
         maxCap: ethers.BigNumber.from(10).pow(18 + 2),
-        toChainIds: [5, 80001],
+        toChainIds: [
+          {
+            chainId: 80001,
+            minCap: ethers.BigNumber.from(10).pow(18 - 2),
+            // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
+            maxCap: ethers.BigNumber.from(97).mul(ethers.BigNumber.from(10).pow(18))
+          },
+          {
+            chainId: 5,
+            minCap: ethers.BigNumber.from(10).pow(18 - 2),
+            // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
+            maxCap: ethers.BigNumber.from(97).mul(ethers.BigNumber.from(10).pow(18))
+          }
+        ],
         equilibriumFee: 10000000,
         maxFee: 200000000,
         maxWalletLiquidityCap: ethers.BigNumber.from(10).pow(18 + 4),
