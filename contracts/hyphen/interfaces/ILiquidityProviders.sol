@@ -59,4 +59,10 @@ interface ILiquidityProviders {
     function transferOwnership(address newOwner) external;
 
     function whiteListPeriodManager() external view returns (address);
+
+    function increaseCurrentLiquidity(address tokenAddress, uint256 amount) external;
+
+    function decreaseCurrentLiquidity(address tokenAddress, uint256 amount) external;
+
+    function getCurrentLiquidity(address tokenAddress) external view returns (uint256);
 }
