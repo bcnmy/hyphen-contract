@@ -130,13 +130,8 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
     }
 
     function getCurrentLiquidity(address tokenAddress) public view returns (uint256 currentLiquidity) {
-        uint256 liquidityPoolBalance;
-        if (tokenAddress == NATIVE) {
-            liquidityPoolBalance = address(this).balance;
-        } else {
-            liquidityPoolBalance = IERC20Upgradeable(tokenAddress).balanceOf(address(this));
-        }
-
+        uint256 liquidityPoolBalance = liquidityProviders.getCurrentLiquidity(tokenAddress);
+        
         currentLiquidity =
             liquidityPoolBalance -
             liquidityProviders.totalLPFees(tokenAddress) -
@@ -171,7 +166,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         if (rewardAmount != 0) {
             incentivePool[tokenAddress] = incentivePool[tokenAddress] - rewardAmount;
         }
-
+        liquidityProviders.increaseCurrentLiquidity(tokenAddress, amount);
         SafeERC20Upgradeable.safeTransferFrom(IERC20Upgradeable(tokenAddress), sender, address(this), amount);
         // Emit (amount + reward amount) in event
         emit Deposit(sender, tokenAddress, receiver, toChainId, amount + rewardAmount, rewardAmount, tag);
@@ -261,6 +256,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         if (rewardAmount != 0) {
             incentivePool[NATIVE] = incentivePool[NATIVE] - rewardAmount;
         }
+        liquidityProviders.increaseCurrentLiquidity(NATIVE, msg.value);
         emit Deposit(_msgSender(), NATIVE, receiver, toChainId, msg.value + rewardAmount, rewardAmount, tag);
     }
 
@@ -286,6 +282,8 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         processedHash[hashSendTransaction] = true;
 
         uint256 amountToTransfer = getAmountToTransfer(initialGas, tokenAddress, amount, tokenGasPrice);
+        liquidityProviders.decreaseCurrentLiquidity(tokenAddress, amountToTransfer);
+
         if (tokenAddress == NATIVE) {
             require(address(this).balance >= amountToTransfer, "Not Enough Balance");
             (bool success, ) = receiver.call{value: amountToTransfer}("");
