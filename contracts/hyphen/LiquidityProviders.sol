@@ -36,6 +36,7 @@ contract LiquidityProviders is
     event FeeClaimed(address indexed tokenAddress, uint256 indexed fee, address indexed lp, uint256 sharesBurnt);
     event FeeAdded(address indexed tokenAddress, uint256 indexed fee);
     event EthReceived(address indexed sender, uint256 value);
+    event CurrentLiquidityChanged(address indexed token, uint256 indexed oldValue, uint256 indexed newValue);
 
     // LP Fee Distribution
     mapping(address => uint256) public totalReserve; // Include Liquidity + Fee accumulated
@@ -133,10 +134,12 @@ contract LiquidityProviders is
 
     function _increaseCurrentLiquidity(address tokenAddress, uint256 amount) private {
         currentLiquidity[tokenAddress] += amount;
+        emit CurrentLiquidityChanged(tokenAddress, currentLiquidity[tokenAddress]-amount, currentLiquidity[tokenAddress]);
     }
 
     function _decreaseCurrentLiquidity(address tokenAddress, uint256 amount) private {
         currentLiquidity[tokenAddress] -= amount;
+        emit CurrentLiquidityChanged(tokenAddress, currentLiquidity[tokenAddress]+amount, currentLiquidity[tokenAddress]);
     }
 
     /**
