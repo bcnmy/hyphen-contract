@@ -97,7 +97,6 @@ contract HyphenLiquidityFarming is
         require(rewardTokens[_baseToken] == address(0), "ERR__POOL_ALREADY_INITIALIZED");
         require(_baseToken != address(0), "ERR__BASE_TOKEN_IS_ZERO");
         require(_rewardToken != address(0), "ERR__REWARD_TOKEN_IS_ZERO");
-        require(rewardPerSecond[_baseToken] == 0, "ERR__POOL_ALREADY_INITIALIZED");
         rewardTokens[_baseToken] = _rewardToken;
         rewardPerSecond[_baseToken] = _rewardPerSecond;
         emit LogRewardPoolInitialized(_baseToken, _rewardToken, _rewardPerSecond);

@@ -102,6 +102,43 @@ abstract contract SvgHelperBase is Ownable {
             );
     }
 
+    function getAttributes(uint256 _suppliedLiquidity, uint256 _totalSuppliedLiquidity)
+        public
+        view
+        virtual
+        returns (string memory)
+    {
+        string memory suppliedLiquidity = _divideByPowerOf10(_suppliedLiquidity, tokenDecimals, 3);
+        string memory sharePercent = _calculatePercentage(_suppliedLiquidity, _totalSuppliedLiquidity);
+        return
+            string(
+                abi.encodePacked(
+                    "[",
+                    '{ "trait_type": "Supplied Liquidity", "display_type": "number", "value": ',
+                    suppliedLiquidity,
+                    '},{ "trait_type": "Share Percentage", "value": "',
+                    sharePercent,
+                    '%"}]'
+                )
+            );
+    }
+
+    function getDescription(uint256 _suppliedLiquidity, uint256 _totalSuppliedLiquidity)
+        public
+        view
+        virtual
+        returns (string memory)
+    {
+        return
+            string(
+                abi.encodePacked(
+                    "This NFT represents your position as Liquidity Provider on Hyphen Bridge on ",
+                    getChainName(),
+                    ". To visit the bridge, visit [Hyphen](https://hyphen.biconomy.io)."
+                )
+            );
+    }
+
     /// @notice Return str(_value / _denom * 100)
     function _calculatePercentage(uint256 _num, uint256 _denom) internal pure returns (string memory) {
         return _divideByPowerOf10((_num * 10**(18 + 2)) / _denom, 18, 2);
@@ -112,4 +149,6 @@ abstract contract SvgHelperBase is Ownable {
         uint256 _suppliedLiquidity,
         uint256 _totalSuppliedLiquidity
     ) public view virtual returns (string memory);
+
+    function getChainName() public view virtual returns (string memory);
 }
