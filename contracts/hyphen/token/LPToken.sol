@@ -119,8 +119,20 @@ contract LPToken is
         address tokenAddress = tokenMetadata[tokenId].token;
         require(svgHelpers[tokenAddress] != ISvgHelper(address(0)), "ERR__SVG_HELPER_NOT_REGISTERED");
 
-        string memory svgData = svgHelpers[tokenAddress].getTokenSvg(
+        ISvgHelper svgHelper = ISvgHelper(svgHelpers[tokenAddress]);
+
+        string memory svgData = svgHelper.getTokenSvg(
             tokenId,
+            tokenMetadata[tokenId].suppliedLiquidity,
+            ILiquidityProviders(liquidityProvidersAddress).totalReserve(tokenAddress)
+        );
+
+        string memory description = svgHelper.getDescription(
+            tokenMetadata[tokenId].suppliedLiquidity,
+            ILiquidityProviders(liquidityProvidersAddress).totalReserve(tokenAddress)
+        );
+
+        string memory attributes = svgHelper.getAttributes(
             tokenMetadata[tokenId].suppliedLiquidity,
             ILiquidityProviders(liquidityProvidersAddress).totalReserve(tokenAddress)
         );
@@ -132,11 +144,12 @@ contract LPToken is
                         '{"name": "',
                         name(),
                         '", "description": "',
-                        // TODO: Check description and opensea attributes
-                        "",
+                        description,
                         '", "image": "data:image/svg+xml;base64,',
                         Base64.encode(bytes(svgData)),
-                        '"}'
+                        '", "attributes": ',
+                        attributes,
+                        "}"
                     )
                 )
             )
