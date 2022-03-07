@@ -114,7 +114,7 @@ abstract contract SvgHelperBase is Ownable {
             string(
                 abi.encodePacked(
                     "[",
-                    '{ "trait_type": "Supplied Liquidity", "value": ',
+                    '{ "trait_type": "Supplied Liquidity", "display_type": "number", "value": ',
                     suppliedLiquidity,
                     '},{ "trait_type": "Share Percentage", "value": "',
                     sharePercent,
@@ -134,7 +134,7 @@ abstract contract SvgHelperBase is Ownable {
                 abi.encodePacked(
                     "This NFT represents your position as Liquidity Provider on Hyphen Bridge on ",
                     getChainName(),
-                    '. To visit the bridge, visit [Hyphen](hyphen.biconomy.io,"Hyphen - Instant Cross Chain Transfers")'
+                    ". To visit the bridge, visit [Hyphen](https://hyphen.biconomy.io)."
                 )
             );
     }
