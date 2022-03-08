@@ -102,6 +102,16 @@ contract HyphenLiquidityFarming is
         emit LogRewardPoolInitialized(_baseToken, _rewardToken, _rewardPerSecond);
     }
 
+    function _sendErc20AndGetSentAmount(
+        IERC20Upgradeable _token,
+        uint256 _amount,
+        address _to
+    ) private returns (uint256) {
+        uint256 recepientBalance = _token.balanceOf(_to);
+        _token.safeTransfer(_to, _amount);
+        return _token.balanceOf(_to) - recepientBalance;
+    }
+
     /// @notice Update the reward state of a nft, and if possible send reward funds to _to.
     /// @param _nftId NFT ID that is being locked
     /// @param _to Address to which rewards will be credited.
@@ -114,6 +124,7 @@ contract HyphenLiquidityFarming is
 
         PoolInfo memory pool = updatePool(baseToken);
         uint256 pending;
+        uint256 amountSent;
         if (amount > 0) {
             pending = ((amount * pool.accTokenPerShare) / ACC_TOKEN_PRECISION) - nft.rewardDebt + nft.unpaidRewards;
             if (rewardTokens[baseToken] == NATIVE) {
@@ -124,10 +135,12 @@ contract HyphenLiquidityFarming is
                     }
                     (bool success, ) = _to.call{value: balance}("");
                     require(success, "ERR__NATIVE_TRANSFER_FAILED");
+                    amountSent = balance;
                 } else {
                     nft.unpaidRewards = 0;
                     (bool success, ) = _to.call{value: pending}("");
                     require(success, "ERR__NATIVE_TRANSFER_FAILED");
+                    amountSent = pending;
                 }
             } else {
                 IERC20Upgradeable rewardToken = IERC20Upgradeable(rewardTokens[baseToken]);
@@ -136,15 +149,15 @@ contract HyphenLiquidityFarming is
                     unchecked {
                         nft.unpaidRewards = pending - balance;
                     }
-                    rewardToken.safeTransfer(_to, balance);
+                    amountSent = _sendErc20AndGetSentAmount(rewardToken, balance, _to);
                 } else {
                     nft.unpaidRewards = 0;
-                    rewardToken.safeTransfer(_to, pending);
+                    amountSent = _sendErc20AndGetSentAmount(rewardToken, pending, _to);
                 }
             }
         }
         nft.rewardDebt = (amount * pool.accTokenPerShare) / ACC_TOKEN_PRECISION;
-        emit LogOnReward(_msgSender(), baseToken, pending - nft.unpaidRewards, _to);
+        emit LogOnReward(_msgSender(), baseToken, amountSent, _to);
     }
 
     /// @notice Sets the sushi per second to be distributed. Can only be called by the owner.
