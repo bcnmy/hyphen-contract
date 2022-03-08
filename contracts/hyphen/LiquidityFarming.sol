@@ -60,7 +60,6 @@ contract HyphenLiquidityFarming is
     mapping(address => uint256) public totalSharesStaked;
 
     uint256 private constant ACC_TOKEN_PRECISION = 1e12;
-    uint256 private constant ACC_SUSHI_PRECISION = 1e12;
     address internal constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     event LogDeposit(address indexed user, address indexed baseToken, uint256 nftId, address indexed to);
@@ -124,7 +123,9 @@ contract HyphenLiquidityFarming is
             if (rewardTokens[_baseToken] == NATIVE) {
                 uint256 balance = address(this).balance;
                 if (pending > balance) {
-                    user.unpaidRewards = pending - balance;
+                    unchecked {
+                        user.unpaidRewards = pending - balance;
+                    }
                     (bool success, ) = payable(_to).call{value: balance}("");
                     require(success, "ERR__NATIVE_TRANSFER_FAILED");
                 } else {
@@ -136,11 +137,13 @@ contract HyphenLiquidityFarming is
                 IERC20Upgradeable rewardToken = IERC20Upgradeable(rewardTokens[_baseToken]);
                 uint256 balance = rewardToken.balanceOf(address(this));
                 if (pending > balance) {
+                    unchecked {
+                        user.unpaidRewards = pending - balance;
+                    }
                     rewardToken.safeTransfer(_to, balance);
-                    user.unpaidRewards = pending - balance;
                 } else {
-                    rewardToken.safeTransfer(_to, pending);
                     user.unpaidRewards = 0;
+                    rewardToken.safeTransfer(_to, pending);
                 }
             }
         }
@@ -166,7 +169,8 @@ contract HyphenLiquidityFarming is
         address _token,
         uint256 _amount,
         address payable _to
-    ) public nonReentrant onlyOwner {
+    ) external nonReentrant onlyOwner {
+        require(_to != address(0), "ERR__TO_IS_ZERO");
         if (_token == NATIVE) {
             (bool success, ) = payable(_to).call{value: _amount}("");
             require(success, "ERR__NATIVE_TRANSFER_FAILED");
@@ -178,7 +182,7 @@ contract HyphenLiquidityFarming is
     /// @notice Deposit LP tokens
     /// @param _nftId LP token nftId to deposit.
     /// @param _to The receiver of `amount` deposit benefit.
-    function deposit(uint256 _nftId, address _to) public whenNotPaused nonReentrant {
+    function deposit(uint256 _nftId, address _to) external whenNotPaused nonReentrant {
         require(lpToken.isApprovedForAll(_msgSender(), address(this)), "ERR__NOT_APPROVED_FOR_ALL");
 
         (address baseToken, , uint256 amount) = lpToken.tokenMetadata(_nftId);
@@ -200,9 +204,9 @@ contract HyphenLiquidityFarming is
     /// @notice Withdraw LP tokens
     /// @param _nftId LP token nftId to withdraw.
     /// @param _to The receiver of `amount` withdraw benefit.
-    function withdraw(uint256 _nftId, address _to) public whenNotPaused nonReentrant {
+    function withdraw(uint256 _nftId, address _to) external whenNotPaused nonReentrant {
         uint256 index;
-        for (index = 0; index < nftIdsStaked[_msgSender()].length; index++) {
+        for (index = 0; index < nftIdsStaked[_msgSender()].length; ++index) {
             if (nftIdsStaked[_msgSender()][index] == _nftId) {
                 break;
             }
