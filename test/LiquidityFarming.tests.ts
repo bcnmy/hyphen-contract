@@ -12,7 +12,7 @@ import {
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BigNumber } from "ethers";
+import { BigNumber, Signer } from "ethers";
 
 import { getLocaleString } from "./utils";
 
@@ -615,6 +615,98 @@ describe("LiquidityFarmingTests", function () {
       await expect(() => farmingContract.connect(bob).withdraw(4, bob.address)).to.changeEtherBalances(
         [farmingContract, bob],
         [-expectedRewards[3], expectedRewards[3]]
+      );
+    });
+  });
+
+  describe("Reward Rate updation", async () => {
+    beforeEach(async () => {
+      await farmingContract.initalizeRewardPool(token.address, NATIVE, 10);
+      await farmingContract.initalizeRewardPool(token2.address, NATIVE, 15);
+
+      for (const signer of [owner, bob, charlie]) {
+        for (const tk of [token, token2]) {
+          await tk.connect(signer).approve(farmingContract.address, ethers.constants.MaxUint256);
+          await tk.connect(signer).approve(liquidityProviders.address, ethers.constants.MaxUint256);
+        }
+      }
+    });
+
+    it("Should not invalidate pending rewards on reward rate updation", async function () {
+      await liquidityProviders.addTokenLiquidity(token.address, 10);
+      await liquidityProviders.connect(bob).addTokenLiquidity(token.address, 10);
+      await liquidityProviders.connect(charlie).addTokenLiquidity(token.address, 20);
+
+      await lpToken.approve(farmingContract.address, 1);
+      await lpToken.connect(bob).approve(farmingContract.address, 2);
+      await lpToken.connect(charlie).approve(farmingContract.address, 3);
+
+      let rewardOwner = 0,
+        rewardBob = 0,
+        rewardCharlie = 0;
+
+      await owner.sendTransaction({ to: farmingContract.address, value: ethers.BigNumber.from(10).pow(18) });
+
+      await farmingContract.deposit(1, owner.address);
+      await advanceTime(100);
+      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 10 * 100));
+      await farmingContract.setRewardPerSecond(token.address, 20);
+      await advanceTime(100);
+      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 10 * 1 + 20 * 100));
+      await farmingContract.setRewardPerSecond(token.address, 16);
+      await advanceTime(100);
+      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 20 * 1 + 16 * 100));
+
+      await farmingContract.connect(bob).deposit(2, bob.address);
+      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 16));
+      expect(await farmingContract.pendingToken(2)).to.equal(rewardBob);
+      await advanceTime(150);
+      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += (16 * 150) / 2));
+      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += (16 * 150) / 2));
+      await farmingContract.setRewardPerSecond(token.address, 0);
+      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 16 / 2));
+      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += 16 / 2));
+      await advanceTime(1000);
+      expect(await farmingContract.pendingToken(1)).to.equal(rewardOwner);
+      expect(await farmingContract.pendingToken(2)).to.equal(rewardBob);
+      await farmingContract.setRewardPerSecond(token.address, 100);
+      expect(await farmingContract.pendingToken(1)).to.equal(rewardOwner);
+      expect(await farmingContract.pendingToken(2)).to.equal(rewardBob);
+      await advanceTime(500);
+      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += (100 * 500) / 2));
+      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += (100 * 500) / 2));
+
+      await farmingContract.connect(charlie).deposit(3, charlie.address);
+      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 100 / 2));
+      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += 100 / 2));
+      expect(await farmingContract.pendingToken(3)).to.equal(rewardCharlie);
+      await advanceTime(500);
+      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += (100 * 500) / 4));
+      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += (100 * 500) / 4));
+      expect(await farmingContract.pendingToken(3)).to.equal((rewardCharlie += (100 * 500) / 2));
+      await farmingContract.setRewardPerSecond(token.address, 600);
+      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 100 / 4));
+      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += 100 / 4));
+      expect(await farmingContract.pendingToken(3)).to.equal((rewardCharlie += 100 / 2));
+      await advanceTime(600);
+      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += (600 * 600) / 4));
+      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += (600 * 600) / 4));
+      expect(await farmingContract.pendingToken(3)).to.equal((rewardCharlie += (600 * 600) / 2));
+
+      await expect(() => farmingContract.withdraw(1, owner.address)).to.changeEtherBalances(
+        [farmingContract, owner],
+        [-(rewardOwner + 600 / 4), rewardOwner + 600 / 4]
+      );
+      rewardBob += 600 / 4;
+      rewardCharlie += 600 / 2;
+      await expect(() => farmingContract.connect(bob).withdraw(2, bob.address)).to.changeEtherBalances(
+        [farmingContract, bob],
+        [-(rewardBob + 600 / 3), rewardBob + 600 / 3]
+      );
+      rewardCharlie += (600 * 2) / 3;
+      await expect(() => farmingContract.connect(charlie).withdraw(3, charlie.address)).to.changeEtherBalances(
+        [farmingContract, charlie],
+        [-(rewardCharlie + 600), rewardCharlie + 600]
       );
     });
   });

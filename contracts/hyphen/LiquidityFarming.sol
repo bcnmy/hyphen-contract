@@ -26,9 +26,6 @@ contract HyphenLiquidityFarming is
     ILPToken public lpToken;
     ILiquidityProviders public liquidityProviders;
 
-    /// @notice Info of each Rewarder user.
-    /// `amount` LP token amount the user has provided.
-    /// `rewardDebt` The amount of Reward Token entitled to the nft staker.
     struct NFTInfo {
         address payable staker;
         uint256 rewardDebt;
@@ -36,10 +33,14 @@ contract HyphenLiquidityFarming is
         bool isStaked;
     }
 
-    /// @notice Info of the rewarder pool
     struct PoolInfo {
         uint256 accTokenPerShare;
         uint256 lastRewardTime;
+    }
+
+    struct RewardsPerSecondEntry {
+        uint256 rewardsPerSecond;
+        uint256 timestamp;
     }
 
     /// @notice Mapping to track the rewarder pool.
@@ -49,7 +50,7 @@ contract HyphenLiquidityFarming is
     mapping(uint256 => NFTInfo) public nftInfo;
 
     /// @notice Reward rate per base token
-    mapping(address => uint256) public rewardPerSecond;
+    //mapping(address => uint256) public rewardPerSecond;
 
     /// @notice Reward Token
     mapping(address => address) public rewardTokens;
@@ -59,6 +60,9 @@ contract HyphenLiquidityFarming is
 
     /// @notice Token => Total Shares Staked
     mapping(address => uint256) public totalSharesStaked;
+
+    /// @notice Token => Reward Rate Updation history
+    mapping(address => RewardsPerSecondEntry[]) public rewardRateLog;
 
     uint256 private constant ACC_TOKEN_PRECISION = 1e12;
     address internal constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
@@ -98,7 +102,7 @@ contract HyphenLiquidityFarming is
         require(_baseToken != address(0), "ERR__BASE_TOKEN_IS_ZERO");
         require(_rewardToken != address(0), "ERR_REWARD_TOKEN_IS_ZERO");
         rewardTokens[_baseToken] = _rewardToken;
-        rewardPerSecond[_baseToken] = _rewardPerSecond;
+        rewardRateLog[_baseToken].push(RewardsPerSecondEntry(_rewardPerSecond, block.timestamp));
         emit LogRewardPoolInitialized(_baseToken, _rewardToken, _rewardPerSecond);
     }
 
@@ -163,7 +167,7 @@ contract HyphenLiquidityFarming is
     /// @notice Sets the sushi per second to be distributed. Can only be called by the owner.
     /// @param _rewardPerSecond The amount of Sushi to be distributed per second.
     function setRewardPerSecond(address _baseToken, uint256 _rewardPerSecond) public onlyOwner {
-        rewardPerSecond[_baseToken] = _rewardPerSecond;
+        rewardRateLog[_baseToken].push(RewardsPerSecondEntry(_rewardPerSecond, block.timestamp));
         emit LogRewardPerSecond(_baseToken, _rewardPerSecond);
     }
 
@@ -192,13 +196,16 @@ contract HyphenLiquidityFarming is
     function deposit(uint256 _nftId, address payable _to) external whenNotPaused nonReentrant {
         address msgSender = _msgSender();
 
-        require(lpToken.isApprovedForAll(msgSender, address(this)), "ERR__NOT_APPROVED_FOR_ALL");
+        require(
+            lpToken.isApprovedForAll(msgSender, address(this)) || lpToken.getApproved(_nftId) == address(this),
+            "ERR__NOT_APPROVED"
+        );
 
         (address baseToken, , uint256 amount) = lpToken.tokenMetadata(_nftId);
         amount /= liquidityProviders.BASE_DIVISOR();
 
         require(rewardTokens[baseToken] != address(0), "ERR__POOL_NOT_INITIALIZED");
-        require(rewardPerSecond[baseToken] != 0, "ERR__POOL_NOT_INITIALIZED");
+        require(rewardRateLog[baseToken].length != 0, "ERR__POOL_NOT_INITIALIZED");
 
         NFTInfo storage nft = nftInfo[_nftId];
         require(!nft.isStaked, "ERR__NFT_ALREADY_STAKED");
@@ -252,6 +259,30 @@ contract HyphenLiquidityFarming is
         _sendRewardsForNft(_nftId, _to);
     }
 
+    function getUpdatedAccTokenPerShare(address _baseToken) public view returns (uint256) {
+        uint256 accumulator = 0;
+        uint256 lastUpdatedTime = poolInfo[_baseToken].lastRewardTime;
+        uint256 counter = block.timestamp;
+        uint256 i = rewardRateLog[_baseToken].length - 1;
+        while (true) {
+            if (lastUpdatedTime >= counter) {
+                break;
+            }
+            unchecked {
+                accumulator +=
+                    rewardRateLog[_baseToken][i].rewardsPerSecond *
+                    (counter - max(lastUpdatedTime, rewardRateLog[_baseToken][i].timestamp));
+            }
+            counter = rewardRateLog[_baseToken][i].timestamp;
+            if (i == 0) {
+                break;
+            }
+            --i;
+        }
+        accumulator = (accumulator * ACC_TOKEN_PRECISION) / totalSharesStaked[_baseToken];
+        return accumulator + poolInfo[_baseToken].accTokenPerShare;
+    }
+
     /// @notice View function to see pending Token
     /// @param _nftId NFT for which pending tokens are to be viewed
     /// @return pending SUSHI reward for a given user.
@@ -267,9 +298,7 @@ contract HyphenLiquidityFarming is
         PoolInfo memory pool = poolInfo[baseToken];
         uint256 accToken1PerShare = pool.accTokenPerShare;
         if (block.timestamp > pool.lastRewardTime && totalSharesStaked[baseToken] != 0) {
-            uint256 time = block.timestamp - pool.lastRewardTime;
-            uint256 sushiReward = time * rewardPerSecond[baseToken];
-            accToken1PerShare = accToken1PerShare + (sushiReward * ACC_TOKEN_PRECISION) / totalSharesStaked[baseToken];
+            accToken1PerShare = getUpdatedAccTokenPerShare(baseToken);
         }
         return ((amount * accToken1PerShare) / ACC_TOKEN_PRECISION) - nft.rewardDebt + nft.unpaidRewards;
     }
@@ -280,11 +309,7 @@ contract HyphenLiquidityFarming is
         pool = poolInfo[_baseToken];
         if (block.timestamp > pool.lastRewardTime) {
             if (totalSharesStaked[_baseToken] > 0) {
-                uint256 time = block.timestamp - pool.lastRewardTime;
-                uint256 sushiReward = time * rewardPerSecond[_baseToken];
-                pool.accTokenPerShare =
-                    pool.accTokenPerShare +
-                    ((sushiReward * (ACC_TOKEN_PRECISION)) / totalSharesStaked[_baseToken]);
+                pool.accTokenPerShare = getUpdatedAccTokenPerShare(_baseToken);
             }
             pool.lastRewardTime = block.timestamp;
             poolInfo[_baseToken] = pool;
@@ -329,5 +354,9 @@ contract HyphenLiquidityFarming is
 
     receive() external payable {
         emit LogNativeReceived(_msgSender(), msg.value);
+    }
+
+    function max(uint256 _a, uint256 _b) private pure returns (uint256) {
+        return _a >= _b ? _a : _b;
     }
 }
