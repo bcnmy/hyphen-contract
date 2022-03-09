@@ -364,13 +364,13 @@ describe("LiquidityFarmingTests", function () {
       const expectedRewards = [
         Math.floor(
           100 * 10 +
-          time1 * 10 +
-          300 * 10 +
-          time2 * 10 +
-          (500 * 10) / 7 +
-          (time3 * 10) / 7 +
-          (900 * 10) / 7 +
-          (3 * 10) / 7
+            time1 * 10 +
+            300 * 10 +
+            time2 * 10 +
+            (500 * 10) / 7 +
+            (time3 * 10) / 7 +
+            (900 * 10) / 7 +
+            (3 * 10) / 7
         ),
         Math.floor(15 * (300 + time2 + 500 + time3 + 900 / 7) + (4 * 15) / 7),
         Math.floor((500 * 6 * 10) / 7 + (time3 * 6 * 10) / 7 + (900 * 6 * 10) / 7 + (5 * 6 * 10) / 7),
@@ -467,17 +467,17 @@ describe("LiquidityFarmingTests", function () {
       const expectedRewards = [
         Math.floor(
           100 * 10 +
-          time1 * 10 +
-          300 * 10 +
-          time2 * 10 +
-          (500 * 10) / 7 +
-          (time3 * 10) / 7 +
-          (900 * 10) / 7 +
-          (3 * 10) / 7
+            time1 * 10 +
+            300 * 10 +
+            time2 * 10 +
+            (500 * 10) / 7 +
+            (time3 * 10) / 7 +
+            (900 * 10) / 7 +
+            (3 * 10) / 7
         ),
         Math.floor(15 * (300 + time2 + 500 + time3 + 900 / 7) + (4 * 15) / 7),
         Math.floor((500 * 6 * 10 + time3 * 6 * 10 + 900 * 6 * 10 + 3 * 6 * 10 + 2 * 7 * 10) / 7),
-        Math.floor(15 * ((900 * 6) / 7) + (4 * 15 * 6) / 7 + (2 * 15)),
+        Math.floor(15 * ((900 * 6) / 7) + (4 * 15 * 6) / 7 + 2 * 15),
       ];
 
       await token.transfer(farmingContract.address, ethers.BigNumber.from(10).pow(18));
@@ -573,33 +573,20 @@ describe("LiquidityFarmingTests", function () {
 
       await farmingContract.deposit(1, owner.address);
       await advanceTime(100);
-      const time1 = await getElapsedTime(async () => {
-        await farmingContract.deposit(2, owner.address);
-      });
+      await farmingContract.deposit(2, owner.address);
       await advanceTime(300);
-      const time2 = await getElapsedTime(async () => {
-        await farmingContract.connect(bob).deposit(3, bob.address);
-      });
+      await farmingContract.connect(bob).deposit(3, bob.address);
       await advanceTime(500);
-      const time3 = await getElapsedTime(async () => {
-        await farmingContract.connect(bob).deposit(4, bob.address);
-      });
+      await farmingContract.connect(bob).deposit(4, bob.address);
       await advanceTime(900);
 
       const expectedRewards = [
         Math.floor(
-          100 * 10 +
-          time1 * 10 +
-          300 * 10 +
-          time2 * 10 +
-          (500 * 10) / 7 +
-          (time3 * 10) / 7 +
-          (900 * 10) / 7 +
-          (2 * 10) / 7
+          100 * 10 + 1 * 10 + 300 * 10 + 1 * 10 + (500 * 10) / 7 + (1 * 10) / 7 + (900 * 10) / 7 + (2 * 10) / 7
         ),
-        Math.floor(15 * (300 + time2 + 500 + time3 + 900 / 7) + (4 * 15) / 7),
-        Math.floor((500 * 6 * 10) / 7 + (time3 * 6 * 10) / 7 + (900 * 6 * 10) / 7 + (4 * 6 * 10) / 7),
-        Math.floor(15 * ((900 * 6) / 7) + (4 * 15 * 6) / 7),
+        Math.floor(15 * (300 + 1 + 500 + 1 + (900 + 3) / 7)),
+        Math.floor((500 * 6 * 10 + 1 * 6 * 10 + 900 * 6 * 10 + 2 * 6 * 10 + 2 * 7 * 10) / 7),
+        Math.floor(15 * ((900 * 6) / 7) + (3 * 15 * 6) / 7 + 2 * 15),
       ];
 
       await owner.sendTransaction({
