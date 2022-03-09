@@ -214,7 +214,9 @@ contract LiquidityProviders is
         if(nftSuppliedLiquidity > eligibleLiquidity) {
             lpFeeAccumulated = 0;
         } else {
-            lpFeeAccumulated = eligibleLiquidity - nftSuppliedLiquidity;
+            unchecked {
+                lpFeeAccumulated = eligibleLiquidity - nftSuppliedLiquidity;
+            }
         }
         return lpFeeAccumulated;
     }
@@ -359,11 +361,14 @@ contract LiquidityProviders is
         uint256 eligibleLiquidity = sharesToTokenAmount(totalNFTShares, _tokenAddress);
         
         uint256 lpFeeAccumulated;
+
         // Handle edge cases where eligibleLiquidity is less than what was supplied by very small amount 
         if(nftSuppliedLiquidity > eligibleLiquidity) {
             lpFeeAccumulated = 0;
         } else {
-            lpFeeAccumulated = eligibleLiquidity - nftSuppliedLiquidity;
+            unchecked {
+                lpFeeAccumulated = eligibleLiquidity - nftSuppliedLiquidity;
+            }
         }
         // Calculate amount of lp shares that represent accumulated Fee
         uint256 lpSharesRepresentingFee = lpFeeAccumulated * getTokenPriceInLPShares(_tokenAddress);
