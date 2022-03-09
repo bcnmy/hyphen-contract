@@ -329,6 +329,10 @@ contract HyphenLiquidityFarming is
         nftIds = nftIdsStaked[_user];
     }
 
+    function getRewardRatePerSecond(address _baseToken) public view returns (uint256) {
+        return rewardRateLog[_baseToken][rewardRateLog[_baseToken].length - 1].rewardsPerSecond;
+    }
+
     function onERC721Received(
         address,
         address,
