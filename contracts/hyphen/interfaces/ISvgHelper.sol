@@ -10,6 +10,18 @@ interface ISvgHelper {
         uint256 _totalSuppliedLiquidity
     ) external view returns (string memory);
 
+    function getAttributes(uint256 _suppliedLiquidity, uint256 _totalSuppliedLiquidity)
+        external
+        view
+        returns (string memory);
+
+    function getDescription(uint256 _suppliedLiquidity, uint256 _totalSuppliedLiquidity)
+        external
+        view
+        returns (string memory);
+
+    function getChainName() external view returns (string memory);
+
     function owner() external view returns (address);
 
     function renounceOwnership() external;
