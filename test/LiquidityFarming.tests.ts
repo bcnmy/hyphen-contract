@@ -239,6 +239,14 @@ describe("LiquidityFarmingTests", function () {
       }
     });
 
+    it("Should prevent others from claiming rewards", async function () {
+      await liquidityProviders.addTokenLiquidity(token.address, 10);
+      await farmingContract.deposit(1, owner.address);
+      await advanceTime(100);
+      expect((await farmingContract.pendingToken(1)).toNumber()).to.be.greaterThan(0);
+      await expect(farmingContract.connect(bob).extractRewards(1, bob.address)).to.be.revertedWith("ERR__NOT_OWNER");
+    });
+
     it("Should be able to calculate correct rewards correctly", async function () {
       await liquidityProviders.addTokenLiquidity(token.address, 10);
       await liquidityProviders.addTokenLiquidity(token2.address, 10);
@@ -470,7 +478,7 @@ describe("LiquidityFarmingTests", function () {
             (3 * 10) / 7
         ),
         Math.floor(15 * (300 + time2 + 500 + time3 + 900 / 7) + (4 * 15) / 7),
-        Math.floor((500 * 6 * 10) / 7 + (time3 * 6 * 10) / 7 + (900 * 6 * 10) / 7 + (5 * 6 * 10) / 7),
+        Math.floor((500 * 6 * 10 + time3 * 6 * 10 + 900 * 6 * 10 + 5 * 6 * 10) / 7),
         Math.floor(15 * ((900 * 6) / 7) + (5 * 15 * 6) / 7),
       ];
 
