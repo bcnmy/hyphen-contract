@@ -43,8 +43,8 @@ describe("LiquidityFarmingTests", function () {
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   let BASE: BigNumber = BigNumber.from(10).pow(18);
 
-  const perWalletMaxCap = getLocaleString(1000 * 1e18);
-  const tokenMaxCap = getLocaleString(1000000 * 1e18);
+  const perWalletMaxCap = 70;
+  const tokenMaxCap = 70;
 
   const perWalletNativeMaxCap = getLocaleString(1 * 1e18);
   const tokenNativeMaxCap = getLocaleString(200 * 1e18);
@@ -100,11 +100,11 @@ describe("LiquidityFarmingTests", function () {
     await liquidityProviders.setWhiteListPeriodManager(wlpm.address);
     await lpToken.setWhiteListPeriodManager(wlpm.address);
     await wlpm.setCaps(
-      [token.address, NATIVE],
-      [tokenMaxCap, tokenNativeMaxCap],
-      [perWalletMaxCap, perWalletNativeMaxCap]
+      [token.address, token2.address, NATIVE],
+      [tokenMaxCap, tokenMaxCap, tokenNativeMaxCap],
+      [perWalletMaxCap, perWalletMaxCap, perWalletNativeMaxCap]
     );
-    await wlpm.setAreWhiteListRestrictionsEnabled(false);
+    await wlpm.setAreWhiteListRestrictionsEnabled(true);
 
     const lpFactory = await ethers.getContractFactory("LiquidityPool");
     liquidityPool = (await upgrades.deployProxy(lpFactory, [
@@ -123,6 +123,7 @@ describe("LiquidityFarmingTests", function () {
       liquidityProviders.address,
       lpToken.address,
     ])) as HyphenLiquidityFarming;
+    await wlpm.setIsExcludedAddressStatus([farmingContract.address], [true]);
   });
 
   it("Should be able to create reward pools", async function () {
@@ -693,20 +694,27 @@ describe("LiquidityFarmingTests", function () {
       expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += (600 * 600) / 4));
       expect(await farmingContract.pendingToken(3)).to.equal((rewardCharlie += (600 * 600) / 2));
 
-      await expect(() => farmingContract.withdraw(1, owner.address)).to.changeEtherBalances(
+      await expect(() => farmingContract.extractRewards(1, owner.address)).to.changeEtherBalances(
         [farmingContract, owner],
         [-(rewardOwner + 600 / 4), rewardOwner + 600 / 4]
       );
+      rewardOwner = 0;
       rewardBob += 600 / 4;
       rewardCharlie += 600 / 2;
       await expect(() => farmingContract.connect(bob).withdraw(2, bob.address)).to.changeEtherBalances(
         [farmingContract, bob],
-        [-(rewardBob + 600 / 3), rewardBob + 600 / 3]
+        [-(rewardBob + 600 / 4), rewardBob + 600 / 4]
       );
-      rewardCharlie += (600 * 2) / 3;
+      rewardOwner += 600 / 4;
+      rewardCharlie += (600 * 2) / 4;
       await expect(() => farmingContract.connect(charlie).withdraw(3, charlie.address)).to.changeEtherBalances(
         [farmingContract, charlie],
-        [-(rewardCharlie + 600), rewardCharlie + 600]
+        [-(rewardCharlie + (600 * 2) / 3), rewardCharlie + (600 * 2) / 3]
+      );
+      rewardOwner += 600 / 3;
+      await expect(() => farmingContract.extractRewards(1, owner.address)).to.changeEtherBalances(
+        [farmingContract, owner],
+        [-(rewardOwner + 600), rewardOwner + 600]
       );
     });
   });

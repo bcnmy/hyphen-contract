@@ -259,6 +259,8 @@ contract HyphenLiquidityFarming is
         _sendRewardsForNft(_nftId, _to);
     }
 
+    /// @notice Calculates an up to date value of accTokenPerShare
+    /// @notice An updated value of accTokenPerShare is comitted to storage every time a new NFT is deposited, withdrawn or rewards are extracted
     function getUpdatedAccTokenPerShare(address _baseToken) public view returns (uint256) {
         uint256 accumulator = 0;
         uint256 lastUpdatedTime = poolInfo[_baseToken].lastRewardTime;
@@ -279,13 +281,17 @@ contract HyphenLiquidityFarming is
             }
             --i;
         }
+
+        // We know that during all the periods that were included in the current iterations,
+        // the value of totalSharesStaked[_baseToken] would not have changed, as we only consider the
+        // updates to the pool that happened after the lastUpdatedTime.
         accumulator = (accumulator * ACC_TOKEN_PRECISION) / totalSharesStaked[_baseToken];
         return accumulator + poolInfo[_baseToken].accTokenPerShare;
     }
 
     /// @notice View function to see pending Token
     /// @param _nftId NFT for which pending tokens are to be viewed
-    /// @return pending SUSHI reward for a given user.
+    /// @return pending reward for a given user.
     function pendingToken(uint256 _nftId) external view returns (uint256) {
         NFTInfo storage nft = nftInfo[_nftId];
         if (!nft.isStaked) {
