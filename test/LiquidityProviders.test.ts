@@ -37,6 +37,13 @@ describe("LiquidityProviderTests", function () {
   let tokenManager: TokenManager;
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
+  let tag: string = "HyphenUI";
+  let equilibriumFee = 10000000;
+  let maxFee = 200000000;
+  const minTokenCap = getLocaleString(1 * 1e18);
+  const maxTokenCap = getLocaleString(100000000 * 1e18);
+  const dummyDepositHash = "0xf408509b00caba5d37325ab33a92f6185c9b5f007a965dfbeff7b81ab1ec871a";
+
   let BASE: BigNumber = BigNumber.from(10).pow(18);
 
   const perWalletMaxCap = getLocaleString(1000 * 1e18);
@@ -86,6 +93,28 @@ describe("LiquidityProviderTests", function () {
     expect(newMetadata.shares.sub(metadataBefore.shares)).to.equal(lpShareDelta);
   };
 
+  async function depositERC20Token(tokenAddress: string, tokenValue: string, receiver: string, toChainId: number) {
+    await token.approve(liquidityPool.address, tokenValue);
+    return await liquidityPool.connect(owner).depositErc20(
+      toChainId,
+      tokenAddress,
+      receiver,
+      tokenValue,
+      tag
+    );
+  }
+
+  async function sendFundsToUser(tokenAddress: string, amount: string, receiver: string, tokenGasPrice: string) {
+    return await liquidityPool.connect(executor).sendFundsToUser(
+        tokenAddress,
+        amount,
+        receiver,
+        dummyDepositHash,
+        tokenGasPrice,
+        137
+    );
+}
+
   beforeEach(async function () {
     [owner, pauser, charlie, bob, tf, , executor] = await ethers.getSigners();
 
@@ -99,12 +128,25 @@ describe("LiquidityProviderTests", function () {
       await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
       await token2.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
     }
-    await tokenManager.addSupportedToken(token.address, BigNumber.from(1), BigNumber.from(10).pow(30), 0, 0);
-    await tokenManager.addSupportedToken(token2.address, BigNumber.from(1), BigNumber.from(10).pow(30), 0, 0);
-    await tokenManager.addSupportedToken(NATIVE, BigNumber.from(1), BigNumber.from(10).pow(30), 0, 0);
+    await tokenManager.addSupportedToken(token.address, BigNumber.from(1), BigNumber.from(10).pow(30), equilibriumFee, maxFee);
+    await tokenManager.addSupportedToken(token2.address, BigNumber.from(1), BigNumber.from(10).pow(30), equilibriumFee, maxFee);
+    await tokenManager.addSupportedToken(NATIVE, BigNumber.from(1), BigNumber.from(10).pow(30), equilibriumFee, maxFee);
+
+
+    let tokenDepositConfig = {
+      min: minTokenCap,
+      max: maxTokenCap
+  }
+  await tokenManager.connect(owner).setDepositConfig(
+      [1],
+      [token.address],
+      [tokenDepositConfig]
+  );
 
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
     executorManager = await executorManagerFactory.deploy();
+
+    await executorManager.addExecutor(executor.address);
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
     lpToken = (await upgrades.deployProxy(lpTokenFactory, ["LPToken", "LPToken", tf.address, pauser.address])) as LPToken;
@@ -283,6 +325,30 @@ describe("LiquidityProviderTests", function () {
       );
     });
   });
+
+  describe("Liquidity Removal", async function () {
+    this.beforeEach(async () => {
+      for (const tk of [token, token2]) {
+        for (const signer of [owner, bob, charlie]) {
+          await tk.connect(signer).approve(liquidityProviders.address, await tk.balanceOf(signer.address));
+        }
+      }
+    });
+
+    it("Should be able to remove liquidity just after addition", async function () {
+      await liquidityProviders.addTokenLiquidity(token.address, "100000000000000000000");
+      await liquidityProviders.connect(charlie).addTokenLiquidity(token.address, "400000000000000000000");
+
+      await depositERC20Token(token.address, "50000000000000000000", charlie.address, 1);
+
+      await sendFundsToUser(token.address, "200000000000000000000", charlie.address, "5000");
+
+      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, "909000000000000000000")).to.not.be.reverted;
+
+      await expect(liquidityProviders.connect(bob).removeLiquidity(3, "909000000000000000000")).to.not.be.reverted;
+
+    })
+  })
 
   describe("Transfer Fee Addition and LP Share Price Increase", async function () {
     this.beforeEach(async () => {

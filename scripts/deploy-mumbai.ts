@@ -16,14 +16,14 @@ import { deploy } from "./helpers";
             chainId: 43113,
             minCap: ethers.BigNumber.from(10).pow(18 + 2),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: ethers.BigNumber.from(9).mul(ethers.BigNumber.from(10).pow(18 + 3))
+            maxCap: ethers.BigNumber.from(9).mul(ethers.BigNumber.from(10).pow(18 + 3)),
           },
           {
             chainId: 5,
             minCap: ethers.BigNumber.from(10).pow(18 + 2),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: ethers.BigNumber.from(9).mul(ethers.BigNumber.from(10).pow(18 + 3))
-          }
+            maxCap: ethers.BigNumber.from(9).mul(ethers.BigNumber.from(10).pow(18 + 3)),
+          },
         ],
         equilibriumFee: 10000000,
         maxFee: 200000000,
@@ -33,7 +33,7 @@ import { deploy } from "./helpers";
         decimals: 18,
       },
       {
-        tokenAddress: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+        tokenAddress: "0xa6fa4fb5f76172d178d61b04b0ecd319c5d1c0aa",
         minCap: ethers.BigNumber.from(10).pow(18 - 2),
         maxCap: ethers.BigNumber.from(10).pow(18 + 2),
         toChainIds: [
@@ -41,14 +41,14 @@ import { deploy } from "./helpers";
             chainId: 43113,
             minCap: ethers.BigNumber.from(10).pow(18 - 2),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: ethers.BigNumber.from(97).mul(ethers.BigNumber.from(10).pow(18))
+            maxCap: ethers.BigNumber.from(97).mul(ethers.BigNumber.from(10).pow(18)),
           },
           {
             chainId: 5,
             minCap: ethers.BigNumber.from(10).pow(18 - 2),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: ethers.BigNumber.from(97).mul(ethers.BigNumber.from(10).pow(18))
-          }
+            maxCap: ethers.BigNumber.from(97).mul(ethers.BigNumber.from(10).pow(18)),
+          },
         ],
         equilibriumFee: 10000000,
         maxFee: 200000000,
@@ -66,8 +66,8 @@ import { deploy } from "./helpers";
             chainId: 5,
             minCap: ethers.BigNumber.from(10).pow(6 + 2),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: ethers.BigNumber.from(9).mul(ethers.BigNumber.from(10).pow(6 + 3))
-          }
+            maxCap: ethers.BigNumber.from(9).mul(ethers.BigNumber.from(10).pow(6 + 3)),
+          },
         ],
         equilibriumFee: 10000000,
         maxFee: 200000000,
@@ -75,7 +75,7 @@ import { deploy } from "./helpers";
         maxLiquidityCap: ethers.BigNumber.from(10).pow(6 + 5),
         svgHelper: await ethers.getContractFactory("PolygonUSDC"),
         decimals: 6,
-      }
+      },
     ],
   };
   await deploy(config);

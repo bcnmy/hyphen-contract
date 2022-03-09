@@ -29,4 +29,8 @@ contract PolygonETH is SvgHelperBase {
                 )
             );
     }
+
+    function getChainName() public pure override returns (string memory) {
+        return "Polygon";
+    }
 }

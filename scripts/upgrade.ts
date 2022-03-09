@@ -19,3 +19,8 @@ export async function upgradeWhiteListPeriodManager(proxyAddress: string) {
   await upgrades.upgradeProxy(proxyAddress, await ethers.getContractFactory("WhitelistPeriodManager"));
   console.log("WhitelistPeriodManager Upgraded");
 }
+
+export async function upgradeLiquidityFarming(proxyAddress: string) {
+  await upgrades.upgradeProxy(proxyAddress, await ethers.getContractFactory("HyphenLiquidityFarming"));
+  console.log("LiquidityFarming Upgraded");
+}

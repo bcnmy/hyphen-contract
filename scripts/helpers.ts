@@ -19,7 +19,7 @@ interface IAddTokenParameters {
   tokenAddress: string;
   minCap: BigNumberish;
   maxCap: BigNumberish;
-  toChainIds: {chainId: number, minCap: BigNumberish, maxCap: BigNumberish}[];
+  toChainIds: { chainId: number; minCap: BigNumberish; maxCap: BigNumberish }[];
   equilibriumFee: BigNumberish;
   maxFee: BigNumberish;
   maxWalletLiquidityCap: BigNumberish;
@@ -54,8 +54,6 @@ const deploy = async (deployConfig: {
       deployConfig.bicoOwner
     );
   }
-  await configure(contracts, deployConfig.bicoOwner);
-  await verify(contracts, deployConfig);
 
   console.log(
     "Deployed contracts:",
@@ -74,6 +72,9 @@ const deploy = async (deployConfig: {
       2
     )
   );
+
+  await configure(contracts, deployConfig.bicoOwner);
+  await verify(contracts, deployConfig);
 };
 
 async function deployCoreContracts(trustedForwarder: string, pauser: string): Promise<IContracts> {
@@ -210,7 +211,7 @@ const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters
 
   let chainIdArray = [];
   let minMaxArray = [];
-  for(let index=0; index<token.toChainIds.length; index++) {
+  for (let index = 0; index < token.toChainIds.length; index++) {
     let entry = token.toChainIds[index];
     chainIdArray.push(entry.chainId);
     minMaxArray.push({ min: entry.minCap, max: entry.maxCap });
