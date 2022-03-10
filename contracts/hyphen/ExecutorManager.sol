@@ -23,9 +23,10 @@ contract ExecutorManager is IExecutorManager, Ownable {
         return executors.contains(executor);
     }
 
-    function getAllExecutors() public view override returns (address[] memory) {
-        address[] memory result = new address[](executors.length());
-        for (uint256 i = 0; i < executors.length(); ) {
+    function getAllExecutors() external view override returns (address[] memory) {
+        uint256 length = executors.length();
+        address[] memory result = new address[](length);
+        for (uint256 i; i < length; ) {
             result[i] = executors.at(i);
             unchecked {
                 ++i;
@@ -36,7 +37,8 @@ contract ExecutorManager is IExecutorManager, Ownable {
 
     //Register new Executors
     function addExecutors(address[] calldata executorArray) external override onlyOwner {
-        for (uint256 i = 0; i < executorArray.length; ) {
+        uint256 length = executorArray.length;
+        for (uint256 i; i < length; ) {
             addExecutor(executorArray[i]);
             unchecked {
                 ++i;
@@ -54,7 +56,8 @@ contract ExecutorManager is IExecutorManager, Ownable {
 
     //Remove registered Executors
     function removeExecutors(address[] calldata executorArray) external override onlyOwner {
-        for (uint256 i = 0; i < executorArray.length; ) {
+        uint256 length = executorArray.length;
+        for (uint256 i; i < length; ) {
             removeExecutor(executorArray[i]);
             unchecked {
                 ++i;

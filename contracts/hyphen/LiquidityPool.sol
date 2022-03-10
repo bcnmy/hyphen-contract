@@ -70,6 +70,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
     event GasFeeWithdraw(address indexed tokenAddress, address indexed owner, uint256 indexed amount);
     event TrustedForwarderChanged(address indexed forwarderAddress);
     event LiquidityProvidersChanged(address indexed liquidityProvidersAddress);
+    event TokenManagerChanged(address indexed tokenManagerAddress);
     event EthReceived(address, uint256);
 
     // MODIFIERS
@@ -109,23 +110,29 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         baseGas = 21000;
     }
 
-    function setTrustedForwarder(address trustedForwarder) public onlyOwner {
+    function setTrustedForwarder(address trustedForwarder) external onlyOwner {
         require(trustedForwarder != address(0), "TrustedForwarder can't be 0");
         _trustedForwarder = trustedForwarder;
         emit TrustedForwarderChanged(trustedForwarder);
     }
 
-    function setLiquidityProviders(address _liquidityProviders) public onlyOwner {
+    function setLiquidityProviders(address _liquidityProviders) external onlyOwner {
         require(_liquidityProviders != address(0), "LiquidityProviders can't be 0");
         liquidityProviders = ILiquidityProviders(_liquidityProviders);
         emit LiquidityProvidersChanged(_liquidityProviders);
+    }
+
+    function setTokenManager(address _tokenManager) external onlyOwner {
+        require(_tokenManager != address(0), "TokenManager can't be 0");
+        tokenManager = ITokenManager(_tokenManager);
+        emit TokenManagerChanged(_tokenManager);
     }
 
     function setBaseGas(uint128 gas) external onlyOwner {
         baseGas = gas;
     }
 
-    function getExecutorManager() public view returns (address) {
+    function getExecutorManager() external view returns (address) {
         return address(executorManager);
     }
 
@@ -156,7 +163,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         address tokenAddress,
         address receiver,
         uint256 amount,
-        string memory tag
+        string calldata tag
     ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
         require(
             tokenManager.getDepositConfig(toChainId, tokenAddress).min <= amount &&
@@ -201,7 +208,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         uint256 amount,
         uint256 toChainId,
         PermitRequest calldata permitOptions,
-        string memory tag
+        string calldata tag
     ) external {
         IERC20Permit(tokenAddress).permit(
             _msgSender(),
@@ -225,7 +232,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         uint256 amount,
         uint256 toChainId,
         PermitRequest calldata permitOptions,
-        string memory tag
+        string calldata tag
     ) external {
         IERC20Permit(tokenAddress).permit(
             _msgSender(),
@@ -247,7 +254,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
     function depositNative(
         address receiver,
         uint256 toChainId,
-        string memory tag
+        string calldata tag
     ) external payable whenNotPaused nonReentrant {
         require(
             tokenManager.getDepositConfig(toChainId, NATIVE).min <= msg.value &&
@@ -269,7 +276,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         address tokenAddress,
         uint256 amount,
         address payable receiver,
-        bytes memory depositHash,
+        bytes calldata depositHash,
         uint256 tokenGasPrice,
         uint256 fromChainId
     ) external nonReentrant onlyExecutor tokenChecks(tokenAddress) whenNotPaused {
@@ -367,7 +374,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         address tokenAddress,
         uint256 amount,
         address payable receiver,
-        bytes memory depositHash
+        bytes calldata depositHash
     ) public view returns (bytes32 hashSendTransaction, bool status) {
         hashSendTransaction = keccak256(abi.encode(tokenAddress, amount, receiver, keccak256(depositHash)));
 
