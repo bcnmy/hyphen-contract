@@ -3,56 +3,69 @@
 pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./interfaces/IExecutorManager.sol";
 
 contract ExecutorManager is IExecutorManager, Ownable {
-    address[] internal executors;
-    mapping(address => bool) internal executorStatus;
+    using EnumerableSet for EnumerableSet.AddressSet;
+    EnumerableSet.AddressSet private executors;
 
     event ExecutorAdded(address executor, address owner);
     event ExecutorRemoved(address executor, address owner);
 
     // MODIFIERS
     modifier onlyExecutor() {
-        require(executorStatus[msg.sender], "You are not allowed to perform this operation");
+        require(getExecutorStatus(msg.sender), "You are not allowed to perform this operation");
         _;
     }
 
     function getExecutorStatus(address executor) public view override returns (bool status) {
-        status = executorStatus[executor];
+        return executors.contains(executor);
     }
 
     function getAllExecutors() public view override returns (address[] memory) {
-        return executors;
+        address[] memory result = new address[](executors.length());
+        for (uint256 i = 0; i < executors.length(); ) {
+            result[i] = executors.at(i);
+            unchecked {
+                ++i;
+            }
+        }
+        return result;
     }
 
     //Register new Executors
     function addExecutors(address[] calldata executorArray) external override onlyOwner {
-        for (uint256 i = 0; i < executorArray.length; ++i) {
+        for (uint256 i = 0; i < executorArray.length; ) {
             addExecutor(executorArray[i]);
+            unchecked {
+                ++i;
+            }
         }
     }
 
     // Register single executor
     function addExecutor(address executorAddress) public override onlyOwner {
         require(executorAddress != address(0), "executor address can not be 0");
-        require(!executorStatus[executorAddress], "Executor already registered");
-        executors.push(executorAddress);
-        executorStatus[executorAddress] = true;
+        require(!getExecutorStatus(executorAddress), "Executor already registered");
+        executors.add(executorAddress);
         emit ExecutorAdded(executorAddress, msg.sender);
     }
 
     //Remove registered Executors
     function removeExecutors(address[] calldata executorArray) external override onlyOwner {
-        for (uint256 i = 0; i < executorArray.length; ++i) {
+        for (uint256 i = 0; i < executorArray.length; ) {
             removeExecutor(executorArray[i]);
+            unchecked {
+                ++i;
+            }
         }
     }
 
     // Remove Register single executor
     function removeExecutor(address executorAddress) public override onlyOwner {
-        require(executorAddress != address(0), "executor address can not be 0");
-        executorStatus[executorAddress] = false;
+        require(getExecutorStatus(executorAddress), "Executor not registered");
+        executors.remove(executorAddress);
         emit ExecutorRemoved(executorAddress, msg.sender);
     }
 }
