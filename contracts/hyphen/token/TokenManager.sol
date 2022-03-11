@@ -8,7 +8,7 @@ import "../metatx/ERC2771Context.sol";
 import "../interfaces/ITokenManager.sol";
 
 contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
-    mapping(address => TokenInfo) public tokensInfo;
+    mapping(address => TokenInfo) public override tokensInfo;
 
     event FeeChanged(address indexed tokenAddress, uint256 indexed equilibriumFee, uint256 indexed maxFee);
 

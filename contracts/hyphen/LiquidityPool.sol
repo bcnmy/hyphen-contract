@@ -10,6 +10,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "./metatx/ERC2771ContextUpgradeable.sol";
 import "../security/Pausable.sol";
+import "./structures/TokenConfig.sol";
 import "./interfaces/IExecutorManager.sol";
 import "./interfaces/ILiquidityProviders.sol";
 import "../interfaces/IERC20Permit.sol";
@@ -91,8 +92,8 @@ contract LiquidityPool is
     }
 
     modifier tokenChecks(address tokenAddress) {
-        require(tokenAddress != address(0), "Token address cannot be 0");
-        require(tokenManager.getTokensInfo(tokenAddress).supportedToken, "Token not supported");
+        (, bool supportedToken, , , ) = tokenManager.tokensInfo(tokenAddress);
+        require(supportedToken, "Token not supported");
         _;
     }
 
@@ -171,11 +172,9 @@ contract LiquidityPool is
         uint256 amount,
         string calldata tag
     ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
-        require(
-            tokenManager.getDepositConfig(toChainId, tokenAddress).min <= amount &&
-                tokenManager.getDepositConfig(toChainId, tokenAddress).max >= amount,
-            "Deposit amount not in Cap limit"
-        );
+        TokenConfig memory config = tokenManager.getDepositConfig(toChainId, tokenAddress);
+
+        require(config.min <= amount && config.max >= amount, "Deposit amount not in Cap limit");
         require(receiver != address(0), "Receiver address cannot be 0");
         require(amount != 0, "Amount cannot be 0");
         address sender = _msgSender();
@@ -287,11 +286,8 @@ contract LiquidityPool is
         uint256 fromChainId
     ) external nonReentrant onlyExecutor tokenChecks(tokenAddress) whenNotPaused {
         uint256 initialGas = gasleft();
-        require(
-            tokenManager.getTransferConfig(tokenAddress).min <= amount &&
-                tokenManager.getTransferConfig(tokenAddress).max >= amount,
-            "Withdraw amnt not in Cap limits"
-        );
+        TokenConfig memory config = tokenManager.getTransferConfig(tokenAddress);
+        require(config.min <= amount && config.max >= amount, "Withdraw amount not in Cap limit");
         require(receiver != address(0), "Bad receiver address");
 
         (bytes32 hashSendTransaction, bool status) = checkHashStatus(tokenAddress, amount, receiver, depositHash);
@@ -329,14 +325,14 @@ contract LiquidityPool is
         uint256 amount,
         uint256 tokenGasPrice
     ) internal returns (uint256 amountToTransfer) {
+        TokenInfo memory tokenInfo = tokenManager.getTokensInfo(tokenAddress);
         uint256 transferFeePerc = getTransferFee(tokenAddress, amount);
         uint256 lpFee;
-        if (transferFeePerc > tokenManager.getTokensInfo(tokenAddress).equilibriumFee) {
+        if (transferFeePerc > tokenInfo.equilibriumFee) {
             // Here add some fee to incentive pool also
-            lpFee = (amount * tokenManager.getTokensInfo(tokenAddress).equilibriumFee) / BASE_DIVISOR;
+            lpFee = (amount * tokenInfo.equilibriumFee) / BASE_DIVISOR;
             incentivePool[tokenAddress] =
-                (incentivePool[tokenAddress] +
-                    (amount * (transferFeePerc - tokenManager.getTokensInfo(tokenAddress).equilibriumFee))) /
+                (incentivePool[tokenAddress] + (amount * (transferFeePerc - tokenInfo.equilibriumFee))) /
                 BASE_DIVISOR;
         } else {
             lpFee = (amount * transferFeePerc) / BASE_DIVISOR;
@@ -346,12 +342,12 @@ contract LiquidityPool is
         liquidityProviders.addLPFee(tokenAddress, lpFee);
 
         uint256 totalGasUsed = initialGas - gasleft();
-        totalGasUsed = totalGasUsed + tokenManager.getTokensInfo(tokenAddress).transferOverhead;
+        totalGasUsed = totalGasUsed + tokenInfo.transferOverhead;
         totalGasUsed = totalGasUsed + baseGas;
 
         uint256 gasFee = totalGasUsed * tokenGasPrice;
-        gasFeeAccumulatedByToken[tokenAddress] = gasFeeAccumulatedByToken[tokenAddress] + gasFee;
-        gasFeeAccumulated[tokenAddress][_msgSender()] = gasFeeAccumulated[tokenAddress][_msgSender()] + gasFee;
+        gasFeeAccumulatedByToken[tokenAddress] += gasFee;
+        gasFeeAccumulated[tokenAddress][_msgSender()] += gasFee;
         amountToTransfer = amount - (transferFeeAmount + gasFee);
 
         emit FeeDetails(lpFee, transferFeeAmount, gasFee, tokenAddress);
@@ -363,11 +359,13 @@ contract LiquidityPool is
 
         uint256 resultingLiquidity = currentLiquidity - amount;
 
-        uint256 equilibriumFee = tokenManager.getTokensInfo(tokenAddress).equilibriumFee;
-        uint256 maxFee = tokenManager.getTokensInfo(tokenAddress).maxFee;
+        TokenInfo memory tokenInfo = tokenManager.getTokensInfo(tokenAddress);
         // Fee is represented in basis points * 10 for better accuracy
-        uint256 numerator = providedLiquidity * equilibriumFee * maxFee; // F(max) * F(e) * L(e)
-        uint256 denominator = equilibriumFee * providedLiquidity + (maxFee - equilibriumFee) * resultingLiquidity; // F(e) * L(e) + (F(max) - F(e)) * L(r)
+        uint256 numerator = providedLiquidity * tokenInfo.equilibriumFee * tokenInfo.maxFee; // F(max) * F(e) * L(e)
+        uint256 denominator = tokenInfo.equilibriumFee *
+            providedLiquidity +
+            (tokenInfo.maxFee - tokenInfo.equilibriumFee) *
+            resultingLiquidity; // F(e) * L(e) + (F(max) - F(e)) * L(r)
 
         if (denominator == 0) {
             fee = 0;
