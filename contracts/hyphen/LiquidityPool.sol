@@ -56,13 +56,10 @@ contract LiquidityPool is
         uint256 indexed transferredAmount,
         address target,
         bytes depositHash,
-        uint256 fromChainId
-    );
-    event FeeDetails(
-        uint256 indexed lpFee,
-        uint256 indexed transferFee,
-        uint256 indexed gasFee,
-        address transferredToken
+        uint256 fromChainId,
+        uint256 lpFee,
+        uint256 transferFee,
+        uint256 gasFee
     );
     event Received(address indexed from, uint256 indexed amount);
     event Deposit(
@@ -295,19 +292,34 @@ contract LiquidityPool is
         require(!status, "Already Processed");
         processedHash[hashSendTransaction] = true;
 
-        uint256 amountToTransfer = getAmountToTransfer(initialGas, tokenAddress, amount, tokenGasPrice);
-        liquidityProviders.decreaseCurrentLiquidity(tokenAddress, amountToTransfer);
+        // uint256 amountToTransfer, uint256 lpFee, uint256 transferFeeAmount, uint256 gasFee
+        uint256[4] memory transferDetails = getAmountToTransfer(initialGas, tokenAddress, amount, tokenGasPrice);
+
+        liquidityProviders.decreaseCurrentLiquidity(tokenAddress, transferDetails[0]);
 
         if (tokenAddress == NATIVE) {
-            require(address(this).balance >= amountToTransfer, "Not Enough Balance");
-            (bool success, ) = receiver.call{value: amountToTransfer}("");
+            require(address(this).balance >= transferDetails[0], "Not Enough Balance");
+            (bool success, ) = receiver.call{value: transferDetails[0]}("");
             require(success, "Native Transfer Failed");
         } else {
-            require(IERC20Upgradeable(tokenAddress).balanceOf(address(this)) >= amountToTransfer, "Not Enough Balance");
-            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, amountToTransfer);
+            require(
+                IERC20Upgradeable(tokenAddress).balanceOf(address(this)) >= transferDetails[0],
+                "Not Enough Balance"
+            );
+            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, transferDetails[0]);
         }
 
-        emit AssetSent(tokenAddress, amount, amountToTransfer, receiver, depositHash, fromChainId);
+        emit AssetSent(
+            tokenAddress,
+            amount,
+            transferDetails[0],
+            receiver,
+            depositHash,
+            fromChainId,
+            transferDetails[1],
+            transferDetails[2],
+            transferDetails[3]
+        );
     }
 
     /**
@@ -324,7 +336,16 @@ contract LiquidityPool is
         address tokenAddress,
         uint256 amount,
         uint256 tokenGasPrice
-    ) internal returns (uint256 amountToTransfer) {
+    )
+        internal
+        returns (uint256[4] memory)
+    /*
+            uint256 amountToTransfer,
+            uint256 lpFee,
+            uint256 transferFeeAmount,
+            uint256 gasFee
+            */
+    {
         TokenInfo memory tokenInfo = tokenManager.getTokensInfo(tokenAddress);
         uint256 transferFeePerc = getTransferFee(tokenAddress, amount);
         uint256 lpFee;
@@ -348,9 +369,8 @@ contract LiquidityPool is
         uint256 gasFee = totalGasUsed * tokenGasPrice;
         gasFeeAccumulatedByToken[tokenAddress] += gasFee;
         gasFeeAccumulated[tokenAddress][_msgSender()] += gasFee;
-        amountToTransfer = amount - (transferFeeAmount + gasFee);
-
-        emit FeeDetails(lpFee, transferFeeAmount, gasFee, tokenAddress);
+        uint256 amountToTransfer = amount - (transferFeeAmount + gasFee);
+        return [amountToTransfer, lpFee, transferFeeAmount, gasFee];
     }
 
     function getTransferFee(address tokenAddress, uint256 amount) public view returns (uint256 fee) {
