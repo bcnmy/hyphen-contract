@@ -1,3 +1,15 @@
+// $$\   $$\                     $$\                                 $$$$$$$\                      $$\
+// $$ |  $$ |                    $$ |                                $$  __$$\                     $$ |
+// $$ |  $$ |$$\   $$\  $$$$$$\  $$$$$$$\   $$$$$$\  $$$$$$$\        $$ |  $$ | $$$$$$\   $$$$$$\  $$ |
+// $$$$$$$$ |$$ |  $$ |$$  __$$\ $$  __$$\ $$  __$$\ $$  __$$\       $$$$$$$  |$$  __$$\ $$  __$$\ $$ |
+// $$  __$$ |$$ |  $$ |$$ /  $$ |$$ |  $$ |$$$$$$$$ |$$ |  $$ |      $$  ____/ $$ /  $$ |$$ /  $$ |$$ |
+// $$ |  $$ |$$ |  $$ |$$ |  $$ |$$ |  $$ |$$   ____|$$ |  $$ |      $$ |      $$ |  $$ |$$ |  $$ |$$ |
+// $$ |  $$ |\$$$$$$$ |$$$$$$$  |$$ |  $$ |\$$$$$$$\ $$ |  $$ |      $$ |      \$$$$$$  |\$$$$$$  |$$ |
+// \__|  \__| \____$$ |$$  ____/ \__|  \__| \_______|\__|  \__|      \__|       \______/  \______/ \__|
+//           $$\   $$ |$$ |
+//           \$$$$$$  |$$ |
+//            \______/ \__|
+//
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.0;
@@ -324,7 +336,7 @@ contract LiquidityPool is
      * @param tokenAddress Token address for which calculation needs to be done
      * @param amount Amount of token to be transfered before deducting the fee
      * @param tokenGasPrice Gas price in the token being transfered to be used to calculate gas fee
-     * @return amountToTransfer Total amount to be transfered after deducting all fees.
+     * @return [ amountToTransfer, lpFee, transferFeeAmount, gasFee ]
      */
     function getAmountToTransfer(
         uint256 initialGas,
@@ -348,8 +360,7 @@ contract LiquidityPool is
 
         liquidityProviders.addLPFee(tokenAddress, lpFee);
 
-        uint256 totalGasUsed = initialGas - gasleft();
-        totalGasUsed += tokenInfo.transferOverhead + baseGas;
+        uint256 totalGasUsed = initialGas + tokenInfo.transferOverhead + baseGas - gasleft();
 
         uint256 gasFee = totalGasUsed * tokenGasPrice;
         gasFeeAccumulatedByToken[tokenAddress] += gasFee;
