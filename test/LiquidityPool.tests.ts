@@ -191,6 +191,12 @@ describe("LiquidityPoolTests", function () {
     expect(await liquidityPool.isPauser(await pauser.getAddress())).to.equals(true);
   }
 
+  it("Should prevent non owners from changing token configuration", async () => {
+    await expect(tokenManager.connect(bob).changeFee(token.address, 1, 1)).to.be.revertedWith(
+      "Ownable: caller is not the owner"
+    );
+  });
+
   it("Should Deploy Liquidity Pool Correctly", async function () {
     expect(await liquidityPool.owner()).to.equal(owner.address);
   });
@@ -696,9 +702,9 @@ describe("LiquidityPoolTests", function () {
   });
 
   it("Should revert on re-entrant calls to transfer", async function () {
-    const maliciousContract = await (await ethers.getContractFactory("LiquidityProvidersMaliciousReentrant")).deploy(
-      liquidityPool.address
-    );
+    const maliciousContract = await (
+      await ethers.getContractFactory("LiquidityProvidersMaliciousReentrant")
+    ).deploy(liquidityPool.address);
     await addNativeLiquidity(ethers.BigNumber.from(10).pow(20).toString(), owner);
     await liquidityPool.setLiquidityProviders(maliciousContract.address);
 

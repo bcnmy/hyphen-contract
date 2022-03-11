@@ -22,8 +22,6 @@ contract LPToken is
     ERC2771ContextUpgradeable,
     Pausable
 {
-    address internal constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-
     address public liquidityProvidersAddress;
     IWhiteListPeriodManager public whiteListPeriodManager;
     mapping(uint256 => LpTokenMetadata) public tokenMetadata;
@@ -34,11 +32,11 @@ contract LPToken is
     event SvgHelperUpdated(address indexed tokenAddress, ISvgHelper indexed svgHelper);
 
     function initialize(
-        string memory _name,
-        string memory _symbol,
+        string calldata _name,
+        string calldata _symbol,
         address _trustedForwarder,
         address _pauser
-    ) public initializer {
+    ) external initializer {
         __Ownable_init();
         __ERC721_init(_name, _symbol);
         __ERC721Enumerable_init();
@@ -74,8 +72,12 @@ contract LPToken is
 
     function getAllNftIdsByUser(address _owner) public view returns (uint256[] memory) {
         uint256[] memory nftIds = new uint256[](balanceOf(_owner));
-        for (uint256 i = 0; i < nftIds.length; ++i) {
+        uint256 length = nftIds.length;
+        for (uint256 i; i < length; ) {
             nftIds[i] = tokenOfOwnerByIndex(_owner, i);
+            unchecked {
+                ++i;
+            }
         }
         return nftIds;
     }
@@ -86,7 +88,7 @@ contract LPToken is
         return tokenId;
     }
 
-    function updateTokenMetadata(uint256 _tokenId, LpTokenMetadata memory _lpTokenMetadata)
+    function updateTokenMetadata(uint256 _tokenId, LpTokenMetadata calldata _lpTokenMetadata)
         external
         onlyHyphenPools
         whenNotPaused
@@ -95,7 +97,7 @@ contract LPToken is
         tokenMetadata[_tokenId] = _lpTokenMetadata;
     }
 
-    function exists(uint256 _tokenId) public view returns (bool) {
+    function exists(uint256 _tokenId) external view returns (bool) {
         return _exists(_tokenId);
     }
 

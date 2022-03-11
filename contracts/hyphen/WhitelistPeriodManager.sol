@@ -3,8 +3,6 @@ pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
 import "../security/Pausable.sol";
 import "./metatx/ERC2771ContextUpgradeable.sol";
@@ -63,7 +61,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
         address _tokenManager,
         address _lpToken,
         address _pauser
-    ) public initializer {
+    ) external initializer {
         __ERC2771Context_init(_trustedForwarder);
         __Ownable_init();
         __Pausable_init(_pauser);
@@ -73,7 +71,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
         _setLpToken(_lpToken);
     }
 
-    function _isSupportedToken(address _token) internal view returns (bool) {
+    function _isSupportedToken(address _token) private view returns (bool) {
         return tokenManager.getTokensInfo(_token).supportedToken;
     }
 
@@ -177,9 +175,13 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
 
     function setIsExcludedAddressStatus(address[] memory _addresses, bool[] memory _status) external onlyOwner {
         require(_addresses.length == _status.length, "ERR__LENGTH_MISMATCH");
-        for (uint256 i = 0; i < _addresses.length; ++i) {
+        uint256 length = _addresses.length;
+        for (uint256 i; i < length; ) {
             isExcludedAddress[_addresses[i]] = _status[i];
             emit ExcludedAddressStatusUpdated(_addresses[i], _status[i]);
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -225,8 +227,12 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
             _tokens.length == _totalCaps.length && _totalCaps.length == _perTokenWalletCaps.length,
             "ERR__LENGTH_MISMACH"
         );
-        for (uint256 i = 0; i < _tokens.length; ++i) {
+        uint256 length = _tokens.length;
+        for (uint256 i; i < length; ) {
             setCap(_tokens[i], _totalCaps[i], _perTokenWalletCaps[i]);
+            unchecked {
+                ++i;
+            }
         }
     }
 

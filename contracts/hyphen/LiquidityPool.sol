@@ -10,12 +10,19 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "./metatx/ERC2771ContextUpgradeable.sol";
 import "../security/Pausable.sol";
+import "./structures/TokenConfig.sol";
 import "./interfaces/IExecutorManager.sol";
 import "./interfaces/ILiquidityProviders.sol";
 import "../interfaces/IERC20Permit.sol";
 import "./interfaces/ITokenManager.sol";
 
-contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeable, ERC2771ContextUpgradeable {
+contract LiquidityPool is
+    Initializable,
+    ReentrancyGuardUpgradeable,
+    Pausable,
+    OwnableUpgradeable,
+    ERC2771ContextUpgradeable
+{
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     uint256 private constant BASE_DIVISOR = 10000000000; // Basis Points * 100 for better accuracy
 
@@ -49,13 +56,10 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         uint256 indexed transferredAmount,
         address target,
         bytes depositHash,
-        uint256 fromChainId
-    );
-    event FeeDetails(
-        uint256 indexed lpFee,
-        uint256 indexed transferFee,
-        uint256 indexed gasFee,
-        address transferredToken
+        uint256 fromChainId,
+        uint256 lpFee,
+        uint256 transferFee,
+        uint256 gasFee
     );
     event Received(address indexed from, uint256 indexed amount);
     event Deposit(
@@ -70,6 +74,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
     event GasFeeWithdraw(address indexed tokenAddress, address indexed owner, uint256 indexed amount);
     event TrustedForwarderChanged(address indexed forwarderAddress);
     event LiquidityProvidersChanged(address indexed liquidityProvidersAddress);
+    event TokenManagerChanged(address indexed tokenManagerAddress);
     event EthReceived(address, uint256);
 
     // MODIFIERS
@@ -84,8 +89,8 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
     }
 
     modifier tokenChecks(address tokenAddress) {
-        require(tokenAddress != address(0), "Token address cannot be 0");
-        require(tokenManager.getTokensInfo(tokenAddress).supportedToken, "Token not supported");
+        (, bool supportedToken, , , ) = tokenManager.tokensInfo(tokenAddress);
+        require(supportedToken, "Token not supported");
         _;
     }
 
@@ -109,23 +114,29 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         baseGas = 21000;
     }
 
-    function setTrustedForwarder(address trustedForwarder) public onlyOwner {
+    function setTrustedForwarder(address trustedForwarder) external onlyOwner {
         require(trustedForwarder != address(0), "TrustedForwarder can't be 0");
         _trustedForwarder = trustedForwarder;
         emit TrustedForwarderChanged(trustedForwarder);
     }
 
-    function setLiquidityProviders(address _liquidityProviders) public onlyOwner {
+    function setLiquidityProviders(address _liquidityProviders) external onlyOwner {
         require(_liquidityProviders != address(0), "LiquidityProviders can't be 0");
         liquidityProviders = ILiquidityProviders(_liquidityProviders);
         emit LiquidityProvidersChanged(_liquidityProviders);
+    }
+
+    function setTokenManager(address _tokenManager) external onlyOwner {
+        require(_tokenManager != address(0), "TokenManager can't be 0");
+        tokenManager = ITokenManager(_tokenManager);
+        emit TokenManagerChanged(_tokenManager);
     }
 
     function setBaseGas(uint128 gas) external onlyOwner {
         baseGas = gas;
     }
 
-    function getExecutorManager() public view returns (address) {
+    function getExecutorManager() external view returns (address) {
         return address(executorManager);
     }
 
@@ -156,13 +167,11 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         address tokenAddress,
         address receiver,
         uint256 amount,
-        string memory tag
+        string calldata tag
     ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
-        require(
-            tokenManager.getDepositConfig(toChainId, tokenAddress).min <= amount &&
-                tokenManager.getDepositConfig(toChainId, tokenAddress).max >= amount,
-            "Deposit amount not in Cap limit"
-        );
+        TokenConfig memory config = tokenManager.getDepositConfig(toChainId, tokenAddress);
+
+        require(config.min <= amount && config.max >= amount, "Deposit amount not in Cap limit");
         require(receiver != address(0), "Receiver address cannot be 0");
         require(amount != 0, "Amount cannot be 0");
         address sender = _msgSender();
@@ -201,7 +210,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         uint256 amount,
         uint256 toChainId,
         PermitRequest calldata permitOptions,
-        string memory tag
+        string calldata tag
     ) external {
         IERC20Permit(tokenAddress).permit(
             _msgSender(),
@@ -225,7 +234,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         uint256 amount,
         uint256 toChainId,
         PermitRequest calldata permitOptions,
-        string memory tag
+        string calldata tag
     ) external {
         IERC20Permit(tokenAddress).permit(
             _msgSender(),
@@ -247,7 +256,7 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
     function depositNative(
         address receiver,
         uint256 toChainId,
-        string memory tag
+        string calldata tag
     ) external payable whenNotPaused nonReentrant {
         require(
             tokenManager.getDepositConfig(toChainId, NATIVE).min <= msg.value &&
@@ -269,16 +278,13 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         address tokenAddress,
         uint256 amount,
         address payable receiver,
-        bytes memory depositHash,
+        bytes calldata depositHash,
         uint256 tokenGasPrice,
         uint256 fromChainId
-    ) external nonReentrant onlyExecutor tokenChecks(tokenAddress) whenNotPaused {
+    ) external nonReentrant onlyExecutor whenNotPaused {
         uint256 initialGas = gasleft();
-        require(
-            tokenManager.getTransferConfig(tokenAddress).min <= amount &&
-                tokenManager.getTransferConfig(tokenAddress).max >= amount,
-            "Withdraw amnt not in Cap limits"
-        );
+        TokenConfig memory config = tokenManager.getTransferConfig(tokenAddress);
+        require(config.min <= amount && config.max >= amount, "Withdraw amount not in Cap limit");
         require(receiver != address(0), "Bad receiver address");
 
         (bytes32 hashSendTransaction, bool status) = checkHashStatus(tokenAddress, amount, receiver, depositHash);
@@ -286,19 +292,29 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         require(!status, "Already Processed");
         processedHash[hashSendTransaction] = true;
 
-        uint256 amountToTransfer = getAmountToTransfer(initialGas, tokenAddress, amount, tokenGasPrice);
-        liquidityProviders.decreaseCurrentLiquidity(tokenAddress, amountToTransfer);
+        // uint256 amountToTransfer, uint256 lpFee, uint256 transferFeeAmount, uint256 gasFee
+        uint256[4] memory transferDetails = getAmountToTransfer(initialGas, tokenAddress, amount, tokenGasPrice);
+
+        liquidityProviders.decreaseCurrentLiquidity(tokenAddress, transferDetails[0]);
 
         if (tokenAddress == NATIVE) {
-            require(address(this).balance >= amountToTransfer, "Not Enough Balance");
-            (bool success, ) = receiver.call{value: amountToTransfer}("");
+            (bool success, ) = receiver.call{value: transferDetails[0]}("");
             require(success, "Native Transfer Failed");
         } else {
-            require(IERC20Upgradeable(tokenAddress).balanceOf(address(this)) >= amountToTransfer, "Not Enough Balance");
-            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, amountToTransfer);
+            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, transferDetails[0]);
         }
 
-        emit AssetSent(tokenAddress, amount, amountToTransfer, receiver, depositHash, fromChainId);
+        emit AssetSent(
+            tokenAddress,
+            amount,
+            transferDetails[0],
+            receiver,
+            depositHash,
+            fromChainId,
+            transferDetails[1],
+            transferDetails[2],
+            transferDetails[3]
+        );
     }
 
     /**
@@ -315,15 +331,15 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         address tokenAddress,
         uint256 amount,
         uint256 tokenGasPrice
-    ) internal returns (uint256 amountToTransfer) {
-        uint256 transferFeePerc = getTransferFee(tokenAddress, amount);
+    ) internal returns (uint256[4] memory) {
+        TokenInfo memory tokenInfo = tokenManager.getTokensInfo(tokenAddress);
+        uint256 transferFeePerc = _getTransferFee(tokenAddress, amount, tokenInfo);
         uint256 lpFee;
-        if (transferFeePerc > tokenManager.getTokensInfo(tokenAddress).equilibriumFee) {
+        if (transferFeePerc > tokenInfo.equilibriumFee) {
             // Here add some fee to incentive pool also
-            lpFee = (amount * tokenManager.getTokensInfo(tokenAddress).equilibriumFee) / BASE_DIVISOR;
+            lpFee = (amount * tokenInfo.equilibriumFee) / BASE_DIVISOR;
             incentivePool[tokenAddress] =
-                (incentivePool[tokenAddress] +
-                    (amount * (transferFeePerc - tokenManager.getTokensInfo(tokenAddress).equilibriumFee))) /
+                (incentivePool[tokenAddress] + (amount * (transferFeePerc - tokenInfo.equilibriumFee))) /
                 BASE_DIVISOR;
         } else {
             lpFee = (amount * transferFeePerc) / BASE_DIVISOR;
@@ -333,28 +349,31 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         liquidityProviders.addLPFee(tokenAddress, lpFee);
 
         uint256 totalGasUsed = initialGas - gasleft();
-        totalGasUsed = totalGasUsed + tokenManager.getTokensInfo(tokenAddress).transferOverhead;
-        totalGasUsed = totalGasUsed + baseGas;
+        totalGasUsed += tokenInfo.transferOverhead + baseGas;
 
         uint256 gasFee = totalGasUsed * tokenGasPrice;
-        gasFeeAccumulatedByToken[tokenAddress] = gasFeeAccumulatedByToken[tokenAddress] + gasFee;
-        gasFeeAccumulated[tokenAddress][_msgSender()] = gasFeeAccumulated[tokenAddress][_msgSender()] + gasFee;
-        amountToTransfer = amount - (transferFeeAmount + gasFee);
-
-        emit FeeDetails(lpFee, transferFeeAmount, gasFee, tokenAddress);
+        gasFeeAccumulatedByToken[tokenAddress] += gasFee;
+        gasFeeAccumulated[tokenAddress][_msgSender()] += gasFee;
+        uint256 amountToTransfer = amount - (transferFeeAmount + gasFee);
+        return [amountToTransfer, lpFee, transferFeeAmount, gasFee];
     }
 
-    function getTransferFee(address tokenAddress, uint256 amount) public view returns (uint256 fee) {
+    function _getTransferFee(
+        address tokenAddress,
+        uint256 amount,
+        TokenInfo memory tokenInfo
+    ) private view returns (uint256 fee) {
         uint256 currentLiquidity = getCurrentLiquidity(tokenAddress);
         uint256 providedLiquidity = liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
 
         uint256 resultingLiquidity = currentLiquidity - amount;
 
-        uint256 equilibriumFee = tokenManager.getTokensInfo(tokenAddress).equilibriumFee;
-        uint256 maxFee = tokenManager.getTokensInfo(tokenAddress).maxFee;
         // Fee is represented in basis points * 10 for better accuracy
-        uint256 numerator = providedLiquidity * equilibriumFee * maxFee; // F(max) * F(e) * L(e)
-        uint256 denominator = equilibriumFee * providedLiquidity + (maxFee - equilibriumFee) * resultingLiquidity; // F(e) * L(e) + (F(max) - F(e)) * L(r)
+        uint256 numerator = providedLiquidity * tokenInfo.equilibriumFee * tokenInfo.maxFee; // F(max) * F(e) * L(e)
+        uint256 denominator = tokenInfo.equilibriumFee *
+            providedLiquidity +
+            (tokenInfo.maxFee - tokenInfo.equilibriumFee) *
+            resultingLiquidity; // F(e) * L(e) + (F(max) - F(e)) * L(r)
 
         if (denominator == 0) {
             fee = 0;
@@ -363,11 +382,15 @@ contract LiquidityPool is ReentrancyGuardUpgradeable, Pausable, OwnableUpgradeab
         }
     }
 
+    function getTransferFee(address tokenAddress, uint256 amount) external view returns (uint256) {
+        return _getTransferFee(tokenAddress, amount, tokenManager.getTokensInfo(tokenAddress));
+    }
+
     function checkHashStatus(
         address tokenAddress,
         uint256 amount,
         address payable receiver,
-        bytes memory depositHash
+        bytes calldata depositHash
     ) public view returns (bytes32 hashSendTransaction, bool status) {
         hashSendTransaction = keccak256(abi.encode(tokenAddress, amount, receiver, keccak256(depositHash)));
 

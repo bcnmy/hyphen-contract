@@ -36,7 +36,7 @@ contract LiquidityProviders is
     event FeeClaimed(address indexed tokenAddress, uint256 indexed fee, address indexed lp, uint256 sharesBurnt);
     event FeeAdded(address indexed tokenAddress, uint256 indexed fee);
     event EthReceived(address indexed sender, uint256 value);
-    event CurrentLiquidityChanged(address indexed token, uint256 indexed oldValue, uint256 indexed newValue);
+    event CurrentLiquidityChanged(address indexed token, uint256 indexed newValue);
 
     // LP Fee Distribution
     mapping(address => uint256) public totalReserve; // Include Liquidity + Fee accumulated
@@ -134,12 +134,12 @@ contract LiquidityProviders is
 
     function _increaseCurrentLiquidity(address tokenAddress, uint256 amount) private {
         currentLiquidity[tokenAddress] += amount;
-        emit CurrentLiquidityChanged(tokenAddress, currentLiquidity[tokenAddress]-amount, currentLiquidity[tokenAddress]);
+        emit CurrentLiquidityChanged(tokenAddress, currentLiquidity[tokenAddress]);
     }
 
     function _decreaseCurrentLiquidity(address tokenAddress, uint256 amount) private {
         currentLiquidity[tokenAddress] -= amount;
-        emit CurrentLiquidityChanged(tokenAddress, currentLiquidity[tokenAddress]+amount, currentLiquidity[tokenAddress]);
+        emit CurrentLiquidityChanged(tokenAddress, currentLiquidity[tokenAddress]);
     }
 
     /**
@@ -210,8 +210,8 @@ contract LiquidityProviders is
         uint256 eligibleLiquidity = sharesToTokenAmount(totalNFTShares, _tokenAddress);
         uint256 lpFeeAccumulated;
 
-        // Handle edge cases where eligibleLiquidity is less than what was supplied by very small amount 
-        if(nftSuppliedLiquidity > eligibleLiquidity) {
+        // Handle edge cases where eligibleLiquidity is less than what was supplied by very small amount
+        if (nftSuppliedLiquidity > eligibleLiquidity) {
             lpFeeAccumulated = 0;
         } else {
             unchecked {
@@ -280,7 +280,7 @@ contract LiquidityProviders is
     function _increaseLiquidity(uint256 _nftId, uint256 _amount) internal onlyValidLpToken(_nftId, _msgSender()) {
         (address token, uint256 totalSuppliedLiquidity, uint256 totalShares) = lpToken.tokenMetadata(_nftId);
 
-        require(_amount > 0, "ERR__AMOUNT_IS_0");
+        require(_amount != 0, "ERR__AMOUNT_IS_0");
         whiteListPeriodManager.beforeLiquidityAddition(_msgSender(), token, _amount);
 
         uint256 mintedSharesAmount;
@@ -359,11 +359,11 @@ contract LiquidityProviders is
 
         // Calculate rewards accumulated
         uint256 eligibleLiquidity = sharesToTokenAmount(totalNFTShares, _tokenAddress);
-        
+
         uint256 lpFeeAccumulated;
 
-        // Handle edge cases where eligibleLiquidity is less than what was supplied by very small amount 
-        if(nftSuppliedLiquidity > eligibleLiquidity) {
+        // Handle edge cases where eligibleLiquidity is less than what was supplied by very small amount
+        if (nftSuppliedLiquidity > eligibleLiquidity) {
             lpFeeAccumulated = 0;
         } else {
             unchecked {
