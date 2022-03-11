@@ -281,7 +281,7 @@ contract LiquidityPool is
         bytes calldata depositHash,
         uint256 tokenGasPrice,
         uint256 fromChainId
-    ) external nonReentrant onlyExecutor tokenChecks(tokenAddress) whenNotPaused {
+    ) external nonReentrant onlyExecutor whenNotPaused {
         uint256 initialGas = gasleft();
         TokenConfig memory config = tokenManager.getTransferConfig(tokenAddress);
         require(config.min <= amount && config.max >= amount, "Withdraw amount not in Cap limit");
@@ -298,14 +298,9 @@ contract LiquidityPool is
         liquidityProviders.decreaseCurrentLiquidity(tokenAddress, transferDetails[0]);
 
         if (tokenAddress == NATIVE) {
-            require(address(this).balance >= transferDetails[0], "Not Enough Balance");
             (bool success, ) = receiver.call{value: transferDetails[0]}("");
             require(success, "Native Transfer Failed");
         } else {
-            require(
-                IERC20Upgradeable(tokenAddress).balanceOf(address(this)) >= transferDetails[0],
-                "Not Enough Balance"
-            );
             SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, transferDetails[0]);
         }
 
@@ -336,18 +331,9 @@ contract LiquidityPool is
         address tokenAddress,
         uint256 amount,
         uint256 tokenGasPrice
-    )
-        internal
-        returns (uint256[4] memory)
-    /*
-            uint256 amountToTransfer,
-            uint256 lpFee,
-            uint256 transferFeeAmount,
-            uint256 gasFee
-            */
-    {
+    ) internal returns (uint256[4] memory) {
         TokenInfo memory tokenInfo = tokenManager.getTokensInfo(tokenAddress);
-        uint256 transferFeePerc = getTransferFee(tokenAddress, amount);
+        uint256 transferFeePerc = _getTransferFee(tokenAddress, amount, tokenInfo);
         uint256 lpFee;
         if (transferFeePerc > tokenInfo.equilibriumFee) {
             // Here add some fee to incentive pool also
@@ -363,8 +349,7 @@ contract LiquidityPool is
         liquidityProviders.addLPFee(tokenAddress, lpFee);
 
         uint256 totalGasUsed = initialGas - gasleft();
-        totalGasUsed = totalGasUsed + tokenInfo.transferOverhead;
-        totalGasUsed = totalGasUsed + baseGas;
+        totalGasUsed += tokenInfo.transferOverhead + baseGas;
 
         uint256 gasFee = totalGasUsed * tokenGasPrice;
         gasFeeAccumulatedByToken[tokenAddress] += gasFee;
@@ -373,13 +358,16 @@ contract LiquidityPool is
         return [amountToTransfer, lpFee, transferFeeAmount, gasFee];
     }
 
-    function getTransferFee(address tokenAddress, uint256 amount) public view returns (uint256 fee) {
+    function _getTransferFee(
+        address tokenAddress,
+        uint256 amount,
+        TokenInfo memory tokenInfo
+    ) private view returns (uint256 fee) {
         uint256 currentLiquidity = getCurrentLiquidity(tokenAddress);
         uint256 providedLiquidity = liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
 
         uint256 resultingLiquidity = currentLiquidity - amount;
 
-        TokenInfo memory tokenInfo = tokenManager.getTokensInfo(tokenAddress);
         // Fee is represented in basis points * 10 for better accuracy
         uint256 numerator = providedLiquidity * tokenInfo.equilibriumFee * tokenInfo.maxFee; // F(max) * F(e) * L(e)
         uint256 denominator = tokenInfo.equilibriumFee *
@@ -392,6 +380,10 @@ contract LiquidityPool is
         } else {
             fee = numerator / denominator;
         }
+    }
+
+    function getTransferFee(address tokenAddress, uint256 amount) external view returns (uint256) {
+        return _getTransferFee(tokenAddress, amount, tokenManager.getTokensInfo(tokenAddress));
     }
 
     function checkHashStatus(
