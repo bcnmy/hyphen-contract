@@ -84,6 +84,9 @@ const config: HardhatUserConfig = {
       goerli: process.env.ETHERSCAN_API_KEY,
       polygonMumbai: process.env.POLYGONSCAN_API_KEY,
       avalancheFujiTestnet: process.env.SNOWTRACE_API_KEY,
+      mainnet: process.env.ETHERSCAN_API_KEY,
+      polygon: process.env.POLYGONSCAN_API_KEY,
+      avalanche: process.env.SNOWTRACE_API_KEY,
     },
   },
   contractSizer: {

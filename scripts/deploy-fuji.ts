@@ -1,8 +1,8 @@
 import { ethers } from "hardhat";
-import { deploy } from "./helpers";
+import { deploy, IDeployConfig } from "./helpers";
 
 (async () => {
-  const config = {
+  const config: IDeployConfig = {
     trustedForwarder: "0x6271Ca63D30507f2Dcbf99B52787032506D75BBF",
     bicoOwner: "0x46b65ae065341D034fEA45D76c6fA936EAfBfdeb",
     pauser: "0x46b65ae065341D034fEA45D76c6fA936EAfBfdeb",
@@ -11,7 +11,7 @@ import { deploy } from "./helpers";
         tokenAddress: "0xB4E0F6FEF81BdFea0856bB846789985c9CFf7e85",
         minCap: ethers.BigNumber.from(10).pow(18 + 2),
         maxCap: ethers.BigNumber.from(10).pow(18 + 4),
-        toChainIds: [
+        depositConfigs: [
           {
             chainId: 5,
             minCap: ethers.BigNumber.from(10).pow(18 + 2),
@@ -37,7 +37,7 @@ import { deploy } from "./helpers";
         tokenAddress: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         minCap: ethers.BigNumber.from(10).pow(18 - 2),
         maxCap: ethers.BigNumber.from(10).pow(18 + 2),
-        toChainIds: [
+        depositConfigs: [
           {
             chainId: 80001,
             minCap: ethers.BigNumber.from(10).pow(18 - 2),
