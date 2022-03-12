@@ -32,6 +32,8 @@ import { deploy, IDeployConfig } from "./helpers";
         maxLiquidityCap: ethers.BigNumber.from(10).pow(18 + 5),
         svgHelper: await ethers.getContractFactory("EthereumUSDT"),
         decimals: 18,
+        rewardRatePerSecond: 100,
+        rewardTokenAddress: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716",
       },
       {
         tokenAddress: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
@@ -58,6 +60,8 @@ import { deploy, IDeployConfig } from "./helpers";
         maxLiquidityCap: ethers.BigNumber.from(10).pow(18 + 5),
         svgHelper: await ethers.getContractFactory("EthereumETH"),
         decimals: 18,
+        rewardRatePerSecond: 100,
+        rewardTokenAddress: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716",
       },
       {
         tokenAddress: "0xb5B640E6414b6DeF4FC9B3C1EeF373925effeCcF",
@@ -78,6 +82,8 @@ import { deploy, IDeployConfig } from "./helpers";
         maxLiquidityCap: ethers.BigNumber.from(10).pow(6 + 5),
         svgHelper: await ethers.getContractFactory("EthereumUSDC"),
         decimals: 6,
+        rewardRatePerSecond: 100,
+        rewardTokenAddress: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716",
       },
     ],
   };

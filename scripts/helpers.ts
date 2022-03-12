@@ -27,6 +27,8 @@ interface IAddTokenParameters {
   maxLiquidityCap: BigNumberish;
   svgHelper: ContractFactory;
   decimals: number;
+  rewardTokenAddress: string;
+  rewardRatePerSecond: BigNumberish;
 }
 
 interface IContracts {
@@ -202,6 +204,7 @@ const configure = async (contracts: IContracts, bicoOwner: string) => {
 
 const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters) => {
   // Add support for token
+  console.log(`Adding token support for ${token.tokenAddress}...`);
   await (
     await contracts.tokenManager.addSupportedToken(
       token.tokenAddress,
@@ -221,6 +224,7 @@ const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters
     minMaxArray.push({ min: entry.minCap, max: entry.maxCap });
   }
 
+  console.log(`Setting Deposit Config for ${token.tokenAddress}...`);
   await (
     await contracts.tokenManager.setDepositConfig(
       chainIdArray,
@@ -228,6 +232,8 @@ const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters
       minMaxArray
     )
   ).wait();
+
+  console.log(`Setting Whitelist Period Fee Config for ${token.tokenAddress}...`);
   await (
     await contracts.whitelistPeriodManager.setCap(
       token.tokenAddress,
@@ -235,6 +241,16 @@ const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters
       token.maxWalletLiquidityCap
     )
   ).wait();
+
+  console.log(`Initializing reward pool for ${token.tokenAddress}...`);
+  await (
+    await contracts.liquidityFarming.initalizeRewardPool(
+      token.tokenAddress,
+      token.rewardTokenAddress,
+      token.rewardRatePerSecond
+    )
+  ).wait();
+
   console.log("Added token support for", token.tokenAddress);
 };
 

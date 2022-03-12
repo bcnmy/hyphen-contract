@@ -4,19 +4,19 @@ import { deploy, IDeployConfig } from "./helpers";
 
 (async () => {
   const config: IDeployConfig = {
-    trustedForwarder: "0x84a0856b038eaAd1cC7E297cF34A7e72685A8693",
+    trustedForwarder: "0x9399BB24DBB5C4b782C70c2969F58716Ebbd6a3b",
     bicoOwner: "0xd76b82204be75ab9610b04cf27c4f4a34291d5e6",
-    pauser: "0x144A36059cdc0eF8e192ddC4df6E6d2F013fDa6A",
+    pauser: "0xc8582180f52B6303F51e7028C3A9f428Eb43DfE7",
     tokens: [
       // USDT
       {
-        tokenAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-        minCap: parseUnits("100", 6),
+        tokenAddress: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+        minCap: parseUnits("10", 6),
         maxCap: parseUnits("58160", 6),
         depositConfigs: [
           {
-            chainId: 137,
-            minCap: parseUnits("10", 6),
+            chainId: 1,
+            minCap: parseUnits("100", 6),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
             maxCap: parseUnits("50000", 6),
           },
@@ -25,21 +25,21 @@ import { deploy, IDeployConfig } from "./helpers";
         maxFee: parseUnits("2.5", 8),
         transferOverhead: 82491,
         maxWalletLiquidityCap: parseUnits("10000", 6),
-        maxLiquidityCap: parseUnits("578829", 6),
-        svgHelper: await ethers.getContractFactory("EthereumUSDT"),
+        maxLiquidityCap: parseUnits("186198", 6),
+        svgHelper: await ethers.getContractFactory("PolygonUSDT"),
         decimals: 6,
-        rewardTokenAddress: "0xf17e65822b568b3903685a7c9f496cf7656cc6c2",
-        rewardRatePerSecond: parseUnits("0.002247835648148150", 18),
+        rewardTokenAddress: "0x91c89A94567980f0e9723b487b0beD586eE96aa7",
+        rewardRatePerSecond: parseUnits("0.000723090277777778", 18),
       },
       // USDC
       {
-        tokenAddress: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-        minCap: parseUnits("100", 6),
+        tokenAddress: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+        minCap: parseUnits("10", 6),
         maxCap: parseUnits("221813", 6),
         depositConfigs: [
           {
-            chainId: 137,
-            minCap: parseUnits("10", 6),
+            chainId: 1,
+            minCap: parseUnits("100", 6),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
             maxCap: parseUnits("200000", 6),
           },
@@ -54,21 +54,21 @@ import { deploy, IDeployConfig } from "./helpers";
         maxFee: ethers.utils.parseUnits("2.5", 8),
         transferOverhead: 89491,
         maxWalletLiquidityCap: parseUnits("10000", 6),
-        maxLiquidityCap: parseUnits("1643855", 6),
-        svgHelper: await ethers.getContractFactory("EthereumUSDC"),
+        maxLiquidityCap: parseUnits("908910", 6),
+        svgHelper: await ethers.getContractFactory("PolygonUSDC"),
         decimals: 6,
-        rewardTokenAddress: "0xf17e65822b568b3903685a7c9f496cf7656cc6c2",
-        rewardRatePerSecond: parseUnits("0.006383761574074080", 18),
+        rewardTokenAddress: "0x91c89A94567980f0e9723b487b0beD586eE96aa7",
+        rewardRatePerSecond: parseUnits("0.003529664351851850", 18),
       },
       // BICO
       {
-        tokenAddress: "0xf17e65822b568b3903685a7c9f496cf7656cc6c2",
-        minCap: parseUnits("50", 18),
+        tokenAddress: "0x91c89A94567980f0e9723b487b0beD586eE96aa7",
+        minCap: parseUnits("10", 18),
         maxCap: parseUnits("123220", 18),
         depositConfigs: [
           {
-            chainId: 137,
-            minCap: parseUnits("10", 18),
+            chainId: 1,
+            minCap: parseUnits("50", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
             maxCap: parseUnits("100000", 18),
           },
@@ -77,21 +77,21 @@ import { deploy, IDeployConfig } from "./helpers";
         maxFee: ethers.utils.parseUnits("2.5", 8),
         transferOverhead: 85949,
         maxWalletLiquidityCap: parseUnits("8474.57", 18),
-        maxLiquidityCap: parseUnits("610350", 18),
-        svgHelper: await ethers.getContractFactory("EthereumBICO"),
+        maxLiquidityCap: parseUnits("967323", 18),
+        svgHelper: await ethers.getContractFactory("PolygonBICO"),
         decimals: 18,
-        rewardTokenAddress: "0xf17e65822b568b3903685a7c9f496cf7656cc6c2",
-        rewardRatePerSecond: parseUnits("0.002796886574074070", 18),
+        rewardTokenAddress: "0x91c89A94567980f0e9723b487b0beD586eE96aa7",
+        rewardRatePerSecond: parseUnits("0.004432685185185190", 18),
       },
-      // ETH
+      // WETH
       {
-        tokenAddress: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-        minCap: parseUnits("0.02", 18),
+        tokenAddress: "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
+        minCap: parseUnits("0.0039", 18),
         maxCap: parseUnits("143", 18),
         depositConfigs: [
           {
-            chainId: 137,
-            minCap: parseUnits("0.0039", 18),
+            chainId: 1,
+            minCap: parseUnits("0.02", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
             maxCap: parseUnits("100", 18),
           },
@@ -104,13 +104,13 @@ import { deploy, IDeployConfig } from "./helpers";
         ],
         equilibriumFee: ethers.utils.parseUnits("0.1", 8),
         maxFee: ethers.utils.parseUnits("2.5", 8),
-        transferOverhead: 59271,
+        transferOverhead: 72945,
         maxWalletLiquidityCap: parseUnits("3.86", 18),
-        maxLiquidityCap: parseUnits("1774", 18),
-        svgHelper: await ethers.getContractFactory("EthereumETH"),
+        maxLiquidityCap: parseUnits("1781", 18),
+        svgHelper: await ethers.getContractFactory("PolygonETH"),
         decimals: 18,
-        rewardTokenAddress: "0xf17e65822b568b3903685a7c9f496cf7656cc6c2",
-        rewardRatePerSecond: parseUnits("0.017809687500000000", 18),
+        rewardTokenAddress: "0x91c89A94567980f0e9723b487b0beD586eE96aa7",
+        rewardRatePerSecond: parseUnits("0.017881504629629600", 18),
       },
     ],
   };
