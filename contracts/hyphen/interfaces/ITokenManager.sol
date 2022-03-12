@@ -1,21 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.0;
 
+import "../structures/TokenConfig.sol";
+
 interface ITokenManager {
-
-    struct TokenInfo {
-        uint256 transferOverhead;
-        bool supportedToken;
-        uint256 equilibriumFee; // Percentage fee Represented in basis points
-        uint256 maxFee; // Percentage fee Represented in basis points
-        TokenConfig tokenConfig;
-    }
-
-    struct TokenConfig {
-        uint256 min;
-        uint256 max;
-    }
-    
     function getEquilibriumFee(address tokenAddress) external view returns (uint256);
 
     function getMaxFee(address tokenAddress) external view returns (uint256);
@@ -25,6 +13,17 @@ interface ITokenManager {
         uint256 _equilibriumFee,
         uint256 _maxFee
     ) external;
+
+    function tokensInfo(address tokenAddress)
+        external
+        view
+        returns (
+            uint256 transferOverhead,
+            bool supportedToken,
+            uint256 equilibriumFee,
+            uint256 maxFee,
+            TokenConfig memory config
+        );
 
     function getTokensInfo(address tokenAddress) external view returns (TokenInfo memory);
 

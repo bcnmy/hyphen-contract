@@ -1,3 +1,14 @@
+// $$$$$$$$\        $$\                                 $$\      $$\                                                             
+// \__$$  __|       $$ |                                $$$\    $$$ |                                                            
+//    $$ | $$$$$$\  $$ |  $$\  $$$$$$\  $$$$$$$\        $$$$\  $$$$ | $$$$$$\  $$$$$$$\   $$$$$$\   $$$$$$\   $$$$$$\   $$$$$$\  
+//    $$ |$$  __$$\ $$ | $$  |$$  __$$\ $$  __$$\       $$\$$\$$ $$ | \____$$\ $$  __$$\  \____$$\ $$  __$$\ $$  __$$\ $$  __$$\ 
+//    $$ |$$ /  $$ |$$$$$$  / $$$$$$$$ |$$ |  $$ |      $$ \$$$  $$ | $$$$$$$ |$$ |  $$ | $$$$$$$ |$$ /  $$ |$$$$$$$$ |$$ |  \__|
+//    $$ |$$ |  $$ |$$  _$$<  $$   ____|$$ |  $$ |      $$ |\$  /$$ |$$  __$$ |$$ |  $$ |$$  __$$ |$$ |  $$ |$$   ____|$$ |      
+//    $$ |\$$$$$$  |$$ | \$$\ \$$$$$$$\ $$ |  $$ |      $$ | \_/ $$ |\$$$$$$$ |$$ |  $$ |\$$$$$$$ |\$$$$$$$ |\$$$$$$$\ $$ |      
+//    \__| \______/ \__|  \__| \_______|\__|  \__|      \__|     \__| \_______|\__|  \__| \_______| \____$$ | \_______|\__|      
+//                                                                                                 $$\   $$ |                    
+//                                                                                                 \$$$$$$  |                    
+//                                                                                                  \______/                     
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.0;
@@ -8,7 +19,7 @@ import "../metatx/ERC2771Context.sol";
 import "../interfaces/ITokenManager.sol";
 
 contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
-    mapping(address => TokenInfo) public tokensInfo;
+    mapping(address => TokenInfo) public override tokensInfo;
 
     event FeeChanged(address indexed tokenAddress, uint256 indexed equilibriumFee, uint256 indexed maxFee);
 
@@ -29,7 +40,7 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
      */
     mapping(address => TokenConfig) public transferConfig;
 
-    constructor(address trustedForwarder) ERC2771Context(trustedForwarder) {
+    constructor(address trustedForwarder) ERC2771Context(trustedForwarder) Ownable() Pausable() {
         // Empty Constructor
     }
 
@@ -75,9 +86,13 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
             (toChainId.length == tokenAddresses.length) && (tokenAddresses.length == tokenConfig.length),
             " ERR_ARRAY_LENGTH_MISMATCH"
         );
-        for (uint256 index = 0; index < tokenConfig.length; ++index) {
+        uint256 length = tokenConfig.length;
+        for (uint256 index; index < length; ) {
             depositConfig[toChainId[index]][tokenAddresses[index]].min = tokenConfig[index].min;
             depositConfig[toChainId[index]][tokenAddresses[index]].max = tokenConfig[index].max;
+            unchecked {
+                ++index;
+            }
         }
     }
 
@@ -142,5 +157,13 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
 
     function _msgData() internal view virtual override(Context, ERC2771Context) returns (bytes calldata) {
         return ERC2771Context._msgData();
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 }

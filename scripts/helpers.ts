@@ -284,4 +284,12 @@ const verify = async (
   await verifyImplementation(contracts.liquidityFarming.address);
 };
 
-export { deployCoreContracts as deployContracts, configure, addTokenSupport, verify, deploy };
+export {
+  deployCoreContracts as deployContracts,
+  configure,
+  addTokenSupport,
+  verify,
+  deploy,
+  verifyContract,
+  verifyImplementation,
+};

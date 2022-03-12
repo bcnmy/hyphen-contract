@@ -123,12 +123,7 @@ abstract contract SvgHelperBase is Ownable {
             );
     }
 
-    function getDescription(uint256 _suppliedLiquidity, uint256 _totalSuppliedLiquidity)
-        public
-        view
-        virtual
-        returns (string memory)
-    {
+    function getDescription(uint256, uint256) public view virtual returns (string memory) {
         return
             string(
                 abi.encodePacked(
