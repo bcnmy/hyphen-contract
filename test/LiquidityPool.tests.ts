@@ -95,7 +95,9 @@ describe("LiquidityPoolTests", function () {
     tokenAddress = token.address;
 
     // Add supported ERC20 token
-    await tokenManager.connect(owner).addSupportedToken(tokenAddress, minTokenCap, maxTokenCap, equilibriumFee, maxFee);
+    await tokenManager
+      .connect(owner)
+      .addSupportedToken(tokenAddress, minTokenCap, maxTokenCap, equilibriumFee, maxFee, 0);
 
     let tokenDepositConfig = {
       min: minTokenCap,
@@ -106,7 +108,7 @@ describe("LiquidityPoolTests", function () {
     // Add supported Native token
     await tokenManager
       .connect(owner)
-      .addSupportedToken(NATIVE, minNativeTokenCap, maxNativeTokenCap, equilibriumFee, maxFee);
+      .addSupportedToken(NATIVE, minNativeTokenCap, maxNativeTokenCap, equilibriumFee, maxFee, 0);
 
     let nativeDepositConfig = {
       min: minTokenCap,
@@ -224,7 +226,9 @@ describe("LiquidityPoolTests", function () {
   });
 
   it("Should addSupportedToken successfully", async () => {
-    await tokenManager.connect(owner).addSupportedToken(tokenAddress, minTokenCap, maxTokenCap, equilibriumFee, maxFee);
+    await tokenManager
+      .connect(owner)
+      .addSupportedToken(tokenAddress, minTokenCap, maxTokenCap, equilibriumFee, maxFee, 0);
     let tokenTransferConfig = await tokenManager.getTransferConfig(tokenAddress);
     let checkTokenStatus = await tokenManager.tokensInfo(tokenAddress);
     expect(checkTokenStatus.supportedToken).to.equal(true);
@@ -568,7 +572,7 @@ describe("LiquidityPoolTests", function () {
     let minTokenCap = "100000000";
     let maxTokenCap = "10000000000";
     await expect(
-      tokenManager.connect(bob).addSupportedToken(tokenAddress, minTokenCap, maxTokenCap, equilibriumFee, maxFee)
+      tokenManager.connect(bob).addSupportedToken(tokenAddress, minTokenCap, maxTokenCap, equilibriumFee, maxFee, 0)
     ).to.be.reverted;
   });
 
@@ -576,7 +580,7 @@ describe("LiquidityPoolTests", function () {
     let minTokenCap = "10000000000";
     let maxTokenCap = "100000000";
     await expect(
-      tokenManager.connect(bob).addSupportedToken(tokenAddress, minTokenCap, maxTokenCap, equilibriumFee, maxFee)
+      tokenManager.connect(bob).addSupportedToken(tokenAddress, minTokenCap, maxTokenCap, equilibriumFee, maxFee, 0)
     ).to.be.reverted;
   });
 
@@ -584,7 +588,7 @@ describe("LiquidityPoolTests", function () {
     let minTokenCap = "10000000000";
     let maxTokenCap = "100000000";
     await expect(
-      tokenManager.connect(bob).addSupportedToken(ZERO_ADDRESS, minTokenCap, maxTokenCap, equilibriumFee, maxFee)
+      tokenManager.connect(bob).addSupportedToken(ZERO_ADDRESS, minTokenCap, maxTokenCap, equilibriumFee, maxFee, 0)
     ).to.be.reverted;
   });
 
