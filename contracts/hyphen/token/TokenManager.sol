@@ -1,14 +1,14 @@
-// $$$$$$$$\        $$\                                 $$\      $$\                                                             
-// \__$$  __|       $$ |                                $$$\    $$$ |                                                            
-//    $$ | $$$$$$\  $$ |  $$\  $$$$$$\  $$$$$$$\        $$$$\  $$$$ | $$$$$$\  $$$$$$$\   $$$$$$\   $$$$$$\   $$$$$$\   $$$$$$\  
-//    $$ |$$  __$$\ $$ | $$  |$$  __$$\ $$  __$$\       $$\$$\$$ $$ | \____$$\ $$  __$$\  \____$$\ $$  __$$\ $$  __$$\ $$  __$$\ 
+// $$$$$$$$\        $$\                                 $$\      $$\
+// \__$$  __|       $$ |                                $$$\    $$$ |
+//    $$ | $$$$$$\  $$ |  $$\  $$$$$$\  $$$$$$$\        $$$$\  $$$$ | $$$$$$\  $$$$$$$\   $$$$$$\   $$$$$$\   $$$$$$\   $$$$$$\
+//    $$ |$$  __$$\ $$ | $$  |$$  __$$\ $$  __$$\       $$\$$\$$ $$ | \____$$\ $$  __$$\  \____$$\ $$  __$$\ $$  __$$\ $$  __$$\
 //    $$ |$$ /  $$ |$$$$$$  / $$$$$$$$ |$$ |  $$ |      $$ \$$$  $$ | $$$$$$$ |$$ |  $$ | $$$$$$$ |$$ /  $$ |$$$$$$$$ |$$ |  \__|
-//    $$ |$$ |  $$ |$$  _$$<  $$   ____|$$ |  $$ |      $$ |\$  /$$ |$$  __$$ |$$ |  $$ |$$  __$$ |$$ |  $$ |$$   ____|$$ |      
-//    $$ |\$$$$$$  |$$ | \$$\ \$$$$$$$\ $$ |  $$ |      $$ | \_/ $$ |\$$$$$$$ |$$ |  $$ |\$$$$$$$ |\$$$$$$$ |\$$$$$$$\ $$ |      
-//    \__| \______/ \__|  \__| \_______|\__|  \__|      \__|     \__| \_______|\__|  \__| \_______| \____$$ | \_______|\__|      
-//                                                                                                 $$\   $$ |                    
-//                                                                                                 \$$$$$$  |                    
-//                                                                                                  \______/                     
+//    $$ |$$ |  $$ |$$  _$$<  $$   ____|$$ |  $$ |      $$ |\$  /$$ |$$  __$$ |$$ |  $$ |$$  __$$ |$$ |  $$ |$$   ____|$$ |
+//    $$ |\$$$$$$  |$$ | \$$\ \$$$$$$$\ $$ |  $$ |      $$ | \_/ $$ |\$$$$$$$ |$$ |  $$ |\$$$$$$$ |\$$$$$$$ |\$$$$$$$\ $$ |
+//    \__| \______/ \__|  \__| \_______|\__|  \__|      \__|     \__| \_______|\__|  \__| \_______| \____$$ | \_______|\__|
+//                                                                                                 $$\   $$ |
+//                                                                                                 \$$$$$$  |
+//                                                                                                  \______/
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.0;
@@ -101,7 +101,8 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
         uint256 minCapLimit,
         uint256 maxCapLimit,
         uint256 equilibriumFee,
-        uint256 maxFee
+        uint256 maxFee,
+        uint256 transferOverhead
     ) external onlyOwner {
         require(tokenAddress != address(0), "Token address cannot be 0");
         require(maxCapLimit > minCapLimit, "maxCapLimit > minCapLimit");
@@ -111,6 +112,7 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
         tokensInfo[tokenAddress].tokenConfig = transferConfig[tokenAddress];
         tokensInfo[tokenAddress].equilibriumFee = equilibriumFee;
         tokensInfo[tokenAddress].maxFee = maxFee;
+        tokensInfo[tokenAddress].transferOverhead = transferOverhead;
     }
 
     function removeSupportedToken(address tokenAddress) external tokenChecks(tokenAddress) onlyOwner {

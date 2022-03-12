@@ -22,6 +22,7 @@ interface IAddTokenParameters {
   toChainIds: { chainId: number; minCap: BigNumberish; maxCap: BigNumberish }[];
   equilibriumFee: BigNumberish;
   maxFee: BigNumberish;
+  transferOverhead: BigNumberish;
   maxWalletLiquidityCap: BigNumberish;
   maxLiquidityCap: BigNumberish;
   svgHelper: ContractFactory;
@@ -205,7 +206,8 @@ const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters
       token.minCap,
       token.maxCap,
       token.equilibriumFee,
-      token.maxFee
+      token.maxFee,
+      token.transferOverhead
     )
   ).wait();
 
