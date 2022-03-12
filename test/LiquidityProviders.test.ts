@@ -95,25 +95,14 @@ describe("LiquidityProviderTests", function () {
 
   async function depositERC20Token(tokenAddress: string, tokenValue: string, receiver: string, toChainId: number) {
     await token.approve(liquidityPool.address, tokenValue);
-    return await liquidityPool.connect(owner).depositErc20(
-      toChainId,
-      tokenAddress,
-      receiver,
-      tokenValue,
-      tag
-    );
+    return await liquidityPool.connect(owner).depositErc20(toChainId, tokenAddress, receiver, tokenValue, tag);
   }
 
   async function sendFundsToUser(tokenAddress: string, amount: string, receiver: string, tokenGasPrice: string) {
-    return await liquidityPool.connect(executor).sendFundsToUser(
-        tokenAddress,
-        amount,
-        receiver,
-        dummyDepositHash,
-        tokenGasPrice,
-        137
-    );
-}
+    return await liquidityPool
+      .connect(executor)
+      .sendFundsToUser(tokenAddress, amount, receiver, dummyDepositHash, tokenGasPrice, 137);
+  }
 
   beforeEach(async function () {
     [owner, pauser, charlie, bob, tf, , executor] = await ethers.getSigners();
@@ -128,20 +117,36 @@ describe("LiquidityProviderTests", function () {
       await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
       await token2.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
     }
-    await tokenManager.addSupportedToken(token.address, BigNumber.from(1), BigNumber.from(10).pow(30), equilibriumFee, maxFee);
-    await tokenManager.addSupportedToken(token2.address, BigNumber.from(1), BigNumber.from(10).pow(30), equilibriumFee, maxFee);
-    await tokenManager.addSupportedToken(NATIVE, BigNumber.from(1), BigNumber.from(10).pow(30), equilibriumFee, maxFee);
-
+    await tokenManager.addSupportedToken(
+      token.address,
+      BigNumber.from(1),
+      BigNumber.from(10).pow(30),
+      equilibriumFee,
+      maxFee,
+      0
+    );
+    await tokenManager.addSupportedToken(
+      token2.address,
+      BigNumber.from(1),
+      BigNumber.from(10).pow(30),
+      equilibriumFee,
+      maxFee,
+      0
+    );
+    await tokenManager.addSupportedToken(
+      NATIVE,
+      BigNumber.from(1),
+      BigNumber.from(10).pow(30),
+      equilibriumFee,
+      maxFee,
+      0
+    );
 
     let tokenDepositConfig = {
       min: minTokenCap,
-      max: maxTokenCap
-  }
-  await tokenManager.connect(owner).setDepositConfig(
-      [1],
-      [token.address],
-      [tokenDepositConfig]
-  );
+      max: maxTokenCap,
+    };
+    await tokenManager.connect(owner).setDepositConfig([1], [token.address], [tokenDepositConfig]);
 
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
     executorManager = await executorManagerFactory.deploy();
@@ -149,7 +154,12 @@ describe("LiquidityProviderTests", function () {
     await executorManager.addExecutor(executor.address);
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
-    lpToken = (await upgrades.deployProxy(lpTokenFactory, ["LPToken", "LPToken", tf.address, pauser.address])) as LPToken;
+    lpToken = (await upgrades.deployProxy(lpTokenFactory, [
+      "LPToken",
+      "LPToken",
+      tf.address,
+      pauser.address,
+    ])) as LPToken;
 
     const liquidtyProvidersFactory = await ethers.getContractFactory("LiquidityProvidersTest");
     liquidityProviders = (await upgrades.deployProxy(liquidtyProvidersFactory, [
@@ -343,12 +353,12 @@ describe("LiquidityProviderTests", function () {
 
       await sendFundsToUser(token.address, "200000000000000000000", charlie.address, "5000");
 
-      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, "909000000000000000000")).to.not.be.reverted;
+      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, "909000000000000000000")).to.not.be
+        .reverted;
 
       await expect(liquidityProviders.connect(bob).removeLiquidity(3, "909000000000000000000")).to.not.be.reverted;
-
-    })
-  })
+    });
+  });
 
   describe("Transfer Fee Addition and LP Share Price Increase", async function () {
     this.beforeEach(async () => {
