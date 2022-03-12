@@ -213,6 +213,7 @@ contract HyphenLiquidityFarming is
     function deposit(uint256 _nftId, address payable _to) external whenNotPaused nonReentrant {
         address msgSender = _msgSender();
 
+        require(_to != address(0), "ERR__TO_IS_ZERO");
         require(
             lpToken.isApprovedForAll(msgSender, address(this)) || lpToken.getApproved(_nftId) == address(this),
             "ERR__NOT_APPROVED"
