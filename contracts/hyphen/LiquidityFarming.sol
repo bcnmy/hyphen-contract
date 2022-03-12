@@ -1,3 +1,15 @@
+// $$\       $$\                     $$\       $$\ $$\   $$\                     $$$$$$$$\                               $$\                     
+// $$ |      \__|                    \__|      $$ |\__|  $$ |                    $$  _____|                              \__|                    
+// $$ |      $$\  $$$$$$\  $$\   $$\ $$\  $$$$$$$ |$$\ $$$$$$\   $$\   $$\       $$ |   $$$$$$\   $$$$$$\  $$$$$$\$$$$\  $$\ $$$$$$$\   $$$$$$\  
+// $$ |      $$ |$$  __$$\ $$ |  $$ |$$ |$$  __$$ |$$ |\_$$  _|  $$ |  $$ |      $$$$$\ \____$$\ $$  __$$\ $$  _$$  _$$\ $$ |$$  __$$\ $$  __$$\ 
+// $$ |      $$ |$$ /  $$ |$$ |  $$ |$$ |$$ /  $$ |$$ |  $$ |    $$ |  $$ |      $$  __|$$$$$$$ |$$ |  \__|$$ / $$ / $$ |$$ |$$ |  $$ |$$ /  $$ |
+// $$ |      $$ |$$ |  $$ |$$ |  $$ |$$ |$$ |  $$ |$$ |  $$ |$$\ $$ |  $$ |      $$ |  $$  __$$ |$$ |      $$ | $$ | $$ |$$ |$$ |  $$ |$$ |  $$ |
+// $$$$$$$$\ $$ |\$$$$$$$ |\$$$$$$  |$$ |\$$$$$$$ |$$ |  \$$$$  |\$$$$$$$ |      $$ |  \$$$$$$$ |$$ |      $$ | $$ | $$ |$$ |$$ |  $$ |\$$$$$$$ |
+// \________|\__| \____$$ | \______/ \__| \_______|\__|   \____/  \____$$ |      \__|   \_______|\__|      \__| \__| \__|\__|\__|  \__| \____$$ |
+//                     $$ |                                      $$\   $$ |                                                            $$\   $$ |
+//                     $$ |                                      \$$$$$$  |                                                            \$$$$$$  |
+//                     \__|                                       \______/                                                              \______/ 
+//
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.0;
 
@@ -49,9 +61,6 @@ contract HyphenLiquidityFarming is
     /// @notice Info of each NFT that is staked.
     mapping(uint256 => NFTInfo) public nftInfo;
 
-    /// @notice Reward rate per base token
-    //mapping(address => uint256) public rewardPerSecond;
-
     /// @notice Reward Token
     mapping(address => address) public rewardTokens;
 
@@ -74,6 +83,7 @@ contract HyphenLiquidityFarming is
     event LogRewardPerSecond(address indexed baseToken, uint256 rewardPerSecond);
     event LogRewardPoolInitialized(address _baseToken, address _rewardToken, uint256 _rewardPerSecond);
     event LogNativeReceived(address indexed sender, uint256 value);
+    event LiquidityProviderUpdated(address indexed liquidityProviders);
 
     function initialize(
         address _trustedForwarder,
@@ -104,6 +114,12 @@ contract HyphenLiquidityFarming is
         rewardTokens[_baseToken] = _rewardToken;
         rewardRateLog[_baseToken].push(RewardsPerSecondEntry(_rewardPerSecond, block.timestamp));
         emit LogRewardPoolInitialized(_baseToken, _rewardToken, _rewardPerSecond);
+    }
+
+    function updateLiquidityProvider(ILiquidityProviders _liquidityProviders) external onlyOwner {
+        require(address(_liquidityProviders) != address(0), "ERR__LIQUIDITY_PROVIDER_IS_ZERO");
+        liquidityProviders = _liquidityProviders;
+        emit LiquidityProviderUpdated(address(liquidityProviders));
     }
 
     function _sendErc20AndGetSentAmount(
@@ -166,7 +182,7 @@ contract HyphenLiquidityFarming is
 
     /// @notice Sets the sushi per second to be distributed. Can only be called by the owner.
     /// @param _rewardPerSecond The amount of Sushi to be distributed per second.
-    function setRewardPerSecond(address _baseToken, uint256 _rewardPerSecond) public onlyOwner {
+    function setRewardPerSecond(address _baseToken, uint256 _rewardPerSecond) external onlyOwner {
         rewardRateLog[_baseToken].push(RewardsPerSecondEntry(_rewardPerSecond, block.timestamp));
         emit LogRewardPerSecond(_baseToken, _rewardPerSecond);
     }
@@ -181,8 +197,9 @@ contract HyphenLiquidityFarming is
         address _token,
         uint256 _amount,
         address payable _to
-    ) external nonReentrant onlyOwner {
+    ) external onlyOwner {
         require(_to != address(0), "ERR__TO_IS_ZERO");
+        require(_amount != 0, "ERR__AMOUNT_IS_ZERO");
         if (_token == NATIVE) {
             (bool success, ) = payable(_to).call{value: _amount}("");
             require(success, "ERR__NATIVE_TRANSFER_FAILED");
@@ -196,19 +213,20 @@ contract HyphenLiquidityFarming is
     function deposit(uint256 _nftId, address payable _to) external whenNotPaused nonReentrant {
         address msgSender = _msgSender();
 
+        require(_to != address(0), "ERR__TO_IS_ZERO");
         require(
             lpToken.isApprovedForAll(msgSender, address(this)) || lpToken.getApproved(_nftId) == address(this),
             "ERR__NOT_APPROVED"
         );
+
+        NFTInfo storage nft = nftInfo[_nftId];
+        require(!nft.isStaked, "ERR__NFT_ALREADY_STAKED");
 
         (address baseToken, , uint256 amount) = lpToken.tokenMetadata(_nftId);
         amount /= liquidityProviders.BASE_DIVISOR();
 
         require(rewardTokens[baseToken] != address(0), "ERR__POOL_NOT_INITIALIZED");
         require(rewardRateLog[baseToken].length != 0, "ERR__POOL_NOT_INITIALIZED");
-
-        NFTInfo storage nft = nftInfo[_nftId];
-        require(!nft.isStaked, "ERR__NFT_ALREADY_STAKED");
 
         lpToken.safeTransferFrom(msgSender, address(this), _nftId);
 
@@ -326,11 +344,11 @@ contract HyphenLiquidityFarming is
 
     /// @notice View function to see the tokens staked by a given user.
     /// @param _user Address of user.
-    function getNftIdsStaked(address _user) public view returns (uint256[] memory nftIds) {
+    function getNftIdsStaked(address _user) external view returns (uint256[] memory nftIds) {
         nftIds = nftIdsStaked[_user];
     }
 
-    function getRewardRatePerSecond(address _baseToken) public view returns (uint256) {
+    function getRewardRatePerSecond(address _baseToken) external view returns (uint256) {
         return rewardRateLog[_baseToken][rewardRateLog[_baseToken].length - 1].rewardsPerSecond;
     }
 
