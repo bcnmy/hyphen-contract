@@ -19,7 +19,7 @@ interface IAddTokenParameters {
   tokenAddress: string;
   minCap: BigNumberish;
   maxCap: BigNumberish;
-  toChainIds: { chainId: number; minCap: BigNumberish; maxCap: BigNumberish }[];
+  depositConfigs: { chainId: number; minCap: BigNumberish; maxCap: BigNumberish }[];
   equilibriumFee: BigNumberish;
   maxFee: BigNumberish;
   transferOverhead: BigNumberish;
@@ -39,13 +39,14 @@ interface IContracts {
   liquidityFarming: HyphenLiquidityFarming;
   svgHelperMap: Record<string, SvgHelperBase>;
 }
-
-const deploy = async (deployConfig: {
+interface IDeployConfig {
   trustedForwarder: string;
   bicoOwner: string;
   pauser: string;
   tokens: IAddTokenParameters[];
-}) => {
+}
+
+const deploy = async (deployConfig: IDeployConfig) => {
   const contracts = await deployCoreContracts(deployConfig.trustedForwarder, deployConfig.pauser);
   for (const token of deployConfig.tokens) {
     await addTokenSupport(contracts, token);
@@ -200,6 +201,7 @@ const configure = async (contracts: IContracts, bicoOwner: string) => {
 };
 
 const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters) => {
+  // Add support for token
   await (
     await contracts.tokenManager.addSupportedToken(
       token.tokenAddress,
@@ -213,8 +215,8 @@ const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters
 
   let chainIdArray = [];
   let minMaxArray = [];
-  for (let index = 0; index < token.toChainIds.length; index++) {
-    let entry = token.toChainIds[index];
+  for (let index = 0; index < token.depositConfigs.length; index++) {
+    let entry = token.depositConfigs[index];
     chainIdArray.push(entry.chainId);
     minMaxArray.push({ min: entry.minCap, max: entry.maxCap });
   }
@@ -294,4 +296,5 @@ export {
   deploy,
   verifyContract,
   verifyImplementation,
+  IDeployConfig,
 };
