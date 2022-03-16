@@ -350,9 +350,9 @@ contract LiquidityPool is
         if (transferFeePerc > tokenInfo.equilibriumFee) {
             // Here add some fee to incentive pool also
             lpFee = (amount * tokenInfo.equilibriumFee) / BASE_DIVISOR;
-            incentivePool[tokenAddress] =
-                (incentivePool[tokenAddress] + (amount * (transferFeePerc - tokenInfo.equilibriumFee))) /
-                BASE_DIVISOR;
+            unchecked {
+                incentivePool[tokenAddress] += (amount * (transferFeePerc - tokenInfo.equilibriumFee)) / BASE_DIVISOR;
+            }
         } else {
             lpFee = (amount * transferFeePerc) / BASE_DIVISOR;
         }
