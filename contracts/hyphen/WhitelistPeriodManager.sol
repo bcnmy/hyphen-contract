@@ -1,6 +1,6 @@
-// $$\      $$\                                                         $$\       $$\       $$\                     $$\       $$\ $$\   $$\               
-// $$$\    $$$ |                                                        $$ |      $$ |      \__|                    \__|      $$ |\__|  $$ |              
-// $$$$\  $$$$ | $$$$$$\  $$$$$$$\   $$$$$$\   $$$$$$\   $$$$$$\   $$$$$$$ |      $$ |      $$\  $$$$$$\  $$\   $$\ $$\  $$$$$$$ |$$\ $$$$$$\   $$\   $$\ 
+// $$\      $$\                                                         $$\       $$\       $$\                     $$\       $$\ $$\   $$\
+// $$$\    $$$ |                                                        $$ |      $$ |      \__|                    \__|      $$ |\__|  $$ |
+// $$$$\  $$$$ | $$$$$$\  $$$$$$$\   $$$$$$\   $$$$$$\   $$$$$$\   $$$$$$$ |      $$ |      $$\  $$$$$$\  $$\   $$\ $$\  $$$$$$$ |$$\ $$$$$$\   $$\   $$\
 // $$\$$\$$ $$ | \____$$\ $$  __$$\  \____$$\ $$  __$$\ $$  __$$\ $$  __$$ |      $$ |      $$ |$$  __$$\ $$ |  $$ |$$ |$$  __$$ |$$ |\_$$  _|  $$ |  $$ |
 // $$ \$$$  $$ | $$$$$$$ |$$ |  $$ | $$$$$$$ |$$ /  $$ |$$$$$$$$ |$$ /  $$ |      $$ |      $$ |$$ /  $$ |$$ |  $$ |$$ |$$ /  $$ |$$ |  $$ |    $$ |  $$ |
 // $$ |\$  /$$ |$$  __$$ |$$ |  $$ |$$  __$$ |$$ |  $$ |$$   ____|$$ |  $$ |      $$ |      $$ |$$ |  $$ |$$ |  $$ |$$ |$$ |  $$ |$$ |  $$ |$$\ $$ |  $$ |
@@ -8,7 +8,7 @@
 // \__|     \__| \_______|\__|  \__| \_______| \____$$ | \_______| \_______|      \________|\__| \____$$ | \______/ \__| \_______|\__|   \____/  \____$$ |
 //                                            $$\   $$ |                                              $$ |                                      $$\   $$ |
 //                                            \$$$$$$  |                                              $$ |                                      \$$$$$$  |
-//                                             \______/                                               \__|                                       \______/ 
+//                                             \______/                                               \__|                                       \______/
 //
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.0;
@@ -31,8 +31,10 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
     /* LP Status */
     // EOA? -> status, stores addresses that we want to ignore, like staking contracts.
     mapping(address => bool) public isExcludedAddress;
+    // WARNING: DEPRECIATED, DO NOT USE
     // Token -> TVL
     mapping(address => uint256) private totalLiquidity;
+    // WARNING: DEPRECIATED, DO NOT USE
     // Token -> TVL
     mapping(address => mapping(address => uint256)) public totalLiquidityByLp;
 
@@ -91,21 +93,15 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
      * @dev Internal Function which checks for various caps before allowing LP to add liqudity
      */
     function _beforeLiquidityAddition(
-        address _lp,
+        address,
         address _token,
         uint256 _amount
     ) internal {
-        if (isExcludedAddress[_lp]) {
-            return;
-        }
         // Per Token Total Cap or PTTC
-        require(ifEnabled(totalLiquidity[_token] + _amount <= perTokenTotalCap[_token]), "ERR__LIQUIDITY_EXCEEDS_PTTC");
         require(
-            ifEnabled(totalLiquidityByLp[_token][_lp] + _amount <= perTokenWalletCap[_token]),
-            "ERR__LIQUIDITY_EXCEEDS_PTWC"
+            ifEnabled(liquidityProviders.getSuppliedLiquidityByToken(_token) + _amount <= perTokenTotalCap[_token]),
+            "ERR__LIQUIDITY_EXCEEDS_PTTC"
         );
-        totalLiquidity[_token] += _amount;
-        totalLiquidityByLp[_token][_lp] += _amount;
     }
 
     /**
@@ -123,15 +119,11 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
      * @dev Internal Function which checks for various caps before allowing LP to remove liqudity
      */
     function _beforeLiquidityRemoval(
-        address _lp,
-        address _token,
-        uint256 _amount
-    ) internal {
-        if (isExcludedAddress[_lp]) {
-            return;
-        }
-        totalLiquidityByLp[_token][_lp] -= _amount;
-        totalLiquidity[_token] -= _amount;
+        address,
+        address,
+        uint256
+    ) internal pure {
+        return;
     }
 
     /**
@@ -141,7 +133,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
         address _lp,
         address _token,
         uint256 _amount
-    ) external onlyLiquidityPool whenNotPaused {
+    ) external view onlyLiquidityPool whenNotPaused {
         _beforeLiquidityRemoval(_lp, _token, _amount);
     }
 
@@ -149,16 +141,12 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
      * @dev External Function which checks for various caps before allowing LP to transfer their LpNFT. Only callable by LpNFT contract
      */
     function beforeLiquidityTransfer(
-        address _from,
-        address _to,
-        address _token,
-        uint256 _amount
-    ) external onlyLpNft whenNotPaused {
-        // Release limit from  _from
-        _beforeLiquidityRemoval(_from, _token, _amount);
-
-        // Block limit of _to
-        _beforeLiquidityAddition(_to, _token, _amount);
+        address,
+        address,
+        address,
+        uint256
+    ) external view onlyLpNft whenNotPaused {
+        return;
     }
 
     function _setTokenManager(address _tokenManager) internal {
@@ -198,7 +186,7 @@ contract WhitelistPeriodManager is Initializable, OwnableUpgradeable, Pausable, 
     }
 
     function setTotalCap(address _token, uint256 _totalCap) public tokenChecks(_token) onlyOwner {
-        require(totalLiquidity[_token] <= _totalCap, "ERR__TOTAL_CAP_LESS_THAN_SL");
+        require(liquidityProviders.getSuppliedLiquidityByToken(_token) <= _totalCap, "ERR__TOTAL_CAP_LESS_THAN_SL");
         require(_totalCap >= perTokenWalletCap[_token], "ERR__TOTAL_CAP_LT_PTWC");
         if (perTokenTotalCap[_token] != _totalCap) {
             perTokenTotalCap[_token] = _totalCap;
