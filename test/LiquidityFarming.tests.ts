@@ -43,8 +43,8 @@ describe("LiquidityFarmingTests", function () {
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   let BASE: BigNumber = BigNumber.from(10).pow(18);
 
-  const perWalletMaxCap = 70;
-  const tokenMaxCap = 70;
+  const perWalletMaxCap = getLocaleString(1 * 1e18);
+  const tokenMaxCap = getLocaleString(1 * 1e18);
 
   const perWalletNativeMaxCap = getLocaleString(1 * 1e18);
   const tokenNativeMaxCap = getLocaleString(200 * 1e18);
