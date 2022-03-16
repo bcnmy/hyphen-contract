@@ -109,7 +109,7 @@ async function deployCoreContracts(trustedForwarder: string, pauser: string): Pr
 
   const ExecutorManager = await ethers.getContractFactory("ExecutorManager");
   console.log("Deploying ExecutorManager...");
-  const executorManager = await ExecutorManager.deploy();
+  const executorManager = await ExecutorManager.deploy({});
   await executorManager.deployed();
   console.log("ExecutorManager deployed to:", executorManager.address);
   await wait(5000);

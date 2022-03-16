@@ -48,6 +48,7 @@ describe("LiquidityPoolTests", function () {
   const tokenNativeMaxCap = getLocaleString(200 * 1e18);
 
   const DEPOSIT_EVENT = "Deposit";
+  const ASSET_SENT = "AssetSent";
   const DEPOSIT_TOPIC_ID = "0x5fe47ed6d4225326d3303476197d782ded5a4e9c14f479dc9ec4992af4e85d59";
   const dummyDepositHash = "0xf408509b00caba5d37325ab33a92f6185c9b5f007a965dfbeff7b81ab1ec871a";
 
@@ -179,10 +180,10 @@ describe("LiquidityPoolTests", function () {
     });
   }
 
-  async function sendFundsToUser(tokenAddress: string, amount: string, receiver: string, tokenGasPrice: string) {
+  async function sendFundsToUser(tokenAddress: string, amount: string, receiver: string, tokenGasPrice: string, depositHash?: string) {
     return await liquidityPool
       .connect(executor)
-      .sendFundsToUser(tokenAddress, amount, receiver, dummyDepositHash, tokenGasPrice, 137);
+      .sendFundsToUser(tokenAddress, amount, receiver, depositHash? depositHash: dummyDepositHash, tokenGasPrice, 137);
   }
 
   async function checkStorage() {
@@ -440,6 +441,10 @@ describe("LiquidityPoolTests", function () {
       let tx = await sendFundsToUser(NATIVE, amountToWithdraw, receiver, "0");
       await tx.wait();
 
+      let rewardPoolBeforeTransfer = await liquidityPool.incentivePool(NATIVE);
+      tx = await sendFundsToUser(NATIVE, amountToWithdraw, receiver, "0", "0xbf4d8d58e7905ad39ea2e4b8c8ae0cae89e5877d8540b03a299a0b14544c1e6a");
+      await tx.wait();
+
       const amountToDeposit = BigNumber.from(minTokenCap).toString();
 
       let rewardAmoutFromContract = await liquidityPool.getRewardAmount(amountToDeposit, NATIVE);
@@ -476,6 +481,35 @@ describe("LiquidityPoolTests", function () {
           calculatedRewardAmount,
           tag
         );
+    });
+
+    it("Sending funds to user should increase the incentive pool", async () => {
+      // Add Native Currency liquidity
+      const liquidityToBeAdded = getLocaleString(50 * 1e18);
+      await addNativeLiquidity(liquidityToBeAdded, owner);
+
+      const amountToWithdraw = BigNumber.from(minTokenCap)
+        .add(BigNumber.from(getLocaleString(5 * 1e18)));
+      let receiver = await getReceiverAddress();
+      let toChainId = 1;
+      await executorManager.addExecutor(executor.address);
+      // Send funds to put pool into deficit state so current liquidity < provided liquidity
+      let tx = await sendFundsToUser(NATIVE, amountToWithdraw.toString(), receiver, "0");
+      await tx.wait();
+
+      let rewardPoolBeforeTransfer = await liquidityPool.incentivePool(NATIVE);
+
+      let transferFeePercentage = await liquidityPool.getTransferFee(NATIVE, amountToWithdraw);
+      
+      let excessFeePercentage = transferFeePercentage.sub(BigNumber.from("10000000"));
+      let expectedRewardAmount = amountToWithdraw.mul(excessFeePercentage).div(1e10);
+      tx = await sendFundsToUser(NATIVE, amountToWithdraw.toString(), receiver, "0", "0xbf4d8d58e7905ad39ea2e4b8c8ae0cae89e5877d8540b03a299a0b14544c1e6a");
+
+      let rewardPoolAfterTrasnfer = await liquidityPool.incentivePool(NATIVE);
+
+      let rewardPoolDiff = rewardPoolAfterTrasnfer.sub(rewardPoolBeforeTransfer);
+      expect(rewardPoolDiff.eq(expectedRewardAmount)).to.be.true;
+      
     });
   });
 

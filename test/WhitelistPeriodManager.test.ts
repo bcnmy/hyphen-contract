@@ -126,17 +126,6 @@ describe("WhiteListPeriodManager", function () {
       await expect(liquidityProviders.increaseTokenLiquidity(1, 5)).to.not.be.reverted;
     });
 
-    it("Should prevent LPs from exceeding per wallet cap", async function () {
-      await expect(liquidityProviders.addTokenLiquidity(token.address, 11)).to.be.revertedWith(
-        "ERR__LIQUIDITY_EXCEEDS_PTWC"
-      );
-    });
-
-    it("Should prevent LP from increasing liquidity to same NFT above cap", async function () {
-      await expect(liquidityProviders.addTokenLiquidity(token.address, 10)).to.not.be.reverted;
-      await expect(liquidityProviders.increaseTokenLiquidity(1, 6)).to.be.revertedWith("ERR__LIQUIDITY_EXCEEDS_PTWC");
-    });
-
     it("Should prevent multiple LPs to exceed global cap", async function () {
       await liquidityProviders.addTokenLiquidity(token.address, 9);
       await liquidityProviders.connect(bob).addTokenLiquidity(token.address, 9);
@@ -166,31 +155,6 @@ describe("WhiteListPeriodManager", function () {
       await lpToken.transferFrom(owner.address, bob.address, 1);
       await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
     });
-
-    it("Should block NFT receiver's limit for adding liquidity", async function () {
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
-      await lpToken.transferFrom(owner.address, bob.address, 1);
-      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(1, 10)).to.be.revertedWith(
-        "ERR__LIQUIDITY_EXCEEDS_PTWC"
-      );
-    });
-
-    it("Should block NFT receiver's limit for adding liquidity - 2", async function () {
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 5)).to.not.be.reverted;
-      await lpToken.transferFrom(owner.address, bob.address, 1);
-      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(1, 5)).to.not.be.reverted;
-      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(1, 1)).to.be.revertedWith(
-        "ERR__LIQUIDITY_EXCEEDS_PTWC"
-      );
-    });
-
-    it("Should prevent NFT transfer if receiver's limit is exhaused", async function () {
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 5)).to.not.be.reverted;
-      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 6)).to.not.be.reverted;
-      await expect(lpToken.transferFrom(owner.address, bob.address, 1)).to.be.revertedWith(
-        "ERR__LIQUIDITY_EXCEEDS_PTWC"
-      );
-    });
   });
 
   describe("Cap Manipulation", async function () {
@@ -205,17 +169,6 @@ describe("WhiteListPeriodManager", function () {
       await expect(wlpm.setTotalCap(token.address, 10)).to.be.revertedWith("ERR__TOTAL_CAP_LESS_THAN_SL");
     });
 
-    it("Should allow member to add more liquidity after increasing per wallet cap", async function () {
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
-      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
-      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(2, 5)).to.be.revertedWith(
-        "ERR__LIQUIDITY_EXCEEDS_PTWC"
-      );
-      await wlpm.setPerTokenWalletCap(token.address, 13);
-      await expect(liquidityProviders.connect(owner).increaseTokenLiquidity(1, 3)).to.not.be.reverted;
-      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(2, 2)).to.not.be.reverted;
-    });
-
     it("Should allow member to add more liquidity after increasing cap", async function () {
       await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
       await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
@@ -225,99 +178,6 @@ describe("WhiteListPeriodManager", function () {
       );
       await wlpm.setTotalCap(token.address, 30);
       await expect(liquidityProviders.connect(charlie).increaseTokenLiquidity(3, 5)).to.not.be.reverted;
-    });
-  });
-
-  describe("Max LP", async function () {
-    this.beforeEach(async function () {
-      await wlpm.setCaps([token.address], [300], [100]);
-    });
-
-    it("Should return correct max lp value", async function () {
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 10)).to.not.be.reverted;
-      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(10);
-      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, 30)).to.not.be.reverted;
-      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(30);
-      await expect(liquidityProviders.connect(charlie).addTokenLiquidity(token.address, 50)).to.not.be.reverted;
-      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(50);
-      await expect(liquidityProviders.connect(bob).increaseTokenLiquidity(2, 25)).to.not.be.reverted;
-      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(55);
-      await expect(liquidityProviders.connect(bob).removeLiquidity(2, 40)).to.not.be.reverted;
-      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(50);
-      await expect(liquidityProviders.connect(charlie).removeLiquidity(3, 25)).to.not.be.reverted;
-      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(25);
-      await expect(liquidityProviders.connect(charlie).removeLiquidity(3, 25)).to.not.be.reverted;
-      expect(await wlpm.getMaxCommunityLpPositon(token.address)).to.equal(15);
-    });
-  });
-
-  describe("Planned Scenario / Prod Dry Run", async function () {
-    const f = (n: number) => BigNumber.from(n).mul(BigNumber.from(10).pow(18));
-    it("Ethereum USDC Pool, Community Pool Not Filled", async function () {
-      // Community Pre Funding Period
-      await wlpm.setCaps([token.address], [f(1000000)], [f(10000)]);
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, f(100))).to.not.be.reverted;
-      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, f(1000))).to.not.be.reverted;
-      await liquidityProviders.connect(charlie).addTokenLiquidity(token.address, f(500));
-      await expect(liquidityProviders.connect(charlie).addTokenLiquidity(token.address, f(500))).to.not.be.reverted;
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, f(800))).to.not.be.reverted;
-      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, f(100))).to.not.be.reverted;
-      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, f(1000))).to.not.be.reverted;
-      await expect(liquidityProviders.connect(charlie).addTokenLiquidity(token.address, f(100))).to.not.be.reverted;
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, f(700))).to.not.be.reverted;
-
-      // Let all hell lose
-      await wlpm.setCaps([token.address], [f(1500000)], [f(1500000)]);
-      await expect(
-        liquidityProviders
-          .connect(elon)
-          .addTokenLiquidity(
-            token.address,
-            f(1500000).sub(await liquidityProviders.getSuppliedLiquidityByToken(token.address))
-          )
-      ).to.not.be.reverted;
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 1)).to.be.revertedWith(
-        "ERR__LIQUIDITY_EXCEEDS_PTTC"
-      );
-    });
-
-    it("Ethereum USDC Pool, Community Pool Filled", async function () {
-      // Community Pre Funding Period
-      await wlpm.setCaps([token.address], [f(1000000)], [f(1000000)]);
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, f(100))).to.not.be.reverted;
-      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, f(1000))).to.not.be.reverted;
-      await liquidityProviders.connect(charlie).addTokenLiquidity(token.address, f(500));
-      await expect(liquidityProviders.connect(charlie).addTokenLiquidity(token.address, f(500))).to.not.be.reverted;
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, f(800))).to.not.be.reverted;
-      await expect(liquidityProviders.connect(bob).addTokenLiquidity(token.address, f(100))).to.not.be.reverted;
-      await expect(liquidityProviders.connect(dan).addTokenLiquidity(token.address, f(1000))).to.not.be.reverted;
-      await expect(liquidityProviders.connect(charlie).addTokenLiquidity(token.address, f(100))).to.not.be.reverted;
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, f(700))).to.not.be.reverted;
-      await expect(
-        liquidityProviders
-          .connect(owner)
-          .addTokenLiquidity(
-            token.address,
-            f(1000000).sub(await liquidityProviders.getSuppliedLiquidityByToken(token.address))
-          )
-      ).to.not.be.reverted;
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 1)).to.be.revertedWith(
-        "ERR__LIQUIDITY_EXCEEDS_PTTC"
-      );
-
-      // Let all hell lose
-      await wlpm.setCaps([token.address], [f(1500000)], [f(1500000)]);
-      await expect(
-        liquidityProviders
-          .connect(elon)
-          .addTokenLiquidity(
-            token.address,
-            f(1500000).sub(await liquidityProviders.getSuppliedLiquidityByToken(token.address))
-          )
-      ).to.not.be.reverted;
-      await expect(liquidityProviders.connect(owner).addTokenLiquidity(token.address, 1)).to.be.revertedWith(
-        "ERR__LIQUIDITY_EXCEEDS_PTTC"
-      );
     });
   });
 });
