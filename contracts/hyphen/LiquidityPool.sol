@@ -62,6 +62,22 @@ contract LiquidityPool is
     // Incentive Pool amount per token address
     mapping(address => uint256) public incentivePool;
 
+    // No of times particular user has used Hyphen
+    mapping(address => uint256) public txnCount;
+
+    // Volume transferred for particular token for any user
+    mapping(address => mapping(address => uint256)) public depositVolume;
+
+    //@review
+    //also could do
+    //mapping(address => uint256) ethDepositVolume;
+    //mapping(address => uint256) bicoDepositVolume; 
+    //and so on
+
+    // Decides which milestone user has reached
+    // Likely to be moved off chain as need cumulative from all pools
+    //mapping(address => uint8) public loyaltyScore;
+
     event AssetSent(
         address indexed asset,
         uint256 indexed amount,
@@ -167,6 +183,7 @@ contract LiquidityPool is
             incentivePool[tokenAddress];
     }
 
+    //@review If this (txnCount) should be accounted when deposit is made or exit is made. @Divya
     /**
      * @dev Function used to deposit tokens into pool to initiate a cross chain token transfer.
      * @param toChainId Chain id where funds needs to be transfered
@@ -194,6 +211,8 @@ contract LiquidityPool is
         }
         liquidityProviders.increaseCurrentLiquidity(tokenAddress, amount);
         SafeERC20Upgradeable.safeTransferFrom(IERC20Upgradeable(tokenAddress), sender, address(this), amount);
+        txnCount[sender] = txnCount[sender] + 1;
+        depositVolume[sender][tokenAddress] = depositVolume[sender][tokenAddress] + amount;
         // Emit (amount + reward amount) in event
         emit Deposit(sender, tokenAddress, receiver, toChainId, amount + rewardAmount, rewardAmount, tag);
     }
@@ -283,6 +302,8 @@ contract LiquidityPool is
             incentivePool[NATIVE] = incentivePool[NATIVE] - rewardAmount;
         }
         liquidityProviders.increaseCurrentLiquidity(NATIVE, msg.value);
+        txnCount[_msgSender()] = txnCount[_msgSender()] + 1;
+        depositVolume[_msgSender()][NATIVE] = depositVolume[_msgSender()][NATIVE] + msg.value;
         emit Deposit(_msgSender(), NATIVE, receiver, toChainId, msg.value + rewardAmount, rewardAmount, tag);
     }
 
