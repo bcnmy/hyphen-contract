@@ -68,15 +68,20 @@ contract LiquidityPool is
     // Volume transferred for particular token for any user
     mapping(address => mapping(address => uint256)) public depositVolume;
 
+    // Number of free transactions given so far to any user on this pool
+    // 1 free transaction = X loyalty points on this pool
+    // get from config
+    mapping(address => uint256) public feeRebates;
+
     //@review
     //also could do
     //mapping(address => uint256) ethDepositVolume;
     //mapping(address => uint256) bicoDepositVolume; 
     //and so on
 
-    // Decides which milestone user has reached
-    // Likely to be moved off chain as need cumulative from all pools
-    //mapping(address => uint8) public loyaltyScore;
+    // Dynamically updated redeem points for particular user
+    // Likely to be moved off chain if needed cumulative from all pools
+    mapping(address => uint256) public loyaltyScore;
 
     event AssetSent(
         address indexed asset,
@@ -148,6 +153,22 @@ contract LiquidityPool is
         emit TrustedForwarderChanged(trustedForwarder);
     }
 
+    function setTxnCount(address _user, uint256 _count) external onlyOwner {
+        txnCount[_user] = _count;
+    }
+
+    function setDepositVolume(address _user, address _token, uint256 _amount) external onlyOwner {
+       depositVolume[_user][_token] = _amount;
+    }
+
+    function setLoyaltyPoints(address _user, uint256 _points) external onlyOwner {
+       loyaltyScore[_user] = _points;
+    }
+
+    function setFeeRebates(address _user, uint256 _howmany) external onlyOwner {
+       feeRebates[_user] = _howmany;
+    }
+
     function setLiquidityProviders(address _liquidityProviders) external onlyOwner {
         require(_liquidityProviders != address(0), "LiquidityProviders can't be 0");
         liquidityProviders = ILiquidityProviders(_liquidityProviders);
@@ -214,6 +235,14 @@ contract LiquidityPool is
         txnCount[sender] = txnCount[sender] + 1;
         depositVolume[sender][tokenAddress] = depositVolume[sender][tokenAddress] + amount;
         // Emit (amount + reward amount) in event
+        uint256 volume = depositVolume[sender][tokenAddress];
+        // some formula for loaylty points
+        if(txnCount[sender] > 0){
+            loyaltyScore[sender] = loyaltyScore[sender] + txnCount[sender] * 10 + volume * 1 /10 ** 18;
+        }
+        //TODO
+        // instead of 1 multiplier it could be token weight from config
+        // 10 ** 18 could be token decimals from config
         emit Deposit(sender, tokenAddress, receiver, toChainId, amount + rewardAmount, rewardAmount, tag);
     }
 
@@ -296,7 +325,7 @@ contract LiquidityPool is
         );
         require(receiver != address(0), "Receiver address cannot be 0");
         require(msg.value != 0, "Amount cannot be 0");
-
+        // address sender = _msgSender();
         uint256 rewardAmount = getRewardAmount(msg.value, NATIVE);
         if (rewardAmount != 0) {
             incentivePool[NATIVE] = incentivePool[NATIVE] - rewardAmount;
@@ -304,13 +333,20 @@ contract LiquidityPool is
         liquidityProviders.increaseCurrentLiquidity(NATIVE, msg.value);
         txnCount[_msgSender()] = txnCount[_msgSender()] + 1;
         depositVolume[_msgSender()][NATIVE] = depositVolume[_msgSender()][NATIVE] + msg.value;
+        uint256 volume = depositVolume[_msgSender()][NATIVE];
+        if(txnCount[_msgSender()] > 0){
+            loyaltyScore[_msgSender()] = loyaltyScore[_msgSender()] + txnCount[_msgSender()] * 10 + volume * 1 /10 ** 18;
+        }
+        //TODO
+        // instead of 1 multiplier it could be token weight from config
+        // 10 ** 18 could be token decimals from config
         emit Deposit(_msgSender(), NATIVE, receiver, toChainId, msg.value + rewardAmount, rewardAmount, tag);
     }
 
     function sendFundsToUser(
         address tokenAddress,
         uint256 amount,
-        address payable receiver,
+        address payable receiver, //@review with Divya
         bytes calldata depositHash,
         uint256 tokenGasPrice,
         uint256 fromChainId
@@ -336,6 +372,17 @@ contract LiquidityPool is
         } else {
             SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, transferDetails[0]);
         }
+
+        // V2 - could get some info from depositHash for Forward fees deducation
+
+        if(tokenGasPrice == 0) {
+            // for each free transaction deduct loaylty points
+            // assuming (for now) we dont allow to send any other reciver when claiming loyalty points 
+            loyaltyScore[receiver] = loyaltyScore[receiver] - 100;
+        }
+        // hard coded to 100
+        // this will come from pool config
+        // 1 free transaction = X loyalty points on this pool
 
         emit AssetSent(
             tokenAddress,
