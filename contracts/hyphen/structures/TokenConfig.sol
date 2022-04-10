@@ -7,6 +7,8 @@ struct TokenInfo {
     uint256 equilibriumFee; // Percentage fee Represented in basis points
     uint256 maxFee; // Percentage fee Represented in basis points
     TokenConfig tokenConfig;
+    uint8 decimals;
+    uint8 weight;
 }
 
 struct TokenConfig {

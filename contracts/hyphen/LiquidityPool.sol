@@ -122,7 +122,7 @@ contract LiquidityPool is
     }
 
     modifier tokenChecks(address tokenAddress) {
-        (, bool supportedToken, , , ) = tokenManager.tokensInfo(tokenAddress);
+        (, bool supportedToken, , , , , ) = tokenManager.tokensInfo(tokenAddress);
         require(supportedToken, "Token not supported");
         _;
     }
@@ -220,29 +220,29 @@ contract LiquidityPool is
         string calldata tag
     ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
         TokenConfig memory config = tokenManager.getDepositConfig(toChainId, tokenAddress);
-
         require(config.min <= amount && config.max >= amount, "Deposit amount not in Cap limit");
         require(receiver != address(0), "Receiver address cannot be 0");
         require(amount != 0, "Amount cannot be 0");
         address sender = _msgSender();
-
         uint256 rewardAmount = getRewardAmount(amount, tokenAddress);
         if (rewardAmount != 0) {
             incentivePool[tokenAddress] = incentivePool[tokenAddress] - rewardAmount;
         }
+        uint256 volume = depositVolume[sender][tokenAddress];
+
+        // Removing now as stack too deep 
+        // uint8 decimals = tokenManager.getTokenDecimals(tokenAddress);
+        // uint8 weight = tokenManager.getTokenWeight(tokenAddress);
+
         liquidityProviders.increaseCurrentLiquidity(tokenAddress, amount);
         SafeERC20Upgradeable.safeTransferFrom(IERC20Upgradeable(tokenAddress), sender, address(this), amount);
         txnCount[sender] = txnCount[sender] + 1;
         depositVolume[sender][tokenAddress] = depositVolume[sender][tokenAddress] + amount;
-        // Emit (amount + reward amount) in event
-        uint256 volume = depositVolume[sender][tokenAddress];
         // some formula for loaylty points
         if(txnCount[sender] > 0){
-            loyaltyScore[sender] = loyaltyScore[sender] + txnCount[sender] * 10 + volume * 1 /10 ** 18;
+            loyaltyScore[sender] = loyaltyScore[sender] + txnCount[sender] * 10 + volume * tokenManager.getTokenWeight(tokenAddress) /10 ** tokenManager.getTokenDecimals(tokenAddress);
         }
-        //TODO
-        // instead of 1 multiplier it could be token weight from config
-        // 10 ** 18 could be token decimals from config
+        // Emit (amount + reward amount) in event
         emit Deposit(sender, tokenAddress, receiver, toChainId, amount + rewardAmount, rewardAmount, tag);
     }
 
@@ -325,22 +325,19 @@ contract LiquidityPool is
         );
         require(receiver != address(0), "Receiver address cannot be 0");
         require(msg.value != 0, "Amount cannot be 0");
-        // address sender = _msgSender();
+        address sender = _msgSender();
         uint256 rewardAmount = getRewardAmount(msg.value, NATIVE);
         if (rewardAmount != 0) {
             incentivePool[NATIVE] = incentivePool[NATIVE] - rewardAmount;
         }
         liquidityProviders.increaseCurrentLiquidity(NATIVE, msg.value);
-        txnCount[_msgSender()] = txnCount[_msgSender()] + 1;
-        depositVolume[_msgSender()][NATIVE] = depositVolume[_msgSender()][NATIVE] + msg.value;
-        uint256 volume = depositVolume[_msgSender()][NATIVE];
-        if(txnCount[_msgSender()] > 0){
-            loyaltyScore[_msgSender()] = loyaltyScore[_msgSender()] + txnCount[_msgSender()] * 10 + volume * 1 /10 ** 18;
+        txnCount[sender] = txnCount[sender] + 1;
+        depositVolume[sender][NATIVE] = depositVolume[sender][NATIVE] + msg.value;
+        uint256 volume = depositVolume[sender][NATIVE];
+        if(txnCount[sender] > 0){
+            loyaltyScore[sender] = loyaltyScore[sender] + txnCount[sender] * 10 + volume * tokenManager.getTokenWeight(NATIVE) /10 ** tokenManager.getTokenDecimals(NATIVE);
         }
-        //TODO
-        // instead of 1 multiplier it could be token weight from config
-        // 10 ** 18 could be token decimals from config
-        emit Deposit(_msgSender(), NATIVE, receiver, toChainId, msg.value + rewardAmount, rewardAmount, tag);
+        emit Deposit(sender, NATIVE, receiver, toChainId, msg.value + rewardAmount, rewardAmount, tag);
     }
 
     function sendFundsToUser(

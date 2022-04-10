@@ -22,10 +22,16 @@ interface ITokenManager {
             bool supportedToken,
             uint256 equilibriumFee,
             uint256 maxFee,
-            TokenConfig memory config
+            TokenConfig memory config,
+            uint8 decimals,
+            uint8 weight
         );
 
     function getTokensInfo(address tokenAddress) external view returns (TokenInfo memory);
+
+    function getTokenDecimals(address tokenAddress) external view returns (uint8);
+
+    function getTokenWeight(address tokenAddress) external view returns (uint8);
 
     function getDepositConfig(uint256 toChainId, address tokenAddress) external view returns (TokenConfig memory);
 

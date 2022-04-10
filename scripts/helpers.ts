@@ -27,6 +27,7 @@ interface IAddTokenParameters {
   maxLiquidityCap: BigNumberish;
   svgHelper: ContractFactory;
   decimals: number;
+  weight: number;
   rewardTokenAddress: string;
   rewardRatePerSecond: BigNumberish;
 }
@@ -251,7 +252,9 @@ const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters
       token.maxCap,
       token.equilibriumFee,
       token.maxFee,
-      token.transferOverhead
+      token.transferOverhead,
+      token.decimals,
+      token.weight
     )
   ).wait();
 

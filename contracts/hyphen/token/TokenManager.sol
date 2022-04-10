@@ -52,6 +52,14 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
         return tokensInfo[tokenAddress].maxFee;
     }
 
+    function changeWeigtht(
+        address tokenAddress,
+        uint8 _weight
+    ) external onlyOwner whenNotPaused {
+        require(_weight != 0, "Token weight cannot be 0");
+        tokensInfo[tokenAddress].weight = _weight;
+    }
+
     function changeFee(
         address tokenAddress,
         uint256 _equilibriumFee,
@@ -102,7 +110,9 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
         uint256 maxCapLimit,
         uint256 equilibriumFee,
         uint256 maxFee,
-        uint256 transferOverhead
+        uint256 transferOverhead,
+        uint8 decimals,
+        uint8 weight
     ) external onlyOwner {
         require(tokenAddress != address(0), "Token address cannot be 0");
         require(maxCapLimit > minCapLimit, "maxCapLimit > minCapLimit");
@@ -113,6 +123,8 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
         tokensInfo[tokenAddress].equilibriumFee = equilibriumFee;
         tokensInfo[tokenAddress].maxFee = maxFee;
         tokensInfo[tokenAddress].transferOverhead = transferOverhead;
+        tokensInfo[tokenAddress].decimals = decimals;
+        tokensInfo[tokenAddress].weight = 1;
     }
 
     function removeSupportedToken(address tokenAddress) external tokenChecks(tokenAddress) onlyOwner {
@@ -135,7 +147,9 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
             tokensInfo[tokenAddress].supportedToken,
             tokensInfo[tokenAddress].equilibriumFee,
             tokensInfo[tokenAddress].maxFee,
-            transferConfig[tokenAddress]
+            transferConfig[tokenAddress],
+            tokensInfo[tokenAddress].decimals,
+            tokensInfo[tokenAddress].weight
         );
         return tokenInfo;
     }
@@ -151,6 +165,14 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
 
     function getTransferConfig(address tokenAddress) public view override returns (TokenConfig memory) {
         return transferConfig[tokenAddress];
+    }
+
+    function getTokenDecimals(address tokenAddress) public view override returns(uint8) {
+        return tokensInfo[tokenAddress].decimals;
+    }
+
+    function getTokenWeight(address tokenAddress) public view override returns(uint8) {
+        return tokensInfo[tokenAddress].weight;
     }
 
     function _msgSender() internal view virtual override(Context, ERC2771Context) returns (address sender) {
