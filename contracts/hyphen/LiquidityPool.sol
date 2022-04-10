@@ -68,19 +68,10 @@ contract LiquidityPool is
     // Volume transferred for particular token for any user
     mapping(address => mapping(address => uint256)) public depositVolume;
 
-    // Number of free transactions given so far to any user on this pool
-    // 1 free transaction = X loyalty points on this pool
-    // get from config
-    mapping(address => uint256) public feeRebates;
+    // Milestones availed by user
+    mapping(uint256 => mapping(address => bool)) public availedMilestones;
 
-    //@review
-    //also could do
-    //mapping(address => uint256) ethDepositVolume;
-    //mapping(address => uint256) bicoDepositVolume; 
-    //and so on
-
-    // Dynamically updated redeem points for particular user
-    // Likely to be moved off chain if needed cumulative from all pools
+    // Decides which milestone user has reached
     mapping(address => uint256) public loyaltyScore;
 
     event AssetSent(
@@ -102,7 +93,8 @@ contract LiquidityPool is
         uint256 toChainId,
         uint256 amount,
         uint256 reward,
-        string tag
+        string tag,
+        uint256 mileStoneCode
     );
     event GasFeeWithdraw(address indexed tokenAddress, address indexed owner, uint256 indexed amount);
     event TrustedForwarderChanged(address indexed forwarderAddress);
@@ -161,12 +153,16 @@ contract LiquidityPool is
        depositVolume[_user][_token] = _amount;
     }
 
+    function setAvailedMilestones(address _user, uint256 mileStoneCode) external onlyOwner {
+       availedMilestones[mileStoneCode][_user] = true;
+    }
+
     function setLoyaltyPoints(address _user, uint256 _points) external onlyOwner {
        loyaltyScore[_user] = _points;
     }
 
-    function setFeeRebates(address _user, uint256 _howmany) external onlyOwner {
-       feeRebates[_user] = _howmany;
+    function removeAvailedMilestones(address _user, uint256 mileStoneCode) external onlyOwner {
+       availedMilestones[mileStoneCode][_user] = false;
     }
 
     function setLiquidityProviders(address _liquidityProviders) external onlyOwner {
@@ -217,7 +213,8 @@ contract LiquidityPool is
         address tokenAddress,
         address receiver,
         uint256 amount,
-        string calldata tag
+        string calldata tag,
+        uint256 mileStoneCode
     ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
         TokenConfig memory config = tokenManager.getDepositConfig(toChainId, tokenAddress);
         require(config.min <= amount && config.max >= amount, "Deposit amount not in Cap limit");
@@ -228,22 +225,12 @@ contract LiquidityPool is
         if (rewardAmount != 0) {
             incentivePool[tokenAddress] = incentivePool[tokenAddress] - rewardAmount;
         }
-        uint256 volume = depositVolume[sender][tokenAddress];
-
-        // Removing now as stack too deep 
-        // uint8 decimals = tokenManager.getTokenDecimals(tokenAddress);
-        // uint8 weight = tokenManager.getTokenWeight(tokenAddress);
 
         liquidityProviders.increaseCurrentLiquidity(tokenAddress, amount);
         SafeERC20Upgradeable.safeTransferFrom(IERC20Upgradeable(tokenAddress), sender, address(this), amount);
-        txnCount[sender] = txnCount[sender] + 1;
-        depositVolume[sender][tokenAddress] = depositVolume[sender][tokenAddress] + amount;
-        // some formula for loaylty points
-        if(txnCount[sender] > 0){
-            loyaltyScore[sender] = loyaltyScore[sender] + txnCount[sender] * 10 + volume * tokenManager.getTokenWeight(tokenAddress) /10 ** tokenManager.getTokenDecimals(tokenAddress);
-        }
+        
         // Emit (amount + reward amount) in event
-        emit Deposit(sender, tokenAddress, receiver, toChainId, amount + rewardAmount, rewardAmount, tag);
+        emit Deposit(sender, tokenAddress, receiver, toChainId, amount + rewardAmount, rewardAmount, tag, mileStoneCode);
     }
 
     function getRewardAmount(uint256 amount, address tokenAddress) public view returns (uint256 rewardAmount) {
@@ -270,7 +257,8 @@ contract LiquidityPool is
         uint256 amount,
         uint256 toChainId,
         PermitRequest calldata permitOptions,
-        string calldata tag
+        string calldata tag,
+        uint256 mileStoneCode
     ) external {
         IERC20Permit(tokenAddress).permit(
             _msgSender(),
@@ -282,7 +270,7 @@ contract LiquidityPool is
             permitOptions.r,
             permitOptions.s
         );
-        depositErc20(toChainId, tokenAddress, receiver, amount, tag);
+        depositErc20(toChainId, tokenAddress, receiver, amount, tag, mileStoneCode);
     }
 
     /**
@@ -294,7 +282,8 @@ contract LiquidityPool is
         uint256 amount,
         uint256 toChainId,
         PermitRequest calldata permitOptions,
-        string calldata tag
+        string calldata tag,
+        uint256 mileStoneCode
     ) external {
         IERC20Permit(tokenAddress).permit(
             _msgSender(),
@@ -305,7 +294,7 @@ contract LiquidityPool is
             permitOptions.r,
             permitOptions.s
         );
-        depositErc20(toChainId, tokenAddress, receiver, amount, tag);
+        depositErc20(toChainId, tokenAddress, receiver, amount, tag, mileStoneCode);
     }
 
     /**
@@ -316,7 +305,8 @@ contract LiquidityPool is
     function depositNative(
         address receiver,
         uint256 toChainId,
-        string calldata tag
+        string calldata tag,
+        uint256 mileStoneCode
     ) external payable whenNotPaused nonReentrant {
         require(
             tokenManager.getDepositConfig(toChainId, NATIVE).min <= msg.value &&
@@ -325,28 +315,24 @@ contract LiquidityPool is
         );
         require(receiver != address(0), "Receiver address cannot be 0");
         require(msg.value != 0, "Amount cannot be 0");
-        address sender = _msgSender();
         uint256 rewardAmount = getRewardAmount(msg.value, NATIVE);
         if (rewardAmount != 0) {
             incentivePool[NATIVE] = incentivePool[NATIVE] - rewardAmount;
         }
         liquidityProviders.increaseCurrentLiquidity(NATIVE, msg.value);
-        txnCount[sender] = txnCount[sender] + 1;
-        depositVolume[sender][NATIVE] = depositVolume[sender][NATIVE] + msg.value;
-        uint256 volume = depositVolume[sender][NATIVE];
-        if(txnCount[sender] > 0){
-            loyaltyScore[sender] = loyaltyScore[sender] + txnCount[sender] * 10 + volume * tokenManager.getTokenWeight(NATIVE) /10 ** tokenManager.getTokenDecimals(NATIVE);
-        }
-        emit Deposit(sender, NATIVE, receiver, toChainId, msg.value + rewardAmount, rewardAmount, tag);
+       
+        emit Deposit(_msgSender(), NATIVE, receiver, toChainId, msg.value + rewardAmount, rewardAmount, tag, mileStoneCode);
     }
 
     function sendFundsToUser(
+        address sender,
         address tokenAddress,
         uint256 amount,
         address payable receiver, //@review with Divya
         bytes calldata depositHash,
         uint256 tokenGasPrice,
-        uint256 fromChainId
+        uint256 fromChainId,
+        uint256 mileStoneCode
     ) external nonReentrant onlyExecutor whenNotPaused {
         uint256 initialGas = gasleft();
         TokenConfig memory config = tokenManager.getTransferConfig(tokenAddress);
@@ -357,6 +343,14 @@ contract LiquidityPool is
 
         require(!status, "Already Processed");
         processedHash[hashSendTransaction] = true;
+
+        // update milestone availed by user, tx count & totalVolume processed by user
+        if (mileStoneCode != 0) {
+            availedMilestones[mileStoneCode][sender] = true;
+        }
+        
+        txnCount[sender] = txnCount[sender] + 1;
+        depositVolume[sender][tokenAddress] = depositVolume[sender][tokenAddress] + amount;
 
         // uint256 amountToTransfer, uint256 lpFee, uint256 transferFeeAmount, uint256 gasFee
         uint256[4] memory transferDetails = getAmountToTransfer(initialGas, tokenAddress, amount, tokenGasPrice);
@@ -369,17 +363,6 @@ contract LiquidityPool is
         } else {
             SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, transferDetails[0]);
         }
-
-        // V2 - could get some info from depositHash for Forward fees deducation
-
-        if(tokenGasPrice == 0) {
-            // for each free transaction deduct loaylty points
-            // assuming (for now) we dont allow to send any other reciver when claiming loyalty points 
-            loyaltyScore[receiver] = loyaltyScore[receiver] - 100;
-        }
-        // hard coded to 100
-        // this will come from pool config
-        // 1 free transaction = X loyalty points on this pool
 
         emit AssetSent(
             tokenAddress,
