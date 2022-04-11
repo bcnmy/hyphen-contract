@@ -4,8 +4,8 @@ import { deploy, IDeployConfig } from "./helpers";
 (async () => {
   const config: IDeployConfig = {
     trustedForwarder: "0xE041608922d06a4F26C0d4c27d8bCD01daf1f792",
-    bicoOwner: "0x46b65ae065341D034fEA45D76c6fA936EAfBfdeb",
-    pauser: "0x46b65ae065341D034fEA45D76c6fA936EAfBfdeb",
+    bicoOwner: "0x22f9a22EA02eB2fE0B76e4685c5D7Ae718717084",
+    pauser: "0x22f9a22EA02eB2fE0B76e4685c5D7Ae718717084",
     tokens: [
       {
         tokenAddress: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716",
