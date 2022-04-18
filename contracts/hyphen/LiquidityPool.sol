@@ -87,6 +87,7 @@ contract LiquidityPool is
     event TrustedForwarderChanged(address indexed forwarderAddress);
     event LiquidityProvidersChanged(address indexed liquidityProvidersAddress);
     event TokenManagerChanged(address indexed tokenManagerAddress);
+    event BaseGasUpdated(uint256 indexed baseGas);
     event EthReceived(address, uint256);
 
     // MODIFIERS
@@ -146,6 +147,7 @@ contract LiquidityPool is
 
     function setBaseGas(uint128 gas) external onlyOwner {
         baseGas = gas;
+        emit BaseGasUpdated(baseGas);
     }
 
     function getExecutorManager() external view returns (address) {
