@@ -48,7 +48,7 @@ abstract contract Pausable is Initializable, PausableUpgradeable {
      * @dev Allows the current pauser to transfer control of the contract to a newPauser.
      * @param newPauser The address to transfer pauserShip to.
      */
-    function changePauser(address newPauser) public onlyPauser {
+    function changePauser(address newPauser) public onlyPauser whenNotPaused {
         _changePauser(newPauser);
     }
 
@@ -62,7 +62,7 @@ abstract contract Pausable is Initializable, PausableUpgradeable {
         _pauser = newPauser;
     }
 
-    function renouncePauser() external virtual onlyPauser {
+    function renouncePauser() external virtual onlyPauser whenNotPaused {
         emit PauserChanged(_pauser, address(0));
         _pauser = address(0);
     }
