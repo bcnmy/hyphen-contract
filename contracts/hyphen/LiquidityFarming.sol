@@ -332,14 +332,12 @@ contract HyphenLiquidityFarming is
     /// @return pool Returns the pool that was updated.
     function updatePool(address _baseToken) public whenNotPaused returns (PoolInfo memory pool) {
         pool = poolInfo[_baseToken];
-        if (block.timestamp > pool.lastRewardTime) {
-            if (totalSharesStaked[_baseToken] > 0) {
-                pool.accTokenPerShare = getUpdatedAccTokenPerShare(_baseToken);
-            }
-            pool.lastRewardTime = block.timestamp;
-            poolInfo[_baseToken] = pool;
-            emit LogUpdatePool(_baseToken, pool.lastRewardTime, totalSharesStaked[_baseToken], pool.accTokenPerShare);
+        if (totalSharesStaked[_baseToken] > 0) {
+            pool.accTokenPerShare = getUpdatedAccTokenPerShare(_baseToken);
         }
+        pool.lastRewardTime = block.timestamp;
+        poolInfo[_baseToken] = pool;
+        emit LogUpdatePool(_baseToken, pool.lastRewardTime, totalSharesStaked[_baseToken], pool.accTokenPerShare);
     }
 
     /// @notice View function to see the tokens staked by a given user.
