@@ -181,6 +181,7 @@ contract LiquidityPool is
         uint256 amount,
         string calldata tag
     ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
+        require(toChainId != block.chainid, "To chain must be different than current chain");
         TokenConfig memory config = tokenManager.getDepositConfig(toChainId, tokenAddress);
 
         require(config.min <= amount && config.max >= amount, "Deposit amount not in Cap limit");
@@ -270,6 +271,7 @@ contract LiquidityPool is
         uint256 toChainId,
         string calldata tag
     ) external payable whenNotPaused nonReentrant {
+        require(toChainId != block.chainid, "To chain must be different than current chain");
         require(
             tokenManager.getDepositConfig(toChainId, NATIVE).min <= msg.value &&
                 tokenManager.getDepositConfig(toChainId, NATIVE).max >= msg.value,
