@@ -189,8 +189,8 @@ contract LiquidityProviders is
      * @return Price of Base token in terms of LP Shares
      */
     function getTokenPriceInLPShares(address _baseToken) public view returns (uint256) {
-        uint256 supply = totalSharesMinted[_baseToken];
-        if (supply > 0) {
+        uint256 reserve = totalReserve[_baseToken];
+        if (reserve > 0) {
             return totalSharesMinted[_baseToken] / totalReserve[_baseToken];
         }
         return BASE_DIVISOR;
