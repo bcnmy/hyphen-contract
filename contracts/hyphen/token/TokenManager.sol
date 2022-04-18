@@ -59,6 +59,7 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
     ) external override onlyOwner whenNotPaused {
         require(_equilibriumFee != 0, "Equilibrium Fee cannot be 0");
         require(_maxFee != 0, "Max Fee cannot be 0");
+        require(_equilibriumFee <= _maxFee && _maxFee <= 10000000000, "Max Fee cannot be greater than 100%");
         tokensInfo[tokenAddress].equilibriumFee = _equilibriumFee;
         tokensInfo[tokenAddress].maxFee = _maxFee;
         emit FeeChanged(tokenAddress, tokensInfo[tokenAddress].equilibriumFee, tokensInfo[tokenAddress].maxFee);
