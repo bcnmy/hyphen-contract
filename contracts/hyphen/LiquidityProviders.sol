@@ -1,14 +1,14 @@
-// $$\       $$\                     $$\       $$\ $$\   $$\                     $$$$$$$\                                $$\       $$\                               
-// $$ |      \__|                    \__|      $$ |\__|  $$ |                    $$  __$$\                               \__|      $$ |                              
-// $$ |      $$\  $$$$$$\  $$\   $$\ $$\  $$$$$$$ |$$\ $$$$$$\   $$\   $$\       $$ |  $$ | $$$$$$\   $$$$$$\ $$\    $$\ $$\  $$$$$$$ | $$$$$$\   $$$$$$\   $$$$$$$\ 
+// $$\       $$\                     $$\       $$\ $$\   $$\                     $$$$$$$\                                $$\       $$\
+// $$ |      \__|                    \__|      $$ |\__|  $$ |                    $$  __$$\                               \__|      $$ |
+// $$ |      $$\  $$$$$$\  $$\   $$\ $$\  $$$$$$$ |$$\ $$$$$$\   $$\   $$\       $$ |  $$ | $$$$$$\   $$$$$$\ $$\    $$\ $$\  $$$$$$$ | $$$$$$\   $$$$$$\   $$$$$$$\
 // $$ |      $$ |$$  __$$\ $$ |  $$ |$$ |$$  __$$ |$$ |\_$$  _|  $$ |  $$ |      $$$$$$$  |$$  __$$\ $$  __$$\\$$\  $$  |$$ |$$  __$$ |$$  __$$\ $$  __$$\ $$  _____|
-// $$ |      $$ |$$ /  $$ |$$ |  $$ |$$ |$$ /  $$ |$$ |  $$ |    $$ |  $$ |      $$  ____/ $$ |  \__|$$ /  $$ |\$$\$$  / $$ |$$ /  $$ |$$$$$$$$ |$$ |  \__|\$$$$$$\  
-// $$ |      $$ |$$ |  $$ |$$ |  $$ |$$ |$$ |  $$ |$$ |  $$ |$$\ $$ |  $$ |      $$ |      $$ |      $$ |  $$ | \$$$  /  $$ |$$ |  $$ |$$   ____|$$ |       \____$$\ 
+// $$ |      $$ |$$ /  $$ |$$ |  $$ |$$ |$$ /  $$ |$$ |  $$ |    $$ |  $$ |      $$  ____/ $$ |  \__|$$ /  $$ |\$$\$$  / $$ |$$ /  $$ |$$$$$$$$ |$$ |  \__|\$$$$$$\
+// $$ |      $$ |$$ |  $$ |$$ |  $$ |$$ |$$ |  $$ |$$ |  $$ |$$\ $$ |  $$ |      $$ |      $$ |      $$ |  $$ | \$$$  /  $$ |$$ |  $$ |$$   ____|$$ |       \____$$\
 // $$$$$$$$\ $$ |\$$$$$$$ |\$$$$$$  |$$ |\$$$$$$$ |$$ |  \$$$$  |\$$$$$$$ |      $$ |      $$ |      \$$$$$$  |  \$  /   $$ |\$$$$$$$ |\$$$$$$$\ $$ |      $$$$$$$  |
-// \________|\__| \____$$ | \______/ \__| \_______|\__|   \____/  \____$$ |      \__|      \__|       \______/    \_/    \__| \_______| \_______|\__|      \_______/ 
-//                     $$ |                                      $$\   $$ |                                                                                          
-//                     $$ |                                      \$$$$$$  |                                                                                          
-//                     \__|                                       \______/                                                                                           
+// \________|\__| \____$$ | \______/ \__| \_______|\__|   \____/  \____$$ |      \__|      \__|       \______/    \_/    \__| \_______| \_______|\__|      \_______/
+//                     $$ |                                      $$\   $$ |
+//                     $$ |                                      \$$$$$$  |
+//                     \__|                                       \______/
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.0;
 
@@ -296,7 +296,7 @@ contract LiquidityProviders is
 
         uint256 mintedSharesAmount;
         // Adding liquidity in the pool for the first time
-        if (totalReserve[token] == 0) {
+        if (totalReserve[token] == 0 || totalSharesMinted[token] == 0) {
             mintedSharesAmount = BASE_DIVISOR * _amount;
         } else {
             mintedSharesAmount = (_amount * totalSharesMinted[token]) / totalReserve[token];
@@ -365,7 +365,7 @@ contract LiquidityProviders is
         require(_amount != 0, "ERR__INVALID_AMOUNT");
         require(nftSuppliedLiquidity >= _amount, "ERR__INSUFFICIENT_LIQUIDITY");
         whiteListPeriodManager.beforeLiquidityRemoval(_msgSender(), _tokenAddress, _amount);
-        // Claculate how much shares represent input amount
+        // Calculate how much shares represent input amount
         uint256 lpSharesForInputAmount = _amount * getTokenPriceInLPShares(_tokenAddress);
 
         // Calculate rewards accumulated

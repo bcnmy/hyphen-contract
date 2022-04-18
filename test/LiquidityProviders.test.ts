@@ -682,6 +682,14 @@ describe("LiquidityProviderTests", function () {
     it("Should revert if more shares are burnt than available for reward", async function () {
       await expect(liquidityProviders.claimFee(1)).to.be.revertedWith("ERR__NO_REWARDS_TO_CLAIM");
     });
+
+    it("Should not mint 0 shares after all shares have been burnt", async function () {
+      await liquidityProviders.addLpFeeTesting(token.address, 1);
+      await liquidityProviders.removeLiquidity(1, 99);
+      expect(await liquidityProviders.totalSharesMinted(token.address)).to.equal(0);
+      await liquidityProviders.addTokenLiquidity(token.address, 10);
+      expect((await lpToken.tokenMetadata(3)).shares).to.not.equal(0);
+    });
   });
 
   describe("Real world flow tests", async function () {
