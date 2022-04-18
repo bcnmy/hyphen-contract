@@ -182,6 +182,7 @@ contract LiquidityPool is
         string calldata tag
     ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
         require(toChainId != block.chainid, "To chain must be different than current chain");
+        require(tokenAddress != NATIVE, "wrong function");
         TokenConfig memory config = tokenManager.getDepositConfig(toChainId, tokenAddress);
 
         require(config.min <= amount && config.max >= amount, "Deposit amount not in Cap limit");
