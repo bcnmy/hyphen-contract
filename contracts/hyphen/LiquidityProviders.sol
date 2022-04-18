@@ -259,6 +259,7 @@ contract LiquidityProviders is
      *      record in the newly minted NFT
      */
     function addNativeLiquidity() external payable nonReentrant tokenChecks(NATIVE) whenNotPaused {
+        require(address(liquidityPool) != address(0), "ERR__LIQUIDITY_POOL_NOT_SET");
         (bool success, ) = address(liquidityPool).call{value: msg.value}("");
         require(success, "ERR__NATIVE_TRANSFER_FAILED");
         _addLiquidity(NATIVE, msg.value);
@@ -344,6 +345,7 @@ contract LiquidityProviders is
         (address token, , ) = lpToken.tokenMetadata(_nftId);
         require(_isSupportedToken(NATIVE), "ERR__TOKEN_NOT_SUPPORTED");
         require(token == NATIVE, "ERR__WRONG_FUNCTION");
+        require(address(liquidityPool) != address(0), "ERR__LIQUIDITY_POOL_NOT_SET");
         (bool success, ) = address(liquidityPool).call{value: msg.value}("");
         require(success, "ERR__NATIVE_TRANSFER_FAILED");
         _increaseLiquidity(_nftId, msg.value);
