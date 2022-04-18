@@ -183,6 +183,7 @@ contract HyphenLiquidityFarming is
     /// @notice Sets the sushi per second to be distributed. Can only be called by the owner.
     /// @param _rewardPerSecond The amount of Sushi to be distributed per second.
     function setRewardPerSecond(address _baseToken, uint256 _rewardPerSecond) external onlyOwner {
+        require(_rewardPerSecond <= 10**40, "ERR__REWARD_PER_SECOND_TOO_HIGH");
         rewardRateLog[_baseToken].push(RewardsPerSecondEntry(_rewardPerSecond, block.timestamp));
         emit LogRewardPerSecond(_baseToken, _rewardPerSecond);
     }
