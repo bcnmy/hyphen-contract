@@ -271,6 +271,8 @@ contract HyphenLiquidityFarming is
         address msgSender = _msgSender();
 
         require(nftIdsStaked[msgSender][_index] == _nftId, "ERR__NOT_OWNER");
+        require(nftInfo[_nftId].staker == msgSender, "ERR__NOT_OWNER");
+        require(nftInfo[_nftId].unpaidRewards == 0, "ERR__UNPAID_REWARDS_EXIST");
 
         nftIdsStaked[msgSender][_index] = nftIdsStaked[msgSender][nftIdsStaked[msgSender].length - 1];
         nftIdsStaked[msgSender].pop();
