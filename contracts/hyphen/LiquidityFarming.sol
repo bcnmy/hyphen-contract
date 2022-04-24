@@ -246,17 +246,33 @@ contract HyphenLiquidityFarming is
     /// @param _nftId LP token nftId to withdraw.
     /// @param _to The receiver of `amount` withdraw benefit.
     function withdraw(uint256 _nftId, address payable _to) external whenNotPaused nonReentrant {
-        address msgSender = _msgSender();
-        uint256 nftsStakedLength = nftIdsStaked[msgSender].length;
+        uint256 index = getStakedNftIndex(_msgSender(), _nftId);
+        _withdraw(_nftId, _to, index);
+    }
+
+    function getStakedNftIndex(address _staker, uint256 _nftId) public view returns (uint256) {
+        uint256 nftsStakedLength = nftIdsStaked[_staker].length;
         uint256 index;
-        for (index = 0; index < nftsStakedLength; ++index) {
-            if (nftIdsStaked[msgSender][index] == _nftId) {
-                break;
+        unchecked {
+            for (index = 0; index < nftsStakedLength; ++index) {
+                if (nftIdsStaked[_staker][index] == _nftId) {
+                    return index;
+                }
             }
         }
+        revert("ERR__NFT_NOT_STAKED");
+    }
 
-        require(index != nftsStakedLength, "ERR__NFT_NOT_STAKED");
-        nftIdsStaked[msgSender][index] = nftIdsStaked[msgSender][nftIdsStaked[msgSender].length - 1];
+    function _withdraw(
+        uint256 _nftId,
+        address payable _to,
+        uint256 _index
+    ) private {
+        address msgSender = _msgSender();
+
+        require(nftIdsStaked[msgSender][_index] == _nftId, "ERR__NOT_OWNER");
+
+        nftIdsStaked[msgSender][_index] = nftIdsStaked[msgSender][nftIdsStaked[msgSender].length - 1];
         nftIdsStaked[msgSender].pop();
 
         _sendRewardsForNft(_nftId, _to);
@@ -269,6 +285,14 @@ contract HyphenLiquidityFarming is
         lpToken.safeTransferFrom(address(this), msgSender, _nftId);
 
         emit LogWithdraw(msgSender, baseToken, _nftId, _to);
+    }
+
+    function withdrawV2(
+        uint256 _nftId,
+        address payable _to,
+        uint256 _index
+    ) external whenNotPaused nonReentrant {
+        _withdraw(_nftId, _to, _index);
     }
 
     /// @notice Extract all rewards without withdrawing LP tokens
