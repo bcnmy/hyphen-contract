@@ -21,7 +21,11 @@ import "../interfaces/ITokenManager.sol";
 contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
     mapping(address => TokenInfo) public override tokensInfo;
 
+    // Excess State Transfer Fee Percentage
+    mapping(address => uint256) public override excessStateTransferFeePerc;
+
     event FeeChanged(address indexed tokenAddress, uint256 indexed equilibriumFee, uint256 indexed maxFee);
+    event ExcessStateTransferFeePercChanged(address indexed tokenAddress, uint256 indexed fee);
 
     modifier tokenChecks(address tokenAddress) {
         require(tokenAddress != address(0), "Token address cannot be 0");
@@ -63,6 +67,18 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
         tokensInfo[tokenAddress].equilibriumFee = _equilibriumFee;
         tokensInfo[tokenAddress].maxFee = _maxFee;
         emit FeeChanged(tokenAddress, tokensInfo[tokenAddress].equilibriumFee, tokensInfo[tokenAddress].maxFee);
+    }
+
+    function changeExcessStateFee(address _tokenAddress, uint256 _excessStateFeePer)
+        external
+        override
+        onlyOwner
+        whenNotPaused
+    {
+        require(_tokenAddress != address(0), "Token address cannot be 0");
+        require(_excessStateFeePer != 0, "Excess State Fee Percentage cannot be 0");
+        excessStateTransferFeePerc[_tokenAddress] = _excessStateFeePer;
+        emit ExcessStateTransferFeePercChanged(_tokenAddress, _excessStateFeePer);
     }
 
     function setTokenTransferOverhead(address tokenAddress, uint256 gasOverhead)

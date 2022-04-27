@@ -378,24 +378,33 @@ contract LiquidityPool is
         address tokenAddress,
         uint256 amount,
         TokenInfo memory tokenInfo
-    ) private view returns (uint256 fee) {
+    ) private view returns (uint256) {
         uint256 currentLiquidity = getCurrentLiquidity(tokenAddress);
         uint256 providedLiquidity = liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
 
         uint256 resultingLiquidity = currentLiquidity - amount;
 
+        // We return a constant value in excess state
+        if (resultingLiquidity > providedLiquidity) {
+            return tokenManager.excessStateTransferFeePerc(tokenAddress);
+        }
+
         // Fee is represented in basis points * 10 for better accuracy
-        uint256 numerator = providedLiquidity * tokenInfo.equilibriumFee * tokenInfo.maxFee; // F(max) * F(e) * L(e)
+        uint256 numerator = providedLiquidity * providedLiquidity * tokenInfo.equilibriumFee * tokenInfo.maxFee; // F(max) * F(e) * L(e) ^ 2
         uint256 denominator = tokenInfo.equilibriumFee *
+            providedLiquidity *
             providedLiquidity +
             (tokenInfo.maxFee - tokenInfo.equilibriumFee) *
-            resultingLiquidity; // F(e) * L(e) + (F(max) - F(e)) * L(r)
+            resultingLiquidity *
+            resultingLiquidity; // F(e) * L(e) ^ 2 + (F(max) - F(e)) * L(r) ^ 2
 
+        uint256 fee;
         if (denominator == 0) {
             fee = 0;
         } else {
             fee = numerator / denominator;
         }
+        return fee;
     }
 
     function getTransferFee(address tokenAddress, uint256 amount) external view returns (uint256) {
