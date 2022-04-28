@@ -58,8 +58,11 @@ describe("LiquidityPoolTests", function () {
   beforeEach(async function () {
     [owner, pauser, charlie, bob, tf, proxyAdmin, executor] = await ethers.getSigners();
 
-    const tokenManagerFactory = await ethers.getContractFactory("TokenManager");
-    tokenManager = await tokenManagerFactory.deploy(trustedForwarder);
+    tokenManager = (await upgrades.deployProxy(await ethers.getContractFactory("TokenManager"), [
+      tf.address,
+      pauser.address,
+    ])) as TokenManager;
+    await tokenManager.deployed();
 
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
     executorManager = await executorManagerFactory.deploy();

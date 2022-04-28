@@ -38,8 +38,11 @@ describe("LPTokenTests", function () {
   beforeEach(async function () {
     [owner, pauser, charlie, bob, tf, , executor] = await ethers.getSigners();
 
-    const tokenManagerFactory = await ethers.getContractFactory("TokenManager");
-    tokenManager = await tokenManagerFactory.deploy(tf.address);
+    tokenManager = (await upgrades.deployProxy(await ethers.getContractFactory("TokenManager"), [
+      tf.address,
+      pauser.address,
+    ])) as TokenManager;
+    await tokenManager.deployed();
 
     const erc20factory = await ethers.getContractFactory("ERC20Token");
     token = (await upgrades.deployProxy(erc20factory, ["USDT", "USDT"])) as ERC20Token;
@@ -114,5 +117,4 @@ describe("LPTokenTests", function () {
     await lpToken.connect(pauser).pause();
     await expect(lpToken.transferFrom(owner.address, bob.address, 1)).to.be.revertedWith("Pausable: paused");
   });
-
 });
