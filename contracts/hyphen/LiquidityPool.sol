@@ -296,7 +296,7 @@ contract LiquidityPool is
         uint256 amount,
         address payable receiver,
         bytes calldata depositHash,
-        uint256 tokenGasPrice,
+        uint256 nativeTokenPriceInTransferredToken,
         uint256 fromChainId
     ) external nonReentrant onlyExecutor whenNotPaused {
         uint256 initialGas = gasleft();
@@ -310,7 +310,12 @@ contract LiquidityPool is
         processedHash[hashSendTransaction] = true;
 
         // uint256 amountToTransfer, uint256 lpFee, uint256 transferFeeAmount, uint256 gasFee
-        uint256[4] memory transferDetails = getAmountToTransfer(initialGas, tokenAddress, amount, tokenGasPrice);
+        uint256[4] memory transferDetails = getAmountToTransfer(
+            initialGas,
+            tokenAddress,
+            amount,
+            nativeTokenPriceInTransferredToken
+        );
 
         liquidityProviders.decreaseCurrentLiquidity(tokenAddress, transferDetails[0]);
 
@@ -340,14 +345,14 @@ contract LiquidityPool is
      * @param initialGas Gas provided initially before any calculations began
      * @param tokenAddress Token address for which calculation needs to be done
      * @param amount Amount of token to be transfered before deducting the fee
-     * @param tokenGasPrice Gas price in the token being transfered to be used to calculate gas fee
+     * @param nativeTokenPriceInTransferredToken Price of native token in terms of the token being transferred (multiplied base div), used to calculate gas fee
      * @return [ amountToTransfer, lpFee, transferFeeAmount, gasFee ]
      */
     function getAmountToTransfer(
         uint256 initialGas,
         address tokenAddress,
         uint256 amount,
-        uint256 tokenGasPrice
+        uint256 nativeTokenPriceInTransferredToken
     ) internal returns (uint256[4] memory) {
         TokenInfo memory tokenInfo = tokenManager.getTokensInfo(tokenAddress);
         uint256 transferFeePerc = _getTransferFee(tokenAddress, amount, tokenInfo);
@@ -366,8 +371,8 @@ contract LiquidityPool is
         liquidityProviders.addLPFee(tokenAddress, lpFee);
 
         uint256 totalGasUsed = initialGas + tokenInfo.transferOverhead + baseGas - gasleft();
+        uint256 gasFee = (totalGasUsed * nativeTokenPriceInTransferredToken * tx.gasprice) / BASE_DIVISOR;
 
-        uint256 gasFee = totalGasUsed * tokenGasPrice;
         gasFeeAccumulatedByToken[tokenAddress] += gasFee;
         gasFeeAccumulated[tokenAddress][_msgSender()] += gasFee;
         uint256 amountToTransfer = amount - (transferFeeAmount + gasFee);
