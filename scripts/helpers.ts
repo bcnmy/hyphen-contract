@@ -58,19 +58,6 @@ const wait = (time: number) : Promise<void> => {
 const deploy = async (deployConfig: IDeployConfig) => {
   const contracts = await deployCoreContracts(deployConfig.trustedForwarder, deployConfig.pauser);
 
-  // const contracts: IContracts = {
-  //   executorManager: await ethers.getContractAt("ExecutorManager","0xbd761D917fB77381B4398Bda89C7F0d9A2BD1399"),
-  //   tokenManager: await ethers.getContractAt("TokenManager","0xd8Ce41FDF0fE96ea4F457d2A22faAF1d128C0954"),
-  //   lpToken: await ethers.getContractAt("LPToken", "0xc49B65e5a350292Afda1f239eBefE562668717c2"),
-  //   liquidityProviders: await ethers.getContractAt("LiquidityProviders", "0xebaB24F13de55789eC1F3fFe99A285754e15F7b9"),
-  //   liquidityPool: await ethers.getContractAt("LiquidityPool", "0x2A5c2568b10A0E826BfA892Cf21BA7218310180b"),
-  //   liquidityFarming: await ethers.getContractAt("HyphenLiquidityFarming", "0x781f4EfC37a08C0ea6631204E46B206330c8c161"),
-  //   whitelistPeriodManager: await ethers.getContractAt("WhitelistPeriodManager","0x684F574CA8C6b52C2b713ad1D1eAcDDF3976e7EB"),
-  //   svgHelperMap: {
-  //     "0xA7D7079b0FEaD91F3e65f86E8915Cb59c1a4C664" : await ethers.getContractAt("SvgHelperBase", "0x0f66A75E8FB3980019d4DD8496c1A24efe4E0D89"),
-  //     "0x49D5c2BdFfac6CE2BFdB6640F4F80f226bc10bAB" : await ethers.getContractAt("SvgHelperBase", "0x5F59206E2965D91a535Ac904F40193aC94365556")
-  //   }
-  // }
   for (const token of deployConfig.tokens) {
     await addTokenSupport(contracts, token);
     contracts.svgHelperMap[token.tokenAddress] = await deploySvgHelper(
