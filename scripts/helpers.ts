@@ -29,6 +29,7 @@ interface IAddTokenParameters {
   decimals: number;
   rewardTokenAddress: string;
   rewardRatePerSecond: BigNumberish;
+  excessStateTransferFeePer: BigNumberish;
 }
 
 interface IContracts {
@@ -48,12 +49,11 @@ interface IDeployConfig {
   tokens: IAddTokenParameters[];
 }
 
-const wait = (time: number) : Promise<void> => {
-  return new Promise((resolve)=>{
+const wait = (time: number): Promise<void> => {
+  return new Promise((resolve) => {
     setTimeout(resolve, time);
   });
-}
-
+};
 
 const deploy = async (deployConfig: IDeployConfig) => {
   const contracts = await deployCoreContracts(deployConfig.trustedForwarder, deployConfig.pauser);
@@ -100,9 +100,12 @@ async function deployCoreContracts(trustedForwarder: string, pauser: string): Pr
   await executorManager.deployed();
   console.log("ExecutorManager deployed to:", executorManager.address);
   await wait(5000);
-  const TokenManager = await ethers.getContractFactory("TokenManager");
+
   console.log("Deploying TokenManager...");
-  const tokenManager = await TokenManager.deploy(trustedForwarder);
+  const tokenManager = (await upgrades.deployProxy(await ethers.getContractFactory("TokenManager"), [
+    trustedForwarder,
+    pauser,
+  ])) as TokenManager;
   await tokenManager.deployed();
   console.log("TokenManager deployed to:", tokenManager.address);
 
@@ -224,7 +227,6 @@ const configure = async (contracts: IContracts, bicoOwner: string) => {
   await wait(5000);
   await (await contracts.whitelistPeriodManager.transferOwnership(bicoOwner)).wait();
 
-
   console.log(`Transferred Ownership to ${bicoOwner}`);
 };
 
@@ -258,6 +260,9 @@ const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters
       minMaxArray
     )
   ).wait();
+
+  console.log(`Setting Excess State Transfer Fee % for ${token.tokenAddress}...`);
+  await (await contracts.tokenManager.changeExcessStateFee(token.tokenAddress, token.excessStateTransferFeePer)).wait();
 
   console.log(`Setting Whitelist Period Fee Config for ${token.tokenAddress}...`);
   await (
