@@ -13,12 +13,12 @@
 
 pragma solidity 0.8.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "../metatx/ERC2771Context.sol";
+import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "../../security/Pausable.sol";
 import "../interfaces/ITokenManager.sol";
 
-contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
+contract TokenManager is ITokenManager, ERC2771ContextUpgradeable, OwnableUpgradeable, Pausable {
     mapping(address => TokenInfo) public override tokensInfo;
 
     // Excess State Transfer Fee Percentage
@@ -44,8 +44,10 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
      */
     mapping(address => TokenConfig) public transferConfig;
 
-    constructor(address trustedForwarder) ERC2771Context(trustedForwarder) Ownable() Pausable() {
-        // Empty Constructor
+    function initialize(address trustedForwarder, address pauser) external initializer {
+        __ERC2771Context_init(trustedForwarder);
+        __Ownable_init();
+        __Pausable_init(pauser);
     }
 
     function getEquilibriumFee(address tokenAddress) public view override returns (uint256) {
@@ -170,19 +172,23 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
         return transferConfig[tokenAddress];
     }
 
-    function _msgSender() internal view virtual override(Context, ERC2771Context) returns (address sender) {
-        return ERC2771Context._msgSender();
+    function _msgSender()
+        internal
+        view
+        virtual
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
+        returns (address sender)
+    {
+        return ERC2771ContextUpgradeable._msgSender();
     }
 
-    function _msgData() internal view virtual override(Context, ERC2771Context) returns (bytes calldata) {
-        return ERC2771Context._msgData();
-    }
-
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    function unpause() external onlyOwner {
-        _unpause();
+    function _msgData()
+        internal
+        view
+        virtual
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
+        returns (bytes calldata)
+    {
+        return ERC2771ContextUpgradeable._msgData();
     }
 }
