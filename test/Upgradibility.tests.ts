@@ -185,6 +185,8 @@ describe("Upgradibility", function () {
   }
 
   it("Should be able to upgrade contracts", async function () {
+    const oldTokenManager = tokenManager.address;
+
     (await upgrades.upgradeProxy(liquidityPool.address, await ethers.getContractFactory("LiquidityPool"))).deployed();
     (
       await upgrades.upgradeProxy(liquidityProviders.address, await ethers.getContractFactory("LiquidityProviders"))
@@ -198,9 +200,13 @@ describe("Upgradibility", function () {
     ])) as TokenManager;
     await tokenManager.deployed();
 
+    expect(tokenManager.address).to.not.equal(oldTokenManager);
+
     await liquidityPool.setTokenManager(tokenManager.address);
     await liquidityProviders.setTokenManager(tokenManager.address);
     await wlpm.setTokenManager(tokenManager.address);
+
+    expect(await liquidityPool.tokenManager()).to.equal(tokenManager.address);
 
     // Add supported ERC20 token
     await tokenManager
