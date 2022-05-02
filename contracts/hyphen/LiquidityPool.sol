@@ -296,6 +296,89 @@ contract LiquidityPool is
         uint256 amount,
         address payable receiver,
         bytes calldata depositHash,
+        uint256 tokenGasPrice,
+        uint256 fromChainId
+    ) external nonReentrant onlyExecutor whenNotPaused {
+        uint256 initialGas = gasleft();
+        TokenConfig memory config = tokenManager.getTransferConfig(tokenAddress);
+        require(config.min <= amount && config.max >= amount, "Withdraw amount not in Cap limit");
+        require(receiver != address(0), "Bad receiver address");
+
+        (bytes32 hashSendTransaction, bool status) = checkHashStatus(tokenAddress, amount, receiver, depositHash);
+
+        require(!status, "Already Processed");
+        processedHash[hashSendTransaction] = true;
+
+        // uint256 amountToTransfer, uint256 lpFee, uint256 transferFeeAmount, uint256 gasFee
+        uint256[4] memory transferDetails = getAmountToTransfer(initialGas, tokenAddress, amount, tokenGasPrice);
+
+        liquidityProviders.decreaseCurrentLiquidity(tokenAddress, transferDetails[0]);
+
+        if (tokenAddress == NATIVE) {
+            (bool success, ) = receiver.call{value: transferDetails[0]}("");
+            require(success, "Native Transfer Failed");
+        } else {
+            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, transferDetails[0]);
+        }
+
+        emit AssetSent(
+            tokenAddress,
+            amount,
+            transferDetails[0],
+            receiver,
+            depositHash,
+            fromChainId,
+            transferDetails[1],
+            transferDetails[2],
+            transferDetails[3]
+        );
+    }
+
+    /**
+     * @dev Internal function to calculate amount of token that needs to be transfered afetr deducting all required fees.
+     * Fee to be deducted includes gas fee, lp fee and incentive pool amount if needed.
+     * @param initialGas Gas provided initially before any calculations began
+     * @param tokenAddress Token address for which calculation needs to be done
+     * @param amount Amount of token to be transfered before deducting the fee
+     * @param tokenGasPrice Gas price in the token being transfered to be used to calculate gas fee
+     * @return [ amountToTransfer, lpFee, transferFeeAmount, gasFee ]
+     */
+    function getAmountToTransfer(
+        uint256 initialGas,
+        address tokenAddress,
+        uint256 amount,
+        uint256 tokenGasPrice
+    ) internal returns (uint256[4] memory) {
+        TokenInfo memory tokenInfo = tokenManager.getTokensInfo(tokenAddress);
+        uint256 transferFeePerc = _getTransferFee(tokenAddress, amount, tokenInfo);
+        uint256 lpFee;
+        if (transferFeePerc > tokenInfo.equilibriumFee) {
+            // Here add some fee to incentive pool also
+            lpFee = (amount * tokenInfo.equilibriumFee) / BASE_DIVISOR;
+            unchecked {
+                incentivePool[tokenAddress] += (amount * (transferFeePerc - tokenInfo.equilibriumFee)) / BASE_DIVISOR;
+            }
+        } else {
+            lpFee = (amount * transferFeePerc) / BASE_DIVISOR;
+        }
+        uint256 transferFeeAmount = (amount * transferFeePerc) / BASE_DIVISOR;
+
+        liquidityProviders.addLPFee(tokenAddress, lpFee);
+
+        uint256 totalGasUsed = initialGas + tokenInfo.transferOverhead + baseGas - gasleft();
+
+        uint256 gasFee = totalGasUsed * tokenGasPrice;
+        gasFeeAccumulatedByToken[tokenAddress] += gasFee;
+        gasFeeAccumulated[tokenAddress][_msgSender()] += gasFee;
+        uint256 amountToTransfer = amount - (transferFeeAmount + gasFee);
+        return [amountToTransfer, lpFee, transferFeeAmount, gasFee];
+    }
+
+    function sendFundsToUserV2(
+        address tokenAddress,
+        uint256 amount,
+        address payable receiver,
+        bytes calldata depositHash,
         uint256 nativeTokenPriceInTransferredToken,
         uint256 fromChainId
     ) external nonReentrant onlyExecutor whenNotPaused {
@@ -310,7 +393,7 @@ contract LiquidityPool is
         processedHash[hashSendTransaction] = true;
 
         // uint256 amountToTransfer, uint256 lpFee, uint256 transferFeeAmount, uint256 gasFee
-        uint256[4] memory transferDetails = getAmountToTransfer(
+        uint256[4] memory transferDetails = getAmountToTransferV2(
             initialGas,
             tokenAddress,
             amount,
@@ -348,7 +431,7 @@ contract LiquidityPool is
      * @param nativeTokenPriceInTransferredToken Price of native token in terms of the token being transferred (multiplied base div), used to calculate gas fee
      * @return [ amountToTransfer, lpFee, transferFeeAmount, gasFee ]
      */
-    function getAmountToTransfer(
+    function getAmountToTransferV2(
         uint256 initialGas,
         address tokenAddress,
         uint256 amount,
