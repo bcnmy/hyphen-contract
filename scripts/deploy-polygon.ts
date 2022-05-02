@@ -30,6 +30,7 @@ import { deploy, IDeployConfig } from "./helpers";
         decimals: 6,
         rewardTokenAddress: "0x91c89A94567980f0e9723b487b0beD586eE96aa7",
         rewardRatePerSecond: parseUnits("0.000723090277777778", 18),
+        excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       // USDC
       {
@@ -59,6 +60,7 @@ import { deploy, IDeployConfig } from "./helpers";
         decimals: 6,
         rewardTokenAddress: "0x91c89A94567980f0e9723b487b0beD586eE96aa7",
         rewardRatePerSecond: parseUnits("0.003529664351851850", 18),
+        excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       // BICO
       {
@@ -82,6 +84,7 @@ import { deploy, IDeployConfig } from "./helpers";
         decimals: 18,
         rewardTokenAddress: "0x91c89A94567980f0e9723b487b0beD586eE96aa7",
         rewardRatePerSecond: parseUnits("0.004432685185185190", 18),
+        excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       // WETH
       {
@@ -111,6 +114,7 @@ import { deploy, IDeployConfig } from "./helpers";
         decimals: 18,
         rewardTokenAddress: "0x91c89A94567980f0e9723b487b0beD586eE96aa7",
         rewardRatePerSecond: parseUnits("0.017881504629629600", 18),
+        excessStateTransferFeePer: parseUnits("0.045", 8),
       },
     ],
   };

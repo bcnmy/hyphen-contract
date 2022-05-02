@@ -25,9 +25,13 @@ interface ITokenManager {
             TokenConfig memory config
         );
 
+    function excessStateTransferFeePerc(address tokenAddress) external view returns (uint256);
+
     function getTokensInfo(address tokenAddress) external view returns (TokenInfo memory);
 
     function getDepositConfig(uint256 toChainId, address tokenAddress) external view returns (TokenConfig memory);
 
     function getTransferConfig(address tokenAddress) external view returns (TokenConfig memory);
+
+    function changeExcessStateFee(address _tokenAddress, uint256 _excessStateFeePer) external;
 }
