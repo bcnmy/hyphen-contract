@@ -167,6 +167,10 @@ contract LiquidityProviders is
         tokenManager = ITokenManager(_tokenManager);
     }
 
+    function setTrustedForwarder(address _tf) external onlyOwner {
+        _setTrustedForwarder(_tf);
+    }
+
     /**
      * @dev To be called post initialization, used to set address of WhiteListPeriodManager Contract
      * @param _whiteListPeriodManager address of WhiteListPeriodManager

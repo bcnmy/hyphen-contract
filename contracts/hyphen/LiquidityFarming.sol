@@ -99,6 +99,10 @@ contract HyphenLiquidityFarming is
         lpToken = _lpToken;
     }
 
+    function setTrustedForwarder(address _tf) external onlyOwner {
+        _setTrustedForwarder(_tf);
+    }
+
     /// @notice Initialize the rewarder pool.
     /// @param _baseToken Base token to be used for the rewarder pool.
     /// @param _rewardToken Reward token to be used for the rewarder pool.

@@ -6,11 +6,13 @@ import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /**
- * @dev Context variant with ERC2771 support. 
+ * @dev Context variant with ERC2771 support.
  * Here _trustedForwarder is made internal instead of private
  * so it can be changed via Child contracts with a setter method.
  */
 abstract contract ERC2771ContextUpgradeable is Initializable, ContextUpgradeable {
+    event TrustedForwarderChanged(address indexed _tf);
+
     address internal _trustedForwarder;
 
     function __ERC2771Context_init(address trustedForwarder) internal initializer {
@@ -44,5 +46,12 @@ abstract contract ERC2771ContextUpgradeable is Initializable, ContextUpgradeable
             return super._msgData();
         }
     }
+
+    function _setTrustedForwarder(address _tf) internal virtual {
+        require(_tf != address(0), "TrustedForwarder can't be 0");
+        _trustedForwarder = _tf;
+        emit TrustedForwarderChanged(_tf);
+    }
+
     uint256[49] private __gap;
 }

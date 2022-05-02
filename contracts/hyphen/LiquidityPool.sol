@@ -84,7 +84,6 @@ contract LiquidityPool is
         string tag
     );
     event GasFeeWithdraw(address indexed tokenAddress, address indexed owner, uint256 indexed amount);
-    event TrustedForwarderChanged(address indexed forwarderAddress);
     event LiquidityProvidersChanged(address indexed liquidityProvidersAddress);
     event TokenManagerChanged(address indexed tokenManagerAddress);
     event BaseGasUpdated(uint256 indexed baseGas);
@@ -128,9 +127,7 @@ contract LiquidityPool is
     }
 
     function setTrustedForwarder(address trustedForwarder) external onlyOwner {
-        require(trustedForwarder != address(0), "TrustedForwarder can't be 0");
-        _trustedForwarder = trustedForwarder;
-        emit TrustedForwarderChanged(trustedForwarder);
+        _setTrustedForwarder(trustedForwarder);
     }
 
     function setLiquidityProviders(address _liquidityProviders) external onlyOwner {

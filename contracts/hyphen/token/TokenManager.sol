@@ -13,9 +13,9 @@
 
 pragma solidity 0.8.0;
 
-import "@openzeppelin/contracts-upgradeable/metatx/ERC2771ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "../../security/Pausable.sol";
+import "../metatx/ERC2771ContextUpgradeable.sol";
 import "../interfaces/ITokenManager.sol";
 
 contract TokenManager is ITokenManager, ERC2771ContextUpgradeable, OwnableUpgradeable, Pausable {
@@ -190,5 +190,9 @@ contract TokenManager is ITokenManager, ERC2771ContextUpgradeable, OwnableUpgrad
         returns (bytes calldata)
     {
         return ERC2771ContextUpgradeable._msgData();
+    }
+
+    function setTrustedForwarder(address _tf) external onlyOwner {
+        _setTrustedForwarder(_tf);
     }
 }
