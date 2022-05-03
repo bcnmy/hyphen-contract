@@ -31,11 +31,11 @@ import { deploy, IDeployConfig } from "./helpers";
         maxFee: parseUnits("0.5", 8),
         transferOverhead: 82491, // TODO
         maxWalletLiquidityCap: parseUnits("10000", 6), // not used
-        maxLiquidityCap: parseUnits("578829", 6), // trevor
+        maxLiquidityCap: parseUnits("800000", 6),
         svgHelper: await ethers.getContractFactory("BSCUSDT"),
-        decimals: 6,
+        decimals: 18,
         rewardTokenAddress: "0x06250a4962558F0F3E69FC07F4c67BB9c9eAc739",
-        rewardRatePerSecond: parseUnits("0.002247835648148150", 18), // trevor
+        rewardRatePerSecond: parseUnits("0.004244", 18),
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       // USDC
@@ -67,11 +67,11 @@ import { deploy, IDeployConfig } from "./helpers";
         maxFee: ethers.utils.parseUnits("0.5", 8),
         transferOverhead: 89491, // TODO
         maxWalletLiquidityCap: parseUnits("10000", 6), // not used
-        maxLiquidityCap: parseUnits("1643855", 6), // trevor
+        maxLiquidityCap: parseUnits("1000000", 6), // trevor
         svgHelper: await ethers.getContractFactory("BSCUSDC"),
-        decimals: 6,
+        decimals: 18,
         rewardTokenAddress: "0x06250a4962558F0F3E69FC07F4c67BB9c9eAc739",
-        rewardRatePerSecond: parseUnits("0.006383761574074080", 18), // trevor 
+        rewardRatePerSecond: parseUnits("0.005191", 18), 
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       // BICO
@@ -97,7 +97,7 @@ import { deploy, IDeployConfig } from "./helpers";
         maxFee: ethers.utils.parseUnits("0.5", 8),
         transferOverhead: 85949, // TODO
         maxWalletLiquidityCap: parseUnits("8474.57", 18),  // not used
-        maxLiquidityCap: parseUnits("610350", 18), // trevor
+        maxLiquidityCap: parseUnits("750000", 18),
         svgHelper: await ethers.getContractFactory("BSCBICO"),
         decimals: 18,
         rewardTokenAddress: "0x06250a4962558F0F3E69FC07F4c67BB9c9eAc739",
@@ -136,11 +136,11 @@ import { deploy, IDeployConfig } from "./helpers";
         maxFee: ethers.utils.parseUnits("0.5", 8),
         transferOverhead: 59271, // TODO
         maxWalletLiquidityCap: parseUnits("3.86", 18), // not used
-        maxLiquidityCap: parseUnits("1774", 18), //trevor
+        maxLiquidityCap: parseUnits("175", 18),
         svgHelper: await ethers.getContractFactory("BSCETH"),
         decimals: 18,
         rewardTokenAddress: "0x06250a4962558F0F3E69FC07F4c67BB9c9eAc739",
-        rewardRatePerSecond: parseUnits("0.017809687500000000", 18), // trevor 
+        rewardRatePerSecond: parseUnits("0.002545", 18), // trevor 
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
     ],
