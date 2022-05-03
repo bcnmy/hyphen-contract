@@ -11,27 +11,27 @@ import { deploy, IDeployConfig } from "./helpers";
       // USDT
       {
         tokenAddress: "0x55d398326f99059ff775485246999027b3197955",
-        minCap: parseUnits("100", 6),
-        maxCap: parseUnits("120000", 6),
+        minCap: parseUnits("100", 18),
+        maxCap: parseUnits("120000", 18),
         depositConfigs: [
           {
             chainId: 137,
-            minCap: parseUnits("10", 6),
+            minCap: parseUnits("10", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("50000", 6),
+            maxCap: parseUnits("50000", 18),
           },
           {
             chainId: 1,
-            minCap: parseUnits("10", 6),
+            minCap: parseUnits("10", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("100,000", 6),
+            maxCap: parseUnits("100,000", 18),
           },
         ],
         equilibriumFee: parseUnits("0.075", 8),
         maxFee: parseUnits("0.5", 8),
         transferOverhead: 82491, // TODO
-        maxWalletLiquidityCap: parseUnits("10000", 6), // not used
-        maxLiquidityCap: parseUnits("800000", 6),
+        maxWalletLiquidityCap: parseUnits("10000", 18), // not used
+        maxLiquidityCap: parseUnits("800000", 18),
         svgHelper: await ethers.getContractFactory("BSCUSDT"),
         decimals: 18,
         rewardTokenAddress: "0x06250a4962558F0F3E69FC07F4c67BB9c9eAc739",
@@ -41,33 +41,33 @@ import { deploy, IDeployConfig } from "./helpers";
       // USDC
       {
         tokenAddress: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
-        minCap: parseUnits("100", 6),
-        maxCap: parseUnits("221813", 6),
+        minCap: parseUnits("100", 18),
+        maxCap: parseUnits("221813", 18),
         depositConfigs: [
           {
             chainId: 137,
-            minCap: parseUnits("10", 6),
+            minCap: parseUnits("10", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("200000", 6),
+            maxCap: parseUnits("200000", 18),
           },
           {
             chainId: 43114,
-            minCap: parseUnits("10", 6),
+            minCap: parseUnits("10", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("200000", 6),
+            maxCap: parseUnits("200000", 18),
           },
           {
             chainId: 1,
-            minCap: parseUnits("10", 6),
+            minCap: parseUnits("10", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("200000", 6),
+            maxCap: parseUnits("200000", 18),
           },
         ],
         equilibriumFee: ethers.utils.parseUnits("0.075", 8),
         maxFee: ethers.utils.parseUnits("0.5", 8),
         transferOverhead: 89491, // TODO
-        maxWalletLiquidityCap: parseUnits("10000", 6), // not used
-        maxLiquidityCap: parseUnits("1000000", 6), // trevor
+        maxWalletLiquidityCap: parseUnits("10000", 18), // not used
+        maxLiquidityCap: parseUnits("1000000", 18), // trevor
         svgHelper: await ethers.getContractFactory("BSCUSDC"),
         decimals: 18,
         rewardTokenAddress: "0x06250a4962558F0F3E69FC07F4c67BB9c9eAc739",
