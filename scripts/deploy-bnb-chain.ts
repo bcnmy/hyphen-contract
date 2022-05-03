@@ -6,12 +6,12 @@ import { deploy, IDeployConfig } from "./helpers";
   const config: IDeployConfig = {
     trustedForwarder: "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
     bicoOwner: "0xd76b82204be75ab9610b04cf27c4f4a34291d5e6",
-    pauser: "0x144A36059cdc0eF8e192ddC4df6E6d2F013fDa6A",
+    pauser: "0x129443cA2a9Dec2020808a2868b38dDA457eaCC7",
     tokens: [
       // USDT
       {
         tokenAddress: "0x55d398326f99059ff775485246999027b3197955",
-        minCap: parseUnits("100", 18),
+        minCap: parseUnits("10", 18),
         maxCap: parseUnits("120000", 18),
         depositConfigs: [
           {
@@ -22,9 +22,9 @@ import { deploy, IDeployConfig } from "./helpers";
           },
           {
             chainId: 1,
-            minCap: parseUnits("10", 18),
+            minCap: parseUnits("100", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("100,000", 18),
+            maxCap: parseUnits("100000", 18),
           },
         ],
         equilibriumFee: parseUnits("0.075", 8),
@@ -41,7 +41,7 @@ import { deploy, IDeployConfig } from "./helpers";
       // USDC
       {
         tokenAddress: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
-        minCap: parseUnits("100", 18),
+        minCap: parseUnits("10", 18),
         maxCap: parseUnits("221813", 18),
         depositConfigs: [
           {
@@ -58,7 +58,7 @@ import { deploy, IDeployConfig } from "./helpers";
           },
           {
             chainId: 1,
-            minCap: parseUnits("10", 18),
+            minCap: parseUnits("100", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
             maxCap: parseUnits("200000", 18),
           },
@@ -77,20 +77,20 @@ import { deploy, IDeployConfig } from "./helpers";
       // BICO
       {
         tokenAddress: "0x06250a4962558F0F3E69FC07F4c67BB9c9eAc739",
-        minCap: parseUnits("50", 18),
+        minCap: parseUnits("10", 18),
         maxCap: parseUnits("510000", 18),
         depositConfigs: [
           {
             chainId: 137,
             minCap: parseUnits("10", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("113220", 18),
+            maxCap: parseUnits("300000", 18),
           },
           {
             chainId: 1,
-            minCap: parseUnits("10", 18),
+            minCap: parseUnits("50", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("530,000", 18),
+            maxCap: parseUnits("530000", 18),
           },
         ],
         equilibriumFee: ethers.utils.parseUnits("0.075", 8),
@@ -127,7 +127,7 @@ import { deploy, IDeployConfig } from "./helpers";
           },
           {
             chainId: 1,
-            minCap: parseUnits("0.0039", 18),
+            minCap: parseUnits("0.02", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
             maxCap: parseUnits("130", 18),
           },

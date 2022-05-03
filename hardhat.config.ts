@@ -85,6 +85,7 @@ const config: HardhatUserConfig = {
     bsc: {
       url: process.env.BSC_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: 10000000000,
     },
     avalanche: {
       url: process.env.AVALANCHE_URL || "",
