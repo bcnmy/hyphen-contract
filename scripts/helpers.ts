@@ -327,7 +327,7 @@ const verify = async (
     await verifyContract(contracts.svgHelperMap[token.tokenAddress].address, [token.decimals]);
   }
   await verifyContract(contracts.executorManager.address, []);
-  await verifyContract(contracts.tokenManager.address, [config.trustedForwarder]);
+  await verifyImplementation(contracts.tokenManager.address);
   await verifyImplementation(contracts.lpToken.address);
   await verifyImplementation(contracts.liquidityProviders.address);
   await verifyImplementation(contracts.liquidityPool.address);
