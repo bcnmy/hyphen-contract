@@ -13,15 +13,19 @@
 
 pragma solidity 0.8.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "../metatx/ERC2771Context.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "../../security/Pausable.sol";
+import "../metatx/ERC2771ContextUpgradeable.sol";
 import "../interfaces/ITokenManager.sol";
 
-contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
+contract TokenManager is ITokenManager, ERC2771ContextUpgradeable, OwnableUpgradeable, Pausable {
     mapping(address => TokenInfo) public override tokensInfo;
 
+    // Excess State Transfer Fee Percentage
+    mapping(address => uint256) public override excessStateTransferFeePerc;
+
     event FeeChanged(address indexed tokenAddress, uint256 indexed equilibriumFee, uint256 indexed maxFee);
+    event ExcessStateTransferFeePercChanged(address indexed tokenAddress, uint256 indexed fee);
 
     modifier tokenChecks(address tokenAddress) {
         require(tokenAddress != address(0), "Token address cannot be 0");
@@ -40,8 +44,10 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
      */
     mapping(address => TokenConfig) public transferConfig;
 
-    constructor(address trustedForwarder) ERC2771Context(trustedForwarder) Ownable() Pausable() {
-        // Empty Constructor
+    function initialize(address trustedForwarder, address pauser) external initializer {
+        __ERC2771Context_init(trustedForwarder);
+        __Ownable_init();
+        __Pausable_init(pauser);
     }
 
     function getEquilibriumFee(address tokenAddress) public view override returns (uint256) {
@@ -59,9 +65,22 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
     ) external override onlyOwner whenNotPaused {
         require(_equilibriumFee != 0, "Equilibrium Fee cannot be 0");
         require(_maxFee != 0, "Max Fee cannot be 0");
+        require(_equilibriumFee <= _maxFee && _maxFee <= 10000000000, "Max Fee cannot be greater than 100%");
         tokensInfo[tokenAddress].equilibriumFee = _equilibriumFee;
         tokensInfo[tokenAddress].maxFee = _maxFee;
         emit FeeChanged(tokenAddress, tokensInfo[tokenAddress].equilibriumFee, tokensInfo[tokenAddress].maxFee);
+    }
+
+    function changeExcessStateFee(address _tokenAddress, uint256 _excessStateFeePer)
+        external
+        override
+        onlyOwner
+        whenNotPaused
+    {
+        require(_tokenAddress != address(0), "Token address cannot be 0");
+        require(_excessStateFeePer != 0, "Excess State Fee Percentage cannot be 0");
+        excessStateTransferFeePerc[_tokenAddress] = _excessStateFeePer;
+        emit ExcessStateTransferFeePercChanged(_tokenAddress, _excessStateFeePer);
     }
 
     function setTokenTransferOverhead(address tokenAddress, uint256 gasOverhead)
@@ -153,19 +172,27 @@ contract TokenManager is ITokenManager, ERC2771Context, Ownable, Pausable {
         return transferConfig[tokenAddress];
     }
 
-    function _msgSender() internal view virtual override(Context, ERC2771Context) returns (address sender) {
-        return ERC2771Context._msgSender();
+    function _msgSender()
+        internal
+        view
+        virtual
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
+        returns (address sender)
+    {
+        return ERC2771ContextUpgradeable._msgSender();
     }
 
-    function _msgData() internal view virtual override(Context, ERC2771Context) returns (bytes calldata) {
-        return ERC2771Context._msgData();
+    function _msgData()
+        internal
+        view
+        virtual
+        override(ContextUpgradeable, ERC2771ContextUpgradeable)
+        returns (bytes calldata)
+    {
+        return ERC2771ContextUpgradeable._msgData();
     }
 
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    function unpause() external onlyOwner {
-        _unpause();
+    function setTrustedForwarder(address _tf) external onlyOwner {
+        _setTrustedForwarder(_tf);
     }
 }

@@ -1,4 +1,5 @@
 import { ethers } from "hardhat";
+import { parseUnits } from "ethers/lib/utils";
 import { deploy, IDeployConfig } from "./helpers";
 
 (async () => {
@@ -34,6 +35,7 @@ import { deploy, IDeployConfig } from "./helpers";
         decimals: 18,
         rewardRatePerSecond: 100,
         rewardTokenAddress: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716",
+        excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       {
         tokenAddress: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
@@ -62,6 +64,7 @@ import { deploy, IDeployConfig } from "./helpers";
         decimals: 18,
         rewardRatePerSecond: 100,
         rewardTokenAddress: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716",
+        excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       {
         tokenAddress: "0xb5B640E6414b6DeF4FC9B3C1EeF373925effeCcF",
@@ -84,6 +87,7 @@ import { deploy, IDeployConfig } from "./helpers";
         decimals: 6,
         rewardRatePerSecond: 100,
         rewardTokenAddress: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716",
+        excessStateTransferFeePer: parseUnits("0.045", 8),
       },
     ],
   };

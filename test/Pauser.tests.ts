@@ -15,7 +15,7 @@ import { BigNumber, ContractTransaction } from "ethers";
 
 let { getLocaleString } = require("./utils");
 
-describe("LPTokenTests", function () {
+describe("PauserTests", function () {
   let owner: SignerWithAddress, pauser: SignerWithAddress, bob: SignerWithAddress;
   let charlie: SignerWithAddress, tf: SignerWithAddress, executor: SignerWithAddress;
   let token: ERC20Token, token2: ERC20Token;
@@ -112,9 +112,31 @@ describe("LPTokenTests", function () {
     expect(await ethers.provider.getBalance(liquidityProviders.address)).to.equal(0);
   });
 
-  it("Should pause nft transfer when nft contract is paused", async function () {
-    await liquidityProviders.addNativeLiquidity({ value: 100 });
+  it("It should allow pauser to renounce it's role", async function () {
+    await expect(lpToken.connect(pauser).renouncePauser()).to.not.be.reverted;
+  });
+
+  it("Should not allow pauser to renounce if contract is paused", async function () {
     await lpToken.connect(pauser).pause();
-    await expect(lpToken.transferFrom(owner.address, bob.address, 1)).to.be.revertedWith("Pausable: paused");
+    await expect(lpToken.connect(pauser).renouncePauser()).to.be.revertedWith("Pausable: paused");
+  });
+
+  it("Should not allow pauser to changePauser if contract is paused", async function () {
+    await lpToken.connect(pauser).pause();
+    await expect(lpToken.connect(pauser).changePauser(bob.address)).to.be.revertedWith("Pausable: paused");
+  });
+
+  it("Should allow pauser to change pauser after unpausing", async function () {
+    await lpToken.connect(pauser).pause();
+    await expect(lpToken.connect(pauser).changePauser(bob.address)).to.be.revertedWith("Pausable: paused");
+    await lpToken.connect(pauser).unpause();
+    await expect(lpToken.connect(pauser).changePauser(bob.address)).to.not.be.reverted;
+  });
+
+  it("Should allow pauser to renounce pauser after unpausing", async function () {
+    await lpToken.connect(pauser).pause();
+    await expect(lpToken.connect(pauser).changePauser(bob.address)).to.be.revertedWith("Pausable: paused");
+    await lpToken.connect(pauser).unpause();
+    await expect(lpToken.connect(pauser).renouncePauser()).to.not.be.reverted;
   });
 });

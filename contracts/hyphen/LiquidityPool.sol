@@ -84,9 +84,9 @@ contract LiquidityPool is
         string tag
     );
     event GasFeeWithdraw(address indexed tokenAddress, address indexed owner, uint256 indexed amount);
-    event TrustedForwarderChanged(address indexed forwarderAddress);
     event LiquidityProvidersChanged(address indexed liquidityProvidersAddress);
     event TokenManagerChanged(address indexed tokenManagerAddress);
+    event BaseGasUpdated(uint256 indexed baseGas);
     event EthReceived(address, uint256);
 
     // MODIFIERS
@@ -127,9 +127,7 @@ contract LiquidityPool is
     }
 
     function setTrustedForwarder(address trustedForwarder) external onlyOwner {
-        require(trustedForwarder != address(0), "TrustedForwarder can't be 0");
-        _trustedForwarder = trustedForwarder;
-        emit TrustedForwarderChanged(trustedForwarder);
+        _setTrustedForwarder(trustedForwarder);
     }
 
     function setLiquidityProviders(address _liquidityProviders) external onlyOwner {
@@ -146,6 +144,7 @@ contract LiquidityPool is
 
     function setBaseGas(uint128 gas) external onlyOwner {
         baseGas = gas;
+        emit BaseGasUpdated(baseGas);
     }
 
     function getExecutorManager() external view returns (address) {
@@ -181,6 +180,8 @@ contract LiquidityPool is
         uint256 amount,
         string calldata tag
     ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
+        require(toChainId != block.chainid, "To chain must be different than current chain");
+        require(tokenAddress != NATIVE, "wrong function");
         TokenConfig memory config = tokenManager.getDepositConfig(toChainId, tokenAddress);
 
         require(config.min <= amount && config.max >= amount, "Deposit amount not in Cap limit");
@@ -270,6 +271,7 @@ contract LiquidityPool is
         uint256 toChainId,
         string calldata tag
     ) external payable whenNotPaused nonReentrant {
+        require(toChainId != block.chainid, "To chain must be different than current chain");
         require(
             tokenManager.getDepositConfig(toChainId, NATIVE).min <= msg.value &&
                 tokenManager.getDepositConfig(toChainId, NATIVE).max >= msg.value,
@@ -369,28 +371,125 @@ contract LiquidityPool is
         return [amountToTransfer, lpFee, transferFeeAmount, gasFee];
     }
 
+    function sendFundsToUserV2(
+        address tokenAddress,
+        uint256 amount,
+        address payable receiver,
+        bytes calldata depositHash,
+        uint256 nativeTokenPriceInTransferredToken,
+        uint256 fromChainId
+    ) external nonReentrant onlyExecutor whenNotPaused {
+        uint256 initialGas = gasleft();
+        TokenConfig memory config = tokenManager.getTransferConfig(tokenAddress);
+        require(config.min <= amount && config.max >= amount, "Withdraw amount not in Cap limit");
+        require(receiver != address(0), "Bad receiver address");
+
+        (bytes32 hashSendTransaction, bool status) = checkHashStatus(tokenAddress, amount, receiver, depositHash);
+
+        require(!status, "Already Processed");
+        processedHash[hashSendTransaction] = true;
+
+        // uint256 amountToTransfer, uint256 lpFee, uint256 transferFeeAmount, uint256 gasFee
+        uint256[4] memory transferDetails = getAmountToTransferV2(
+            initialGas,
+            tokenAddress,
+            amount,
+            nativeTokenPriceInTransferredToken
+        );
+
+        liquidityProviders.decreaseCurrentLiquidity(tokenAddress, transferDetails[0]);
+
+        if (tokenAddress == NATIVE) {
+            (bool success, ) = receiver.call{value: transferDetails[0]}("");
+            require(success, "Native Transfer Failed");
+        } else {
+            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, transferDetails[0]);
+        }
+
+        emit AssetSent(
+            tokenAddress,
+            amount,
+            transferDetails[0],
+            receiver,
+            depositHash,
+            fromChainId,
+            transferDetails[1],
+            transferDetails[2],
+            transferDetails[3]
+        );
+    }
+
+    /**
+     * @dev Internal function to calculate amount of token that needs to be transfered afetr deducting all required fees.
+     * Fee to be deducted includes gas fee, lp fee and incentive pool amount if needed.
+     * @param initialGas Gas provided initially before any calculations began
+     * @param tokenAddress Token address for which calculation needs to be done
+     * @param amount Amount of token to be transfered before deducting the fee
+     * @param nativeTokenPriceInTransferredToken Price of native token in terms of the token being transferred (multiplied base div), used to calculate gas fee
+     * @return [ amountToTransfer, lpFee, transferFeeAmount, gasFee ]
+     */
+    function getAmountToTransferV2(
+        uint256 initialGas,
+        address tokenAddress,
+        uint256 amount,
+        uint256 nativeTokenPriceInTransferredToken
+    ) internal returns (uint256[4] memory) {
+        TokenInfo memory tokenInfo = tokenManager.getTokensInfo(tokenAddress);
+        uint256 transferFeePerc = _getTransferFee(tokenAddress, amount, tokenInfo);
+        uint256 lpFee;
+        if (transferFeePerc > tokenInfo.equilibriumFee) {
+            // Here add some fee to incentive pool also
+            lpFee = (amount * tokenInfo.equilibriumFee) / BASE_DIVISOR;
+            unchecked {
+                incentivePool[tokenAddress] += (amount * (transferFeePerc - tokenInfo.equilibriumFee)) / BASE_DIVISOR;
+            }
+        } else {
+            lpFee = (amount * transferFeePerc) / BASE_DIVISOR;
+        }
+        uint256 transferFeeAmount = (amount * transferFeePerc) / BASE_DIVISOR;
+
+        liquidityProviders.addLPFee(tokenAddress, lpFee);
+
+        uint256 totalGasUsed = initialGas + tokenInfo.transferOverhead + baseGas - gasleft();
+        uint256 gasFee = (totalGasUsed * nativeTokenPriceInTransferredToken * tx.gasprice) / BASE_DIVISOR;
+
+        gasFeeAccumulatedByToken[tokenAddress] += gasFee;
+        gasFeeAccumulated[tokenAddress][_msgSender()] += gasFee;
+        uint256 amountToTransfer = amount - (transferFeeAmount + gasFee);
+        return [amountToTransfer, lpFee, transferFeeAmount, gasFee];
+    }
+
     function _getTransferFee(
         address tokenAddress,
         uint256 amount,
         TokenInfo memory tokenInfo
-    ) private view returns (uint256 fee) {
+    ) private view returns (uint256) {
         uint256 currentLiquidity = getCurrentLiquidity(tokenAddress);
         uint256 providedLiquidity = liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
 
         uint256 resultingLiquidity = currentLiquidity - amount;
 
+        // We return a constant value in excess state
+        if (resultingLiquidity > providedLiquidity) {
+            return tokenManager.excessStateTransferFeePerc(tokenAddress);
+        }
+
         // Fee is represented in basis points * 10 for better accuracy
-        uint256 numerator = providedLiquidity * tokenInfo.equilibriumFee * tokenInfo.maxFee; // F(max) * F(e) * L(e)
+        uint256 numerator = providedLiquidity * providedLiquidity * tokenInfo.equilibriumFee * tokenInfo.maxFee; // F(max) * F(e) * L(e) ^ 2
         uint256 denominator = tokenInfo.equilibriumFee *
+            providedLiquidity *
             providedLiquidity +
             (tokenInfo.maxFee - tokenInfo.equilibriumFee) *
-            resultingLiquidity; // F(e) * L(e) + (F(max) - F(e)) * L(r)
+            resultingLiquidity *
+            resultingLiquidity; // F(e) * L(e) ^ 2 + (F(max) - F(e)) * L(r) ^ 2
 
+        uint256 fee;
         if (denominator == 0) {
             fee = 0;
         } else {
             fee = numerator / denominator;
         }
+        return fee;
     }
 
     function getTransferFee(address tokenAddress, uint256 amount) external view returns (uint256) {
