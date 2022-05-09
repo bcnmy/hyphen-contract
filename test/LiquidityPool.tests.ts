@@ -11,7 +11,8 @@ import {
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BigNumber } from "ethers";
+import { BigNumber, BigNumberish } from "ethers";
+import { parseEther } from "ethers/lib/utils";
 
 let { getLocaleString } = require("./utils");
 
@@ -28,6 +29,7 @@ describe("LiquidityPoolTests", function () {
 
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   let equilibriumFee = 10000000;
+  let excessStateFee = 4500000;
   let maxFee = 200000000;
   let tokenAddress: string;
   let tag: string = "HyphenUI";
@@ -42,6 +44,7 @@ describe("LiquidityPoolTests", function () {
   const communityPerWalletMaxCap = getLocaleString(1000 * 1e18);
   const commuintyPerTokenMaxCap = getLocaleString(500000 * 1e18);
   const tokenMaxCap = getLocaleString(1000000 * 1e18);
+  const baseDivisor = ethers.BigNumber.from(10).pow(10);
 
   const communityPerWalletNativeMaxCap = getLocaleString(1 * 1e18);
   const commuintyPerTokenNativeMaxCap = getLocaleString(100 * 1e18);
@@ -55,8 +58,11 @@ describe("LiquidityPoolTests", function () {
   beforeEach(async function () {
     [owner, pauser, charlie, bob, tf, proxyAdmin, executor] = await ethers.getSigners();
 
-    const tokenManagerFactory = await ethers.getContractFactory("TokenManager");
-    tokenManager = await tokenManagerFactory.deploy(trustedForwarder);
+    tokenManager = (await upgrades.deployProxy(await ethers.getContractFactory("TokenManager"), [
+      tf.address,
+      pauser.address,
+    ])) as TokenManager;
+    await tokenManager.deployed();
 
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
     executorManager = await executorManagerFactory.deploy();
@@ -105,6 +111,7 @@ describe("LiquidityPoolTests", function () {
       max: maxTokenCap,
     };
     await tokenManager.connect(owner).setDepositConfig([1], [tokenAddress], [tokenDepositConfig]);
+    await tokenManager.connect(owner).changeExcessStateFee(tokenAddress, excessStateFee);
 
     // Add supported Native token
     await tokenManager
@@ -138,10 +145,13 @@ describe("LiquidityPoolTests", function () {
 
     for (const signer of [owner, bob, charlie]) {
       await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
+      await token
+        .connect(signer)
+        .approve(liquidityPool.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
     }
   });
 
-  async function addTokenLiquidity(tokenAddress: string, tokenValue: string, sender: SignerWithAddress) {
+  async function addTokenLiquidity(tokenAddress: string, tokenValue: BigNumberish, sender: SignerWithAddress) {
     let tx = await token.connect(sender).approve(liquidityProviders.address, tokenValue);
     await tx.wait();
     await liquidityProviders.connect(sender).addTokenLiquidity(tokenAddress, tokenValue);
@@ -180,10 +190,23 @@ describe("LiquidityPoolTests", function () {
     });
   }
 
-  async function sendFundsToUser(tokenAddress: string, amount: string, receiver: string, tokenGasPrice: string, depositHash?: string) {
+  async function sendFundsToUser(
+    tokenAddress: string,
+    amount: string,
+    receiver: string,
+    tokenGasPrice: string,
+    depositHash?: string
+  ) {
     return await liquidityPool
       .connect(executor)
-      .sendFundsToUser(tokenAddress, amount, receiver, depositHash? depositHash: dummyDepositHash, tokenGasPrice, 137);
+      .sendFundsToUser(
+        tokenAddress,
+        amount,
+        receiver,
+        depositHash ? depositHash : dummyDepositHash,
+        tokenGasPrice,
+        137
+      );
   }
 
   async function checkStorage() {
@@ -442,7 +465,13 @@ describe("LiquidityPoolTests", function () {
       await tx.wait();
 
       let rewardPoolBeforeTransfer = await liquidityPool.incentivePool(NATIVE);
-      tx = await sendFundsToUser(NATIVE, amountToWithdraw, receiver, "0", "0xbf4d8d58e7905ad39ea2e4b8c8ae0cae89e5877d8540b03a299a0b14544c1e6a");
+      tx = await sendFundsToUser(
+        NATIVE,
+        amountToWithdraw,
+        receiver,
+        "0",
+        "0xbf4d8d58e7905ad39ea2e4b8c8ae0cae89e5877d8540b03a299a0b14544c1e6a"
+      );
       await tx.wait();
 
       const amountToDeposit = BigNumber.from(minTokenCap).toString();
@@ -488,8 +517,7 @@ describe("LiquidityPoolTests", function () {
       const liquidityToBeAdded = getLocaleString(50 * 1e18);
       await addNativeLiquidity(liquidityToBeAdded, owner);
 
-      const amountToWithdraw = BigNumber.from(minTokenCap)
-        .add(BigNumber.from(getLocaleString(5 * 1e18)));
+      const amountToWithdraw = BigNumber.from(minTokenCap).add(BigNumber.from(getLocaleString(5 * 1e18)));
       let receiver = await getReceiverAddress();
       let toChainId = 1;
       await executorManager.addExecutor(executor.address);
@@ -500,16 +528,21 @@ describe("LiquidityPoolTests", function () {
       let rewardPoolBeforeTransfer = await liquidityPool.incentivePool(NATIVE);
 
       let transferFeePercentage = await liquidityPool.getTransferFee(NATIVE, amountToWithdraw);
-      
+
       let excessFeePercentage = transferFeePercentage.sub(BigNumber.from("10000000"));
       let expectedRewardAmount = amountToWithdraw.mul(excessFeePercentage).div(1e10);
-      tx = await sendFundsToUser(NATIVE, amountToWithdraw.toString(), receiver, "0", "0xbf4d8d58e7905ad39ea2e4b8c8ae0cae89e5877d8540b03a299a0b14544c1e6a");
+      tx = await sendFundsToUser(
+        NATIVE,
+        amountToWithdraw.toString(),
+        receiver,
+        "0",
+        "0xbf4d8d58e7905ad39ea2e4b8c8ae0cae89e5877d8540b03a299a0b14544c1e6a"
+      );
 
       let rewardPoolAfterTrasnfer = await liquidityPool.incentivePool(NATIVE);
 
       let rewardPoolDiff = rewardPoolAfterTrasnfer.sub(rewardPoolBeforeTransfer);
       expect(rewardPoolDiff.eq(expectedRewardAmount)).to.be.true;
-      
     });
   });
 
@@ -752,5 +785,82 @@ describe("LiquidityPoolTests", function () {
         value: 1,
       })
     ).to.be.reverted;
+  });
+
+  describe("Transfer Fee", async function () {
+    it("Should calculate fee properly", async function () {
+      const providedLiquidity = ethers.BigNumber.from(minTokenCap).mul(10);
+      await addTokenLiquidity(tokenAddress, providedLiquidity, owner);
+
+      const amount = ethers.BigNumber.from(minTokenCap);
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+      const resultingLiquidity = providedLiquidity.sub(amount);
+
+      const expectedFeePerNum = providedLiquidity.mul(providedLiquidity).mul(equilibriumFee).mul(maxFee);
+      const expectedFeePerDen = providedLiquidity
+        .mul(providedLiquidity)
+        .mul(equilibriumFee)
+        .add(resultingLiquidity.mul(resultingLiquidity).mul(maxFee - equilibriumFee));
+      const expectedFeePer = expectedFeePerNum.div(expectedFeePerDen);
+
+      const expectedTransferFee = amount.mul(expectedFeePer).div(baseDivisor);
+      const lpFee = amount.mul(equilibriumFee).div(baseDivisor);
+      const incentivePoolFee = expectedTransferFee.sub(lpFee);
+
+      await expect(
+        liquidityPool
+          .connect(executor)
+          .sendFundsToUser(token.address, amount, await getReceiverAddress(), dummyDepositHash, 0, 137)
+      )
+        .to.emit(liquidityPool, "AssetSent")
+        .withArgs(
+          token.address,
+          amount,
+          amount.sub(expectedTransferFee),
+          await getReceiverAddress(),
+          dummyDepositHash,
+          137,
+          lpFee,
+          expectedTransferFee,
+          0
+        );
+      expect(await liquidityPool.incentivePool(token.address)).to.equal(incentivePoolFee);
+    });
+
+    it("Should collect constant transaction fee in excess state", async function () {
+      const providedLiquidity = ethers.BigNumber.from(minTokenCap).mul(10);
+      await addTokenLiquidity(tokenAddress, providedLiquidity, owner);
+
+      await liquidityPool.depositErc20(1, token.address, owner.address, providedLiquidity.mul(10), "test");
+
+      const amount = ethers.BigNumber.from(minTokenCap);
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+
+      const expectedTransferFee = amount.mul(excessStateFee).div(baseDivisor);
+      const lpFee = expectedTransferFee;
+      const incentivePoolFee = 0;
+
+      for (let i = 0; i < 10; i++) {
+        const hash = ethers.BigNumber.from(dummyDepositHash).add(i).toHexString();
+        await expect(
+          liquidityPool
+            .connect(executor)
+            .sendFundsToUser(token.address, amount, await getReceiverAddress(), hash, 0, 137)
+        )
+          .to.emit(liquidityPool, "AssetSent")
+          .withArgs(
+            token.address,
+            amount,
+            amount.sub(expectedTransferFee),
+            await getReceiverAddress(),
+            hash,
+            137,
+            lpFee,
+            expectedTransferFee,
+            0
+          );
+        expect(await liquidityPool.incentivePool(token.address)).to.equal(incentivePoolFee);
+      }
+    });
   });
 });

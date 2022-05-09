@@ -36,6 +36,7 @@ import { deploy, IDeployConfig } from "./helpers";
         decimals: 6,
         rewardTokenAddress: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         rewardRatePerSecond: parseUnits("0.000034814379098636", 18),
+        excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       // WETH
       {
@@ -65,6 +66,7 @@ import { deploy, IDeployConfig } from "./helpers";
         decimals: 18,
         rewardTokenAddress: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         rewardRatePerSecond: parseUnits("0.000030666706752555", 18),
+        excessStateTransferFeePer: parseUnits("0.045", 8),
       },
     ],
   };

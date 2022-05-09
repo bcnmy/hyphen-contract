@@ -1,14 +1,14 @@
-// $$\       $$\                     $$\       $$\ $$\   $$\                     $$$$$$$\                                $$\       $$\                               
-// $$ |      \__|                    \__|      $$ |\__|  $$ |                    $$  __$$\                               \__|      $$ |                              
-// $$ |      $$\  $$$$$$\  $$\   $$\ $$\  $$$$$$$ |$$\ $$$$$$\   $$\   $$\       $$ |  $$ | $$$$$$\   $$$$$$\ $$\    $$\ $$\  $$$$$$$ | $$$$$$\   $$$$$$\   $$$$$$$\ 
+// $$\       $$\                     $$\       $$\ $$\   $$\                     $$$$$$$\                                $$\       $$\
+// $$ |      \__|                    \__|      $$ |\__|  $$ |                    $$  __$$\                               \__|      $$ |
+// $$ |      $$\  $$$$$$\  $$\   $$\ $$\  $$$$$$$ |$$\ $$$$$$\   $$\   $$\       $$ |  $$ | $$$$$$\   $$$$$$\ $$\    $$\ $$\  $$$$$$$ | $$$$$$\   $$$$$$\   $$$$$$$\
 // $$ |      $$ |$$  __$$\ $$ |  $$ |$$ |$$  __$$ |$$ |\_$$  _|  $$ |  $$ |      $$$$$$$  |$$  __$$\ $$  __$$\\$$\  $$  |$$ |$$  __$$ |$$  __$$\ $$  __$$\ $$  _____|
-// $$ |      $$ |$$ /  $$ |$$ |  $$ |$$ |$$ /  $$ |$$ |  $$ |    $$ |  $$ |      $$  ____/ $$ |  \__|$$ /  $$ |\$$\$$  / $$ |$$ /  $$ |$$$$$$$$ |$$ |  \__|\$$$$$$\  
-// $$ |      $$ |$$ |  $$ |$$ |  $$ |$$ |$$ |  $$ |$$ |  $$ |$$\ $$ |  $$ |      $$ |      $$ |      $$ |  $$ | \$$$  /  $$ |$$ |  $$ |$$   ____|$$ |       \____$$\ 
+// $$ |      $$ |$$ /  $$ |$$ |  $$ |$$ |$$ /  $$ |$$ |  $$ |    $$ |  $$ |      $$  ____/ $$ |  \__|$$ /  $$ |\$$\$$  / $$ |$$ /  $$ |$$$$$$$$ |$$ |  \__|\$$$$$$\
+// $$ |      $$ |$$ |  $$ |$$ |  $$ |$$ |$$ |  $$ |$$ |  $$ |$$\ $$ |  $$ |      $$ |      $$ |      $$ |  $$ | \$$$  /  $$ |$$ |  $$ |$$   ____|$$ |       \____$$\
 // $$$$$$$$\ $$ |\$$$$$$$ |\$$$$$$  |$$ |\$$$$$$$ |$$ |  \$$$$  |\$$$$$$$ |      $$ |      $$ |      \$$$$$$  |  \$  /   $$ |\$$$$$$$ |\$$$$$$$\ $$ |      $$$$$$$  |
-// \________|\__| \____$$ | \______/ \__| \_______|\__|   \____/  \____$$ |      \__|      \__|       \______/    \_/    \__| \_______| \_______|\__|      \_______/ 
-//                     $$ |                                      $$\   $$ |                                                                                          
-//                     $$ |                                      \$$$$$$  |                                                                                          
-//                     \__|                                       \______/                                                                                           
+// \________|\__| \____$$ | \______/ \__| \_______|\__|   \____/  \____$$ |      \__|      \__|       \______/    \_/    \__| \_______| \_______|\__|      \_______/
+//                     $$ |                                      $$\   $$ |
+//                     $$ |                                      \$$$$$$  |
+//                     \__|                                       \______/
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.0;
 
@@ -167,6 +167,10 @@ contract LiquidityProviders is
         tokenManager = ITokenManager(_tokenManager);
     }
 
+    function setTrustedForwarder(address _tf) external onlyOwner {
+        _setTrustedForwarder(_tf);
+    }
+
     /**
      * @dev To be called post initialization, used to set address of WhiteListPeriodManager Contract
      * @param _whiteListPeriodManager address of WhiteListPeriodManager
@@ -189,8 +193,8 @@ contract LiquidityProviders is
      * @return Price of Base token in terms of LP Shares
      */
     function getTokenPriceInLPShares(address _baseToken) public view returns (uint256) {
-        uint256 supply = totalSharesMinted[_baseToken];
-        if (supply > 0) {
+        uint256 reserve = totalReserve[_baseToken];
+        if (reserve > 0) {
             return totalSharesMinted[_baseToken] / totalReserve[_baseToken];
         }
         return BASE_DIVISOR;
@@ -259,6 +263,7 @@ contract LiquidityProviders is
      *      record in the newly minted NFT
      */
     function addNativeLiquidity() external payable nonReentrant tokenChecks(NATIVE) whenNotPaused {
+        require(address(liquidityPool) != address(0), "ERR__LIQUIDITY_POOL_NOT_SET");
         (bool success, ) = address(liquidityPool).call{value: msg.value}("");
         require(success, "ERR__NATIVE_TRANSFER_FAILED");
         _addLiquidity(NATIVE, msg.value);
@@ -296,7 +301,7 @@ contract LiquidityProviders is
 
         uint256 mintedSharesAmount;
         // Adding liquidity in the pool for the first time
-        if (totalReserve[token] == 0) {
+        if (totalReserve[token] == 0 || totalSharesMinted[token] == 0) {
             mintedSharesAmount = BASE_DIVISOR * _amount;
         } else {
             mintedSharesAmount = (_amount * totalSharesMinted[token]) / totalReserve[token];
@@ -344,6 +349,7 @@ contract LiquidityProviders is
         (address token, , ) = lpToken.tokenMetadata(_nftId);
         require(_isSupportedToken(NATIVE), "ERR__TOKEN_NOT_SUPPORTED");
         require(token == NATIVE, "ERR__WRONG_FUNCTION");
+        require(address(liquidityPool) != address(0), "ERR__LIQUIDITY_POOL_NOT_SET");
         (bool success, ) = address(liquidityPool).call{value: msg.value}("");
         require(success, "ERR__NATIVE_TRANSFER_FAILED");
         _increaseLiquidity(_nftId, msg.value);
@@ -365,7 +371,7 @@ contract LiquidityProviders is
         require(_amount != 0, "ERR__INVALID_AMOUNT");
         require(nftSuppliedLiquidity >= _amount, "ERR__INSUFFICIENT_LIQUIDITY");
         whiteListPeriodManager.beforeLiquidityRemoval(_msgSender(), _tokenAddress, _amount);
-        // Claculate how much shares represent input amount
+        // Calculate how much shares represent input amount
         uint256 lpSharesForInputAmount = _amount * getTokenPriceInLPShares(_tokenAddress);
 
         // Calculate rewards accumulated
