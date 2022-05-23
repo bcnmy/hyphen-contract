@@ -7,12 +7,11 @@ import {
   ExecutorManager,
   LPToken,
   WhitelistPeriodManager,
-  TokenManager,
+  TokenManager
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, BigNumberish } from "ethers";
-import { parseEther } from "ethers/lib/utils";
 
 let { getLocaleString } = require("./utils");
 
@@ -41,19 +40,18 @@ describe("LiquidityPoolTests", function () {
   const minNativeTokenCap = getLocaleString(1e17);
   const maxNativeTokenCap = getLocaleString(25 * 1e18);
 
-  const communityPerWalletMaxCap = getLocaleString(1000 * 1e18);
   const commuintyPerTokenMaxCap = getLocaleString(500000 * 1e18);
   const tokenMaxCap = getLocaleString(1000000 * 1e18);
   const baseDivisor = ethers.BigNumber.from(10).pow(10);
 
-  const communityPerWalletNativeMaxCap = getLocaleString(1 * 1e18);
   const commuintyPerTokenNativeMaxCap = getLocaleString(100 * 1e18);
   const tokenNativeMaxCap = getLocaleString(200 * 1e18);
 
   const DEPOSIT_EVENT = "Deposit";
-  const ASSET_SENT = "AssetSent";
-  const DEPOSIT_TOPIC_ID = "0x5fe47ed6d4225326d3303476197d782ded5a4e9c14f479dc9ec4992af4e85d59";
+  const DEPOSIT_AND_SWAP_EVENT = "DepositAndSwap";
   const dummyDepositHash = "0xf408509b00caba5d37325ab33a92f6185c9b5f007a965dfbeff7b81ab1ec871a";
+  const swapRequestOne = [[NATIVE, 20000000, 0]];
+  const swapRequestTwo = [[NATIVE, 2000000000, 0], [NATIVE, 9000000000, 0]];
 
   beforeEach(async function () {
     [owner, pauser, charlie, bob, tf, proxyAdmin, executor] = await ethers.getSigners();
@@ -189,6 +187,16 @@ describe("LiquidityPoolTests", function () {
       value: tokenValue,
     });
   }
+  async function depositNativeAndSwap(tokenValue: string, receiver: string, toChainId: number, swapRequest: any) {
+    return await liquidityPool.connect(owner).depositNativeAndSwap(receiver, toChainId, tag, swapRequest, {
+      value: tokenValue,
+    });
+  }
+
+  async function depositAndSwapERC20Token(tokenAddress: string, tokenValue: string, receiver: string, toChainId: number, swapRequest: any) {
+    await token.approve(liquidityPool.address, tokenValue);
+    return await liquidityPool.connect(owner).depositAndSwapErc20(toChainId, tokenAddress, receiver, tokenValue, tag, swapRequest);
+  }
 
   async function sendFundsToUser(
     tokenAddress: string,
@@ -304,6 +312,30 @@ describe("LiquidityPoolTests", function () {
       .withArgs(await getOwnerAddress(), tokenAddress, receiver, toChainId, tokenValue, 0, tag);
     let tokenLiquidityAfter = (await token.balanceOf(liquidityPool.address)).toString();
     expect(parseInt(tokenLiquidityAfter)).to.equal(parseInt(tokenLiquidityBefore) + parseInt(tokenValue));
+  });
+
+  it("Should deposit ERC20 and Swap data successfully without rewards", async () => {
+    //Deposit Token
+    const tokenValue = minTokenCap;
+    let receiver = await getReceiverAddress();
+    let toChainId = 1;
+    let tokenLiquidityBefore = (await token.balanceOf(liquidityPool.address)).toString();
+    let tx = await depositAndSwapERC20Token(tokenAddress, tokenValue, receiver, toChainId, swapRequestOne);
+
+    expect(tx)
+      .to.emit(liquidityPool, DEPOSIT_AND_SWAP_EVENT)
+      .withArgs(await getOwnerAddress(), tokenAddress, receiver, toChainId, tokenValue, 0, tag);
+    let tokenLiquidityAfter = (await token.balanceOf(liquidityPool.address)).toString();
+    expect(parseInt(tokenLiquidityAfter)).to.equal(parseInt(tokenLiquidityBefore) + parseInt(tokenValue));
+  });
+
+  it("Should revert if swap percentage > 100", async () => {
+    //Deposit Token
+    const tokenValue = minTokenCap;
+    let receiver = await getReceiverAddress();
+    let toChainId = 1;
+
+    await expect(depositAndSwapERC20Token(tokenAddress, tokenValue, receiver, toChainId, swapRequestTwo)).to.be.reverted;
   });
 
   it("Should not get reward during deposit if current liquidity = provided liquidity", async () => {
@@ -551,14 +583,34 @@ describe("LiquidityPoolTests", function () {
     const tokenLiquidityBefore = await ethers.provider.getBalance(liquidityPool.address);
 
     //Deposit Native
-    await liquidityPool.connect(owner).depositNative(await getReceiverAddress(), 1, tag, {
-      value: tokenValue,
-    });
+    await depositNative(tokenValue, await getReceiverAddress(), 1);
     const tokenLiquidityAfter = await ethers.provider.getBalance(liquidityPool.address);
 
     expect(parseInt(tokenLiquidityAfter.toString())).to.equal(
       parseInt(tokenLiquidityBefore.toString()) + parseInt(tokenValue)
     );
+  });
+
+  it("Should deposit native and Swap data successfully without rewards", async () => {
+    const tokenValue = minTokenCap;
+    const tokenLiquidityBefore = await ethers.provider.getBalance(liquidityPool.address);
+
+    //Deposit Native
+    await depositNativeAndSwap(tokenValue, await getReceiverAddress(), 1, swapRequestOne);
+    const tokenLiquidityAfter = await ethers.provider.getBalance(liquidityPool.address);
+
+    expect(parseInt(tokenLiquidityAfter.toString())).to.equal(
+      parseInt(tokenLiquidityBefore.toString()) + parseInt(tokenValue)
+    );
+  });
+
+  it("Should revert if swap percentage > 100", async () => {
+    //Deposit Token
+    const tokenValue = minTokenCap;
+    let receiver = await getReceiverAddress();
+    let toChainId = 1;
+
+    await expect(depositNativeAndSwap(tokenValue, receiver, toChainId, swapRequestTwo)).to.be.reverted;
   });
 
   it("Should setTokenTransferOverhead successfully", async () => {

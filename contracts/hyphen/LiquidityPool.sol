@@ -500,8 +500,7 @@ contract LiquidityPool is
             require(success, "Native Transfer Failed");
         } else if(swapAdptorMap[swapAdaptor] != address(0)) {
             ISwapAdaptor(swapAdptorMap[swapAdaptor]).swap(tokenAddress, transferDetails[0], receiver, swapRequests);
-        } 
-        else {
+        } else {
             SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, transferDetails[0]);
         }
 
