@@ -503,7 +503,7 @@ contract LiquidityPool is
             (bool success, ) = receiver.call{value: transferDetails[0]}("");
             require(success, "Native Transfer Failed");
         } else if(swapAdaptorMap[swapAdaptor] != address(0)) {
-            console.log("Swap Adaptor is not null");
+            SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(tokenAddress), address(swapAdaptorMap[swapAdaptor]), transferDetails[0]);
             uint256 swapGasFee = calculateGasFee(swapGasOverhead, tokenAddress, nativeTokenPriceInTransferredToken, _msgSender());
             transferDetails[0] -= swapGasFee; // Deduct swap gas fee from amount to be sent
             transferDetails[3] += swapGasFee; // Add swap gas fee to gas fee
