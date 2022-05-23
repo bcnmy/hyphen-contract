@@ -213,15 +213,14 @@ contract LiquidityPool is
     function depositAndSwapErc20(
         uint256 toChainId,
         address tokenAddress,
-        SwapRequest[] memory swapRequest,
         address receiver,
         uint256 amount,
-        string calldata tag
+        string calldata tag,
+        SwapRequest[] memory swapRequest
     ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
     
         uint256 totalPercentage = 0;
-        uint256 index;
-        for (index = 0; index < swapRequest.length; ++index) {
+        for (uint256 index = 0; index < swapRequest.length; ++index) {
             totalPercentage += swapRequest[index].swapPercentage;
         }
         
@@ -333,15 +332,14 @@ contract LiquidityPool is
     }
 
     function depositNativeAndSwap(
-        SwapRequest[] memory swapRequest,
         address receiver,
         uint256 toChainId,
-        string calldata tag
+        string calldata tag,
+        SwapRequest[] memory swapRequest
     ) external payable whenNotPaused nonReentrant {
 
         uint256 totalPercentage = 0;
-        uint256 index;
-        for (index = 0; index < swapRequest.length; ++index) {
+        for (uint256 index = 0; index < swapRequest.length; ++index) {
             totalPercentage += swapRequest[index].swapPercentage;
         }
         
