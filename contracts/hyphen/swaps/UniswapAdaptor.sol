@@ -14,8 +14,6 @@ pragma abicoder v2;
 contract UniswapAdaptor is ISwapAdaptor {
 
     ISwapRouter public immutable swapRouter;
-
-    // For this example, we will set the pool fee to 0.3%.
     uint24 public constant POOL_FEE = 3000;
 
     constructor(ISwapRouter _swapRouter) {
@@ -34,60 +32,23 @@ contract UniswapAdaptor is ISwapAdaptor {
         SwapRequest[] memory swapRequests
     ) override external returns (uint256 amountIn) {
         TransferHelper.safeTransferFrom(inputTokenAddress, msg.sender, address(this), amountInMaximum);
-
         TransferHelper.safeApprove(inputTokenAddress, address(swapRouter), amountInMaximum);
+        
+        ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
+            tokenIn: inputTokenAddress,
+            tokenOut: swapRequests[0].tokenAddress,
+            fee: POOL_FEE,
+            recipient: receiver,
+            amountOut: swapRequests[0].amount,
+            amountInMaximum: amountInMaximum,
+            sqrtPriceLimitX96: 0
+        });
 
-        uint256 index = 0;
-        for(index = 0; index < swapRequests.length; index++) {
-
-            ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
-                tokenIn: inputTokenAddress,
-                tokenOut: swapRequests[index].swapTokenAddress,
-                fee: POOL_FEE,
-                recipient: receiver,
-                amountOut: swapRequests[index].swapAmount,
-                amountInMaximum: amountInMaximum,
-                sqrtPriceLimitX96: 0
-            });
-
-            amountIn = swapRouter.exactOutputSingle(params);
-        }
-
+        amountIn = swapRouter.exactOutputSingle(params);
+        
         if (amountIn < amountInMaximum) {
             TransferHelper.safeApprove(inputTokenAddress, address(swapRouter), 0);
             TransferHelper.safeTransfer(inputTokenAddress, receiver, amountInMaximum - amountIn);
         }
     }
-
-    /// @notice swapExactInputSingle swaps a fixed amount of DAI for a maximum possible amount of WETH9
-    /// using the DAI/WETH9 0.3% pool by calling `exactInputSingle` in the swap router.
-    /// @dev The calling address must approve this contract to spend at least `amountIn` worth of its DAI for this function to succeed.
-    /// @param amountIn The exact amount of DAI that will be swapped for WETH9.
-    /// @return amountOut The amount of WETH9 received.
-    // function swapExactInputSingle(uint256 amountIn) external returns (uint256 amountOut) {
-    //     // msg.sender must approve this contract
-
-    //     // Transfer the specified amount of DAI to this contract.
-    //     TransferHelper.safeTransferFrom(DAI, msg.sender, address(this), amountIn);
-
-    //     // Approve the router to spend DAI.
-    //     TransferHelper.safeApprove(DAI, address(swapRouter), amountIn);
-
-    //     // Naively set amountOutMinimum to 0. In production, use an oracle or other data source to choose a safer value for amountOutMinimum.
-    //     // We also set the sqrtPriceLimitx96 to be 0 to ensure we swap our exact input amount.
-    //     ISwapRouter.ExactInputSingleParams memory params =
-    //         ISwapRouter.ExactInputSingleParams({
-    //             tokenIn: DAI,
-    //             tokenOut: WETH9,
-    //             fee: poolFee,
-    //             recipient: msg.sender,
-    //             deadline: block.timestamp,
-    //             amountIn: amountIn,
-    //             amountOutMinimum: 0,
-    //             sqrtPriceLimitX96: 0
-    //         });
-
-    //     // The call to `exactInputSingle` executes the swap.
-    //     amountOut = swapRouter.exactInputSingle(params);
-    // }
 }

@@ -28,6 +28,7 @@ import "./interfaces/ILiquidityProviders.sol";
 import "../interfaces/IERC20Permit.sol";
 import "./interfaces/ITokenManager.sol";
 import "./interfaces/ISwapAdaptor.sol";
+import "hardhat/console.sol";
 
 contract LiquidityPool is
     Initializable,
@@ -63,7 +64,7 @@ contract LiquidityPool is
     // Incentive Pool amount per token address
     mapping(address => uint256) public incentivePool;
 
-    mapping(string => address) public swapAdptorMap;
+    mapping(string => address) public swapAdaptorMap;
 
     event AssetSent(
         address indexed asset,
@@ -138,8 +139,8 @@ contract LiquidityPool is
         baseGas = 21000;
     }
 
-    function setSwapAdaptor(string memory name, address _swapAdaptor) public {
-        swapAdptorMap[name] = _swapAdaptor;
+    function setSwapAdaptor(string calldata name, address _swapAdaptor) external onlyOwner {
+        swapAdaptorMap[name] = _swapAdaptor;
     }
 
     function setTrustedForwarder(address trustedForwarder) external onlyOwner {
@@ -204,27 +205,29 @@ contract LiquidityPool is
     }
 
     /**
-     * @dev Function used to deposit tokens into pool to initiate a cross chain token transfer.
+     * @dev Function used to deposit tokens into pool to initiate a cross chain token swap And transfer .
      * @param toChainId Chain id where funds needs to be transfered
      * @param tokenAddress ERC20 Token address that needs to be transfered
      * @param receiver Address on toChainId where tokens needs to be transfered
      * @param amount Amount of token being transfered
+     * @param tag Dapp unique identifier
+     * @param swapRequest information related to token swap on exit chain
      */
     function depositAndSwapErc20(
-        uint256 toChainId,
         address tokenAddress,
         address receiver,
+        uint256 toChainId,
         uint256 amount,
         string calldata tag,
-        SwapRequest[] memory swapRequest
+        SwapRequest[] calldata swapRequest
     ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
     
         uint256 totalPercentage = 0;
         for (uint256 index = 0; index < swapRequest.length; ++index) {
-            totalPercentage += swapRequest[index].swapPercentage;
+            totalPercentage += swapRequest[index].percentage;
         }
         
-        require(totalPercentage <= BASE_DIVISOR, "Total percentage cannot be > 100");
+        require(totalPercentage <= 100*BASE_DIVISOR, "Total percentage cannot be > 100");
         address sender = _msgSender();
         uint256 rewardAmount = _depositErc20(sender, toChainId, tokenAddress, receiver, amount);
         // Emit (amount + reward amount) in event
@@ -340,10 +343,10 @@ contract LiquidityPool is
 
         uint256 totalPercentage = 0;
         for (uint256 index = 0; index < swapRequest.length; ++index) {
-            totalPercentage += swapRequest[index].swapPercentage;
+            totalPercentage += swapRequest[index].percentage;
         }
         
-        require(totalPercentage <= BASE_DIVISOR, "Total percentage cannot be > 100");
+        require(totalPercentage <= 100*BASE_DIVISOR, "Total percentage cannot be > 100");
         
         uint256 rewardAmount = _depositNative(receiver, toChainId); // TODO: check if need to pass msg.value
         emit DepositAndSwap(_msgSender(), NATIVE, receiver, toChainId, msg.value + rewardAmount, rewardAmount, tag, swapRequest);
@@ -490,16 +493,21 @@ contract LiquidityPool is
         bytes calldata depositHash,
         uint256 nativeTokenPriceInTransferredToken,
         uint256 fromChainId,
+        uint256 swapGasOverhead,
         SwapRequest[] memory swapRequests,
         string memory swapAdaptor
     ) external nonReentrant onlyExecutor whenNotPaused {
-         uint256[4] memory transferDetails = _sendFundsToUser(tokenAddress, amount, receiver, depositHash, nativeTokenPriceInTransferredToken);
+        uint256[4] memory transferDetails = _sendFundsToUser(tokenAddress, amount, receiver, depositHash, nativeTokenPriceInTransferredToken);
 
         if (tokenAddress == NATIVE) {
             (bool success, ) = receiver.call{value: transferDetails[0]}("");
             require(success, "Native Transfer Failed");
-        } else if(swapAdptorMap[swapAdaptor] != address(0)) {
-            ISwapAdaptor(swapAdptorMap[swapAdaptor]).swap(tokenAddress, transferDetails[0], receiver, swapRequests);
+        } else if(swapAdaptorMap[swapAdaptor] != address(0)) {
+            console.log("Swap Adaptor is not null");
+            uint256 swapGasFee = calculateGasFee(swapGasOverhead, tokenAddress, nativeTokenPriceInTransferredToken, _msgSender());
+            transferDetails[0] -= swapGasFee; // Deduct swap gas fee from amount to be sent
+            transferDetails[3] += swapGasFee; // Add swap gas fee to gas fee
+            ISwapAdaptor(swapAdaptorMap[swapAdaptor]).swap(tokenAddress, transferDetails[0], receiver, swapRequests);
         } else {
             SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, transferDetails[0]);
         }
@@ -528,12 +536,10 @@ contract LiquidityPool is
         TokenConfig memory config = tokenManager.getTransferConfig(tokenAddress);
         require(config.min <= amount && config.max >= amount, "Withdraw amount not in Cap limit");
         require(receiver != address(0), "Bad receiver address");
-
         (bytes32 hashSendTransaction, bool status) = checkHashStatus(tokenAddress, amount, receiver, depositHash);
 
         require(!status, "Already Processed");
         processedHash[hashSendTransaction] = true;
-
         // uint256 amountToTransfer, uint256 lpFee, uint256 transferFeeAmount, uint256 gasFee
         uint256[4] memory transferDetails = getAmountToTransferV2(
             initialGas,
@@ -579,12 +585,22 @@ contract LiquidityPool is
         liquidityProviders.addLPFee(tokenAddress, lpFee);
 
         uint256 totalGasUsed = initialGas + tokenInfo.transferOverhead + baseGas - gasleft();
-        uint256 gasFee = (totalGasUsed * nativeTokenPriceInTransferredToken * tx.gasprice) / BASE_DIVISOR;
-
-        gasFeeAccumulatedByToken[tokenAddress] += gasFee;
-        gasFeeAccumulated[tokenAddress][_msgSender()] += gasFee;
+        uint256 gasFee = calculateGasFee(totalGasUsed, tokenAddress, nativeTokenPriceInTransferredToken, _msgSender());
         uint256 amountToTransfer = amount - (transferFeeAmount + gasFee);
         return [amountToTransfer, lpFee, transferFeeAmount, gasFee];
+    }
+
+    function calculateGasFee(
+        uint256 gasUsed,
+        address tokenAddress,
+        uint256 nativeTokenPriceInTransferredToken,
+        address sender
+    ) internal returns (uint256) {
+        uint256 gasFee = (gasUsed * nativeTokenPriceInTransferredToken * tx.gasprice) / BASE_DIVISOR;
+
+        gasFeeAccumulatedByToken[tokenAddress] += gasFee;
+        gasFeeAccumulated[tokenAddress][sender] += gasFee;
+        return gasFee;
     }
 
     function _getTransferFee(
