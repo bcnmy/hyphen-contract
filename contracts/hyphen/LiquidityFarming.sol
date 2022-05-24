@@ -383,7 +383,7 @@ contract HyphenLiquidityFarming is
         return rewardRateLog[_baseToken][rewardRateLog[_baseToken].length - 1].rewardsPerSecond;
     }
 
-    function migrateNftsToV2(uint256[] memory _nftIds, IHyphenLiquidityFarmingV2 _farmingV2) external {
+    function migrateNftsToV2(uint256[] calldata _nftIds, IHyphenLiquidityFarmingV2 _farmingV2) external {
         uint256 length = _nftIds.length;
         address payable msgSender = payable(_msgSender());
 

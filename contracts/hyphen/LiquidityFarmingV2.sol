@@ -352,7 +352,7 @@ contract HyphenLiquidityFarmingV2 is
     /// @param _to The receiver of withdraw benefit.
     function extractRewards(
         uint256 _nftId,
-        address[] memory _rewardTokens,
+        address[] calldata _rewardTokens,
         address payable _to
     ) external whenNotPaused nonReentrant {
         require(nftInfo[_nftId].staker == _msgSender(), "ERR__NOT_OWNER");
