@@ -92,7 +92,8 @@ contract LiquidityPool is
     event TokenManagerChanged(address indexed tokenManagerAddress);
     event BaseGasUpdated(uint256 indexed baseGas);
     event EthReceived(address, uint256);
-    event DepositAndSwap(address indexed from,
+    event DepositAndSwap(
+        address indexed from,
         address indexed tokenAddress,
         address indexed receiver,
         uint256 toChainId,
@@ -101,6 +102,7 @@ contract LiquidityPool is
         string tag,
         SwapRequest[] swapRequests
     );
+    event SwapAdaptorChanged(string indexed name, address indexed liquidityProvidersAddress);
 
     // MODIFIERS
     modifier onlyExecutor() {
@@ -141,6 +143,7 @@ contract LiquidityPool is
 
     function setSwapAdaptor(string calldata name, address _swapAdaptor) external onlyOwner {
         swapAdaptorMap[name] = _swapAdaptor;
+        emit SwapAdaptorChanged(name, _swapAdaptor);
     }
 
     function setTrustedForwarder(address trustedForwarder) external onlyOwner {
@@ -220,13 +223,18 @@ contract LiquidityPool is
         uint256 amount,
         string calldata tag,
         SwapRequest[] calldata swapRequest
-    ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
+    ) external tokenChecks(tokenAddress) whenNotPaused nonReentrant {
     
         uint256 totalPercentage = 0;
-        for (uint256 index = 0; index < swapRequest.length; ++index) {
-            totalPercentage += swapRequest[index].percentage;
+        {
+            uint256 swapArrayLength = swapRequest.length;
+            unchecked {
+                for (uint256 index = 0; index < swapArrayLength; ++index) {
+                    totalPercentage += swapRequest[index].percentage;
+                }
+            }
         }
-        
+
         require(totalPercentage <= 100*BASE_DIVISOR, "Total percentage cannot be > 100");
         address sender = _msgSender();
         uint256 rewardAmount = _depositErc20(sender, toChainId, tokenAddress, receiver, amount);
@@ -239,7 +247,8 @@ contract LiquidityPool is
         uint256 toChainId,
         address tokenAddress,
         address receiver,
-        uint256 amount ) internal returns ( uint256 ){
+        uint256 amount 
+    ) internal returns ( uint256 ){
         require(toChainId != block.chainid, "To chain must be different than current chain");
         require(tokenAddress != NATIVE, "wrong function");
         TokenConfig memory config = tokenManager.getDepositConfig(toChainId, tokenAddress);
@@ -338,12 +347,17 @@ contract LiquidityPool is
         address receiver,
         uint256 toChainId,
         string calldata tag,
-        SwapRequest[] memory swapRequest
+        SwapRequest[] calldata swapRequest
     ) external payable whenNotPaused nonReentrant {
 
         uint256 totalPercentage = 0;
-        for (uint256 index = 0; index < swapRequest.length; ++index) {
-            totalPercentage += swapRequest[index].percentage;
+        {
+            uint256 swapArrayLength = swapRequest.length;
+            unchecked {
+                for (uint256 index = 0; index < swapArrayLength; ++index) {
+                    totalPercentage += swapRequest[index].percentage;
+                }
+            }
         }
         
         require(totalPercentage <= 100*BASE_DIVISOR, "Total percentage cannot be > 100");
@@ -494,8 +508,8 @@ contract LiquidityPool is
         uint256 nativeTokenPriceInTransferredToken,
         uint256 fromChainId,
         uint256 swapGasOverhead,
-        SwapRequest[] memory swapRequests,
-        string memory swapAdaptor
+        SwapRequest[] calldata swapRequests,
+        string calldata swapAdaptor
     ) external nonReentrant onlyExecutor whenNotPaused {
         uint256[4] memory transferDetails = _sendFundsToUser(tokenAddress, amount, receiver, depositHash, nativeTokenPriceInTransferredToken);
 

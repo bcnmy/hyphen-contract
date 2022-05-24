@@ -9,8 +9,6 @@ import "../interfaces/ISwapAdaptor.sol";
 import "../interfaces/ISwapRouter.sol";
 import "../lib/TransferHelper.sol";
 
-pragma abicoder v2;
-
 contract UniswapAdaptor is ISwapAdaptor {
 
     ISwapRouter public immutable swapRouter;
@@ -29,7 +27,7 @@ contract UniswapAdaptor is ISwapAdaptor {
         address inputTokenAddress,
         uint256 amountInMaximum,
         address receiver,
-        SwapRequest[] memory swapRequests
+        SwapRequest[] calldata swapRequests
     ) override external returns (uint256 amountIn) {
         TransferHelper.safeTransferFrom(inputTokenAddress, msg.sender, address(this), amountInMaximum);
         TransferHelper.safeApprove(inputTokenAddress, address(swapRouter), amountInMaximum);
