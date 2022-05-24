@@ -58,8 +58,16 @@ describe("LiquidityPoolTests", function () {
   const depositNswapRequestOne = [[NATIVE, 20000000, 0]];
   const depositNswapRequestTwo = [[NATIVE, 200000000000, 0], [NATIVE, 900000000000, 0]];
 
-  const swapNexitRequestOne = [[NATIVE, 0, "20000000000000000"]];
-  const swapNexitRequestTwo = [[NATIVE, 0, "20000000000000000000"]];
+  // const swapNexitRequestOne = [[NATIVE, 0, "20000000000000000"]];
+  const swapNexitRequestOne = [{
+    tokenAddress: NATIVE, 
+    percentage: "0", 
+    amount: "20000000000000000"}];
+    
+  const swapNexitRequestTwo = [{
+    tokenAddress: NATIVE, 
+    percentage: "0", 
+    amount: "20000000000000000000"}];
 
   beforeEach(async function () {
     [owner, pauser, charlie, bob, tf, proxyAdmin, executor] = await ethers.getSigners();
