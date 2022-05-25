@@ -510,13 +510,16 @@ contract LiquidityPool is
         SwapRequest[] calldata swapRequests,
         string calldata swapAdaptor
     ) external nonReentrant onlyExecutor whenNotPaused {
+        require(swapRequests.length > 0, "Wrong method call");
+        require(swapAdaptorMap[swapAdaptor] != address(0), "Swap adaptor not found");
+        
         uint256[4] memory transferDetails = _sendFundsToUser(tokenAddress, amount, receiver, depositHash, nativeTokenPriceInTransferredToken);
 
         if (tokenAddress == NATIVE) {    
             (bool success, ) = swapAdaptorMap[swapAdaptor].call{value: transferDetails[0]}("");
             require(success, "Native Transfer to Adaptor Failed");
             ISwapAdaptor(swapAdaptorMap[swapAdaptor]).swapNative(transferDetails[0], receiver, swapRequests);
-        } else if(swapAdaptorMap[swapAdaptor] != address(0)) {
+        } else 
             {
                 uint256 gasBeforeApproval = gasleft();
                 SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(tokenAddress), address(swapAdaptorMap[swapAdaptor]), transferDetails[0]);
@@ -527,9 +530,8 @@ contract LiquidityPool is
                 transferDetails[3] += swapGasFee; // Add swap gas fee to gas fee
             }
             ISwapAdaptor(swapAdaptorMap[swapAdaptor]).swap(tokenAddress, transferDetails[0], receiver, swapRequests);
-        } else {
-            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, transferDetails[0]);
         }
+        
 
         emit AssetSent(
             tokenAddress,
