@@ -14,18 +14,20 @@ contract UniswapAdaptor is ISwapAdaptor {
     uint24 public constant POOL_FEE = 3000;
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     
-    address public immutable WRAPPED_NATIVE_TOKEN_ADDRESS;
+    address public immutable WRAPPER_ADDRESS;
     ISwapRouter public immutable swapRouter;
 
-    constructor(ISwapRouter _swapRouter, address wNativeTokenAddress) {
-        WRAPPED_NATIVE_TOKEN_ADDRESS = wNativeTokenAddress;
-        swapRouter = _swapRouter; // "0xE592427A0AEce92De3Edee1F18E0157C05861564"
+    constructor(ISwapRouter _swapRouter, address wrapperAddress) {
+        WRAPPER_ADDRESS = wrapperAddress;
+        swapRouter = _swapRouter; // "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
     }
 
     /// @notice swapForFixedInput swaps a fixed amount of DAI for a maximum possible amount of WETH9
     /// @dev The calling address must approve this contract to spend at least `amountIn` worth of its DAI for this function to succeed.
-    /// @param amountInMaximum The exact amount of DAI that will be swapped for WETH9.
-    /// @return amountOut The amount of WETH9 received.
+    /// @param inputTokenAddress Erc20 token address.
+    /// @param amountInMaximum The exact amount of Erc20 that will be swapped for desired token.
+    /// @param receiver address where all tokens will be sent.
+    /// @return amountOut The amount of Swapped token received.
     function swap(
         address inputTokenAddress,
         uint256 amountInMaximum,
@@ -36,39 +38,49 @@ contract UniswapAdaptor is ISwapAdaptor {
         require(inputTokenAddress != NATIVE, "wrong function");
         uint256 swapArrayLength = swapRequests.length;
 
-        // Only first element should have ExactOutput operation
-        if(swapArrayLength > 1) {
-            for( uint256 index=0; index < swapArrayLength; index++ ) {
-                require(index == 0 || swapRequests[index].operation != SwapOperation.ExactOutput, "Invalid swap request");
-            }   
-        } else {
-            require(swapRequests[0].operation == SwapOperation.ExactOutput, "Invalid swap request");
-        }
-        
+        require(swapArrayLength <= 2, "too many swap requests");
+        require(swapArrayLength == 1 || swapRequests[1].operation == SwapOperation.ExactInput, "Invalid swap operation");
 
         TransferHelper.safeTransferFrom(inputTokenAddress, msg.sender, address(this), amountInMaximum);
         TransferHelper.safeApprove(inputTokenAddress, address(swapRouter), amountInMaximum);
         
-        uint256 amountIn = _fixedOutputSwap (
-            inputTokenAddress,
-            amountInMaximum,
-            receiver,
-            swapRequests[0]
-        );
-
-        if(amountIn < amountInMaximum){
-            if(swapArrayLength > 1) {
-                amountOut = _fixedInputSwap (
+        uint256 amountIn;
+        if(swapArrayLength == 1) {
+            if (swapRequests[0].operation == SwapOperation.ExactOutput ){
+                amountIn = _fixedOutputSwap (
                     inputTokenAddress,
                     amountInMaximum,
                     receiver,
+                    swapRequests[0]
+                );
+                if(amountIn < amountInMaximum) {
+                    TransferHelper.safeApprove(inputTokenAddress, address(swapRouter), 0);
+                    TransferHelper.safeTransfer(inputTokenAddress, receiver, amountInMaximum - amountIn);
+                }
+            } else {
+                _fixedInputSwap (
+                    inputTokenAddress,
+                    amountInMaximum,
+                    receiver,
+                    swapRequests[0]
+                );
+            }
+        } else {
+            amountIn = _fixedOutputSwap (
+                inputTokenAddress,
+                amountInMaximum,
+                receiver,
+                swapRequests[0]
+            );
+            if(amountIn < amountInMaximum){
+                amountOut = _fixedInputSwap (
+                    inputTokenAddress,
+                    amountInMaximum - amountIn,
+                    receiver,
                     swapRequests[1]
                 );
-            } else {
-                TransferHelper.safeApprove(inputTokenAddress, address(swapRouter), 0);
-                TransferHelper.safeTransfer(inputTokenAddress, receiver, amountInMaximum - amountIn);
-            }
-        }   
+            } 
+        }
     }
 
     /// @notice swapNative swaps a fixed amount of WETH for a maximum possible amount of Swap tokens
@@ -81,7 +93,8 @@ contract UniswapAdaptor is ISwapAdaptor {
         address receiver,
         SwapRequest[] calldata swapRequests
     ) override external returns (uint256 amountOut) {
-        amountOut = _fixedInputSwap(WRAPPED_NATIVE_TOKEN_ADDRESS, amountInMaximum, receiver, swapRequests[1]);
+        require(swapRequests.length == 1 , "only 1 swap request allowed");
+        amountOut = _fixedInputSwap(WRAPPER_ADDRESS, amountInMaximum, receiver, swapRequests[0]);
     }
 
     function _fixedOutputSwap(
