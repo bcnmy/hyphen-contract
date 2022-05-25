@@ -7,6 +7,12 @@ interface ISwapAdaptor {
         address inputTokenAddress,
         uint256 amountInMaximum,
         address receiver,
-        SwapRequest[] memory swapRequests
+        SwapRequest[] calldata swapRequests
     ) external returns (uint256 amountIn);
+
+    function swapNative(
+        uint256 amountInMaximum,
+        address receiver,
+        SwapRequest[] calldata swapRequests
+    ) external returns (uint256 amountOut);
 }

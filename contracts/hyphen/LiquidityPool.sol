@@ -512,14 +512,20 @@ contract LiquidityPool is
     ) external nonReentrant onlyExecutor whenNotPaused {
         uint256[4] memory transferDetails = _sendFundsToUser(tokenAddress, amount, receiver, depositHash, nativeTokenPriceInTransferredToken);
 
-        if (tokenAddress == NATIVE) {
-            (bool success, ) = receiver.call{value: transferDetails[0]}("");
-            require(success, "Native Transfer Failed");
+        if (tokenAddress == NATIVE) {    
+            (bool success, ) = swapAdaptorMap[swapAdaptor].call{value: transferDetails[0]}("");
+            require(success, "Native Transfer to Adaptor Failed");
+            ISwapAdaptor(swapAdaptorMap[swapAdaptor]).swapNative(transferDetails[0], receiver, swapRequests);
         } else if(swapAdaptorMap[swapAdaptor] != address(0)) {
-            SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(tokenAddress), address(swapAdaptorMap[swapAdaptor]), transferDetails[0]);
-            uint256 swapGasFee = calculateGasFee(swapGasOverhead, tokenAddress, nativeTokenPriceInTransferredToken, _msgSender());
-            transferDetails[0] -= swapGasFee; // Deduct swap gas fee from amount to be sent
-            transferDetails[3] += swapGasFee; // Add swap gas fee to gas fee
+            {
+                uint256 gasBeforeApproval = gasleft();
+                SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(tokenAddress), address(swapAdaptorMap[swapAdaptor]), transferDetails[0]);
+                
+                swapGasOverhead += (gasBeforeApproval - gasleft());
+                uint256 swapGasFee = calculateGasFee(tokenAddress, nativeTokenPriceInTransferredToken, swapGasOverhead, _msgSender());
+                transferDetails[0] -= swapGasFee; // Deduct swap gas fee from amount to be sent
+                transferDetails[3] += swapGasFee; // Add swap gas fee to gas fee
+            }
             ISwapAdaptor(swapAdaptorMap[swapAdaptor]).swap(tokenAddress, transferDetails[0], receiver, swapRequests);
         } else {
             SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, transferDetails[0]);
@@ -598,15 +604,15 @@ contract LiquidityPool is
         liquidityProviders.addLPFee(tokenAddress, lpFee);
 
         uint256 totalGasUsed = initialGas + tokenInfo.transferOverhead + baseGas - gasleft();
-        uint256 gasFee = calculateGasFee(totalGasUsed, tokenAddress, nativeTokenPriceInTransferredToken, _msgSender());
+        uint256 gasFee = calculateGasFee(tokenAddress, nativeTokenPriceInTransferredToken, totalGasUsed, _msgSender());
         uint256 amountToTransfer = amount - (transferFeeAmount + gasFee);
         return [amountToTransfer, lpFee, transferFeeAmount, gasFee];
     }
 
     function calculateGasFee(
-        uint256 gasUsed,
         address tokenAddress,
         uint256 nativeTokenPriceInTransferredToken,
+        uint256 gasUsed,
         address sender
     ) internal returns (uint256) {
         uint256 gasFee = (gasUsed * nativeTokenPriceInTransferredToken * tx.gasprice) / BASE_DIVISOR;

@@ -22,4 +22,12 @@ contract MockAdaptorFail is ISwapAdaptor {
     ) external override returns (uint256 amountIn) {
         revert("Insufitient funds");
     }
+
+    function swapNative(
+        uint256 amountInMaximum,
+        address receiver,
+        SwapRequest[] memory swapRequests
+    ) external override returns (uint256 amountIn) {
+        revert("Insufitient funds");
+    }
 }

@@ -9,6 +9,7 @@ contract MockAdaptor is ISwapAdaptor {
 
     // For this example, we will set the pool fee to 0.3%.
     uint24 public constant POOL_FEE = 3000;
+    address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 
     constructor(ISwapRouter _swapRouter) {
         swapRouter = _swapRouter; // "0xE592427A0AEce92De3Edee1F18E0157C05861564"
@@ -20,10 +21,12 @@ contract MockAdaptor is ISwapAdaptor {
         address receiver,
         SwapRequest[] memory swapRequests
     ) external override returns (uint256 amountIn) {
-        TransferHelper.safeTransferFrom(inputTokenAddress, msg.sender, address(this), amountInMaximum);
-        console.log("transfer");
-        TransferHelper.safeTransfer(inputTokenAddress, receiver, amountInMaximum);
+    }
 
-        return 0;
+    function swapNative(
+        uint256 amountInMaximum,
+        address receiver,
+        SwapRequest[] calldata swapRequests
+    ) override external returns (uint256 amountOut) {
     }
 }
