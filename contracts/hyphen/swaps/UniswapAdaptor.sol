@@ -14,11 +14,11 @@ contract UniswapAdaptor is ISwapAdaptor {
     uint24 public constant POOL_FEE = 3000;
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     
-    address public immutable WRAPPER_ADDRESS;
+    address public immutable NATIVE_WRAP_ADDRESS;
     ISwapRouter public immutable swapRouter;
 
-    constructor(ISwapRouter _swapRouter, address wrapperAddress) {
-        WRAPPER_ADDRESS = wrapperAddress;
+    constructor(ISwapRouter _swapRouter, address nativeWrapAddress) {
+        NATIVE_WRAP_ADDRESS = nativeWrapAddress;
         swapRouter = _swapRouter; // "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
     }
 
@@ -94,9 +94,10 @@ contract UniswapAdaptor is ISwapAdaptor {
         SwapRequest[] calldata swapRequests
     ) override external returns (uint256 amountOut) {
         require(swapRequests.length == 1 , "only 1 swap request allowed");
-        amountOut = _fixedInputSwap(WRAPPER_ADDRESS, amountInMaximum, receiver, swapRequests[0]);
+        amountOut = _fixedInputSwap(NATIVE_WRAP_ADDRESS, amountInMaximum, receiver, swapRequests[0]);
     }
 
+    // Call uniswap router for a fixed output swap
     function _fixedOutputSwap(
         address inputTokenAddress,
         uint256 amountInMaximum,
@@ -116,6 +117,7 @@ contract UniswapAdaptor is ISwapAdaptor {
         amountIn = swapRouter.exactOutputSingle(params);
     }
 
+    // Call uniswap router for a fixed Input amount
      function _fixedInputSwap(
         address inputTokenAddress,
         uint256 amount,

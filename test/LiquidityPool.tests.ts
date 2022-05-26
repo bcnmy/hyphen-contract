@@ -8,7 +8,7 @@ import {
   LPToken,
   WhitelistPeriodManager,
   TokenManager,
-  MockAdaptor
+  MockAdaptor,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -55,19 +55,60 @@ describe("LiquidityPoolTests", function () {
   const DEPOSIT_EVENT = "Deposit";
   const DEPOSIT_AND_SWAP_EVENT = "DepositAndSwap";
   const dummyDepositHash = "0xf408509b00caba5d37325ab33a92f6185c9b5f007a965dfbeff7b81ab1ec871a";
-  const depositNswapRequestOne = [[NATIVE, 20000000, 0]];
-  const depositNswapRequestTwo = [[NATIVE, 200000000000, 0], [NATIVE, 900000000000, 0]];
+  const depositNswapRequestOne = [{
+    tokenAddress: NATIVE, 
+    percentage: "2000000000", 
+    amount: "0",
+    operation: 1}];
+  
+  const depositNswapRequestTwo = [{
+    tokenAddress: NATIVE, 
+    percentage: "2000000000", 
+    amount: "0",
+    operation: 1
+  },
+  {
+    tokenAddress: NATIVE, 
+    percentage: "900000000000", 
+    amount: "0",
+    operation: 2
+  }];
 
-  // const swapNexitRequestOne = [[NATIVE, 0, "20000000000000000"]];
   const swapNexitRequestOne = [{
     tokenAddress: NATIVE, 
     percentage: "0", 
-    amount: "20000000000000000"}];
+    amount: "20000000000000000",
+    operation: 1}];
     
   const swapNexitRequestTwo = [{
     tokenAddress: NATIVE, 
     percentage: "0", 
-    amount: "20000000000000000000"}];
+    amount: "20000000000000000000",
+    operation: 1}];
+  const invalidSwapRequest = [{
+    tokenAddress: NATIVE, 
+    percentage: "0", 
+    amount: "20000000000000000000",
+    operation: 3}];
+
+  const swapNexitRequestThree = [{
+    tokenAddress: NATIVE, 
+    percentage: "0", 
+    amount: "20000000000000000000",
+    operation: 1
+  },
+  {
+    tokenAddress: NATIVE, 
+    percentage: "0", 
+    amount: "200000000000000",
+    operation: 1
+  },
+  {
+    tokenAddress: NATIVE, 
+    percentage: "0", 
+    amount: "2000000000",
+    operation: 1
+  }];
 
   beforeEach(async function () {
     [owner, pauser, charlie, bob, tf, proxyAdmin, executor] = await ethers.getSigners();
@@ -245,8 +286,8 @@ describe("LiquidityPoolTests", function () {
     tokenAddress: string,
     amount: string,
     receiver: string,
-    tokenGasPrice: BigNumberish,
     depositHash?: string,
+    tokenGasPrice: BigNumberish = 0,
     swapGasOverhead: BigNumberish = 0,
     swapRequest?: any,
     swapAdapter?: string,
@@ -964,9 +1005,7 @@ describe("LiquidityPoolTests", function () {
       }
     });
 
-    // (node:219241) UnhandledPromiseRejectionWarning: Error: VM Exception while processing transaction: revert SafeMath: subtraction overflow
     it("Should send GasToken & Remaining ERC20 to user successfully", async () => {
-      await setSwapAdaptor("uniswap", mockAdaptor.address);
       await addTokenLiquidity(tokenAddress, minTokenCap, owner);
       const amount = minTokenCap;
       const usdtBalanceBefore = await token.balanceOf(liquidityPool.address);
@@ -974,9 +1013,9 @@ describe("LiquidityPoolTests", function () {
       await executorManager.connect(owner).addExecutor(await executor.getAddress());
 
       let transferFeeFromContract = await liquidityPool.getTransferFee(tokenAddress, amount);
-
-      await swapAndSendFundsToUser(token.address, amount.toString(), await getReceiverAddress(), 
-      0, dummyDepositHash, "12876", swapNexitRequestOne, "uniswap");
+      await setSwapAdaptor("uniswap", mockAdaptor.address);
+      await swapAndSendFundsToUser(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash,
+       0, "12876", swapNexitRequestOne, "uniswap");
 
       let equilibriumLiquidity = suppliedLiquidity;
       let resultingLiquidity = usdtBalanceBefore.sub(amount);
@@ -1000,9 +1039,40 @@ describe("LiquidityPoolTests", function () {
       await setSwapAdaptor("uniswap", mockAdaptorFail.address);
       await addTokenLiquidity(tokenAddress, minTokenCap, owner);
       const amount = minTokenCap;
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
 
       await expect(swapAndSendFundsToUser(token.address, amount.toString(), await getReceiverAddress(), 
-      0, dummyDepositHash, "12876", swapNexitRequestTwo, "uniswap")).to.be.reverted;;
+      dummyDepositHash, 0, "12876", swapNexitRequestTwo, "uniswap")).to.be.reverted;
+    });
+
+    it("Should fail if Array length is 0", async () => {
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+      await expect(swapAndSendFundsToUser(token.address, minTokenCap.toString(), await getReceiverAddress(), 
+      dummyDepositHash, 0, "12876", [], "uniswap")).to.be.revertedWith("Wrong method call");
+    });
+
+    it("Should fail if SwapAdaptor Not Found", async () => {
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+      await expect(swapAndSendFundsToUser(token.address, minTokenCap.toString(), await getReceiverAddress(), 
+      dummyDepositHash, 0, "12876", swapNexitRequestTwo, "anyRandomSwap")).to.be.revertedWith("Swap adaptor not found");
+    });
+
+    it("Should fail Swap Array > 3", async () => {
+      await addTokenLiquidity(tokenAddress, minTokenCap, owner);
+      await setSwapAdaptor("uniswap", mockAdaptor.address);
+
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+      await expect( swapAndSendFundsToUser(token.address, minTokenCap.toString(), await getReceiverAddress(), 
+      dummyDepositHash, 0, "12876", swapNexitRequestThree, "uniswap")).to.be.revertedWith("too many swap requests");
+    });
+
+    it("Should fail for Invalid Swap operation", async () => {
+      await addTokenLiquidity(tokenAddress, minTokenCap, owner);
+      await setSwapAdaptor("uniswap", mockAdaptor.address);
+
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+      await expect( swapAndSendFundsToUser(token.address, minTokenCap.toString(), await getReceiverAddress(), 
+      dummyDepositHash, 0, "12876", invalidSwapRequest, "uniswap")).to.be.reverted;
     });
 
   });

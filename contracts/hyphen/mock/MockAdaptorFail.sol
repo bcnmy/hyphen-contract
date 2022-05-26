@@ -2,7 +2,6 @@ pragma solidity ^0.8.0;
 import "../interfaces/ISwapAdaptor.sol";
 import "../interfaces/ISwapRouter.sol";
 import "../lib/TransferHelper.sol";
-import "hardhat/console.sol";
 
 contract MockAdaptorFail is ISwapAdaptor {
     ISwapRouter public immutable swapRouter;

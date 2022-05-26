@@ -28,7 +28,6 @@ import "./interfaces/ILiquidityProviders.sol";
 import "../interfaces/IERC20Permit.sol";
 import "./interfaces/ITokenManager.sol";
 import "./interfaces/ISwapAdaptor.sol";
-import "hardhat/console.sol";
 
 contract LiquidityPool is
     Initializable,
