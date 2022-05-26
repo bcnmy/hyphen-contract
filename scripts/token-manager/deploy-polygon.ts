@@ -6,7 +6,7 @@ import { deploy, IDeployConfig } from "./helper";
   const config: IDeployConfig = {
     trustedForwarder: "0x86C80a8aa58e0A4fa09A69624c31Ab2a6CAD56b8",
     bicoOwner: "0xd76b82204be75ab9610b04cf27c4f4a34291d5e6",
-    pauser: "0x144A36059cdc0eF8e192ddC4df6E6d2F013fDa6A",
+    pauser: "0xc8582180f52B6303F51e7028C3A9f428Eb43DfE7",
     tokens: [
       // USDT
       {
