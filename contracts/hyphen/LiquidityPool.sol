@@ -28,6 +28,7 @@ import "./interfaces/ILiquidityProviders.sol";
 import "../interfaces/IERC20Permit.sol";
 import "./interfaces/ITokenManager.sol";
 import "./interfaces/ISwapAdaptor.sol";
+import "hardhat/console.sol";
 
 contract LiquidityPool is
     Initializable,
@@ -223,7 +224,6 @@ contract LiquidityPool is
         string calldata tag,
         SwapRequest[] calldata swapRequest
     ) external tokenChecks(tokenAddress) whenNotPaused nonReentrant {
-    
         uint256 totalPercentage = 0;
         {
             uint256 swapArrayLength = swapRequest.length;
@@ -519,7 +519,7 @@ contract LiquidityPool is
             (bool success, ) = swapAdaptorMap[swapAdaptor].call{value: transferDetails[0]}("");
             require(success, "Native Transfer to Adaptor Failed");
             ISwapAdaptor(swapAdaptorMap[swapAdaptor]).swapNative(transferDetails[0], receiver, swapRequests);
-        } else 
+        } else {
             {
                 uint256 gasBeforeApproval = gasleft();
                 SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(tokenAddress), address(swapAdaptorMap[swapAdaptor]), transferDetails[0]);
@@ -532,7 +532,6 @@ contract LiquidityPool is
             ISwapAdaptor(swapAdaptorMap[swapAdaptor]).swap(tokenAddress, transferDetails[0], receiver, swapRequests);
         }
         
-
         emit AssetSent(
             tokenAddress,
             amount,

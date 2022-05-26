@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.0;
 
-enum SwapOperation {ExactInput, ExactOutput}
+enum SwapOperation {ExactOutput, ExactInput}
 
 struct SwapRequest {
     address tokenAddress;
