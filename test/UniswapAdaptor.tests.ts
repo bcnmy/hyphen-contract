@@ -152,19 +152,19 @@ describe("AdaptorTests", function () {
       .revertedWith("VM Exception while processing transaction: reverted with reason string 'STF'");
     });
 
-    // it("Should not hold any funds in case of failure: swapForFixedOutput", async function () {
+    it("Should not hold any funds in case of failure", async function () {
 
-    //     let mockRouterFailFactory = await ethers.getContractFactory("MockSwapRouterFail");
-    //     let mockswapFailManager = await mockRouterFailFactory.deploy();
-    //     await mockswapFailManager.deployed();
+        let mockRouterFailFactory = await ethers.getContractFactory("MockSwapRouterFail");
+        let mockswapFailManager = await mockRouterFailFactory.deploy();
+        await mockswapFailManager.deployed();
 
-    //     const uniswapAdaptorFactory = await ethers.getContractFactory("UniswapAdaptor");
-    //     uniswapManager = await uniswapAdaptorFactory.deploy(mockswapFailManager.address);
-    //     await uniswapManager.deployed();
+        const uniswapAdaptorFactory = await ethers.getContractFactory("UniswapAdaptor");
+        uniswapManager = await uniswapAdaptorFactory.deploy(mockswapFailManager.address, NATIVE_WRAP_ADDRESS);
+        await uniswapManager.deployed();
 
-    //     await token.approve(uniswapManager.address, minTokenCap);
-    //     await expect(uniswapManager.swapForFixedOutput(token.address, minTokenCap, await getReceiverAddress(),swapNexitRequestOne)).to.be
-    //     .reverted;
-    //     expect(await ethers.provider.getBalance(uniswapManager.address)).to.equal(0); // uniswap manager should have zero balance
-    // });
+        await token.approve(uniswapManager.address, minTokenCap);
+        await expect(uniswapManager.swap(token.address, minTokenCap, await getReceiverAddress(),swapRequestFixedInput)).to.be
+        .reverted;
+        expect(await ethers.provider.getBalance(uniswapManager.address)).to.equal(0); // uniswap manager should have zero balance
+    });
 });
