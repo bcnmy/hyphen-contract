@@ -33,6 +33,10 @@ const wait = (time: number): Promise<void> => {
 const deploy = async (deployConfig: IDeployConfig) => {
   const contracts = await deployCoreContracts(deployConfig.trustedForwarder, deployConfig.pauser);
 
+  for (const token of deployConfig.tokens) {
+    await addTokenSupport(contracts, token);
+  }
+
   // await configure(contracts, deployConfig.bicoOwner);
   await verify(contracts, deployConfig);
 };

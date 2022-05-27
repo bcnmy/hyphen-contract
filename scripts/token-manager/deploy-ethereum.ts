@@ -72,7 +72,7 @@ import { deploy, IDeployConfig } from "./helper";
             chainId: 137,
             minCap: parseUnits("10", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("100000", 18),
+            maxCap: parseUnits("300000", 18),
           },
           {
             chainId: 56,
