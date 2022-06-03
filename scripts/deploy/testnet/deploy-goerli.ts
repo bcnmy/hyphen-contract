@@ -1,15 +1,15 @@
 import { ethers } from "hardhat";
-import { deploy, IDeployConfig } from "./helpers";
 import { parseUnits } from "ethers/lib/utils";
+import { deploy, IDeployConfig } from "../../helpers";
 
 (async () => {
   const config: IDeployConfig = {
-    trustedForwarder: "0x9399BB24DBB5C4b782C70c2969F58716Ebbd6a3b",
+    trustedForwarder: "0xE041608922d06a4F26C0d4c27d8bCD01daf1f792",
     bicoOwner: "0x46b65ae065341D034fEA45D76c6fA936EAfBfdeb",
     pauser: "0x46b65ae065341D034fEA45D76c6fA936EAfBfdeb",
     tokens: [
       {
-        tokenAddress: "0xeabc4b91d9375796aa4f69cc764a4ab509080a58",
+        tokenAddress: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716",
         minCap: ethers.BigNumber.from(10).pow(18 + 2),
         maxCap: ethers.BigNumber.from(10).pow(18 + 4),
         depositConfigs: [
@@ -20,7 +20,7 @@ import { parseUnits } from "ethers/lib/utils";
             maxCap: ethers.BigNumber.from(9).mul(ethers.BigNumber.from(10).pow(18 + 3)),
           },
           {
-            chainId: 5,
+            chainId: 80001,
             minCap: ethers.BigNumber.from(10).pow(18 + 2),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
             maxCap: ethers.BigNumber.from(9).mul(ethers.BigNumber.from(10).pow(18 + 3)),
@@ -31,14 +31,14 @@ import { parseUnits } from "ethers/lib/utils";
         transferOverhead: 0,
         maxWalletLiquidityCap: ethers.BigNumber.from(10).pow(18 + 4),
         maxLiquidityCap: ethers.BigNumber.from(10).pow(18 + 5),
-        svgHelper: await ethers.getContractFactory("PolygonUSDT"),
+        svgHelper: await ethers.getContractFactory("EthereumUSDT"),
         decimals: 18,
         rewardRatePerSecond: 100,
-        rewardTokenAddress: "0xeabc4b91d9375796aa4f69cc764a4ab509080a58",
+        rewardTokenAddress: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716",
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       {
-        tokenAddress: "0xa6fa4fb5f76172d178d61b04b0ecd319c5d1c0aa",
+        tokenAddress: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
         minCap: ethers.BigNumber.from(10).pow(18 - 2),
         maxCap: ethers.BigNumber.from(10).pow(18 + 2),
         depositConfigs: [
@@ -49,7 +49,7 @@ import { parseUnits } from "ethers/lib/utils";
             maxCap: ethers.BigNumber.from(97).mul(ethers.BigNumber.from(10).pow(18)),
           },
           {
-            chainId: 5,
+            chainId: 80001,
             minCap: ethers.BigNumber.from(10).pow(18 - 2),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
             maxCap: ethers.BigNumber.from(97).mul(ethers.BigNumber.from(10).pow(18)),
@@ -60,19 +60,19 @@ import { parseUnits } from "ethers/lib/utils";
         transferOverhead: 0,
         maxWalletLiquidityCap: ethers.BigNumber.from(10).pow(18 + 4),
         maxLiquidityCap: ethers.BigNumber.from(10).pow(18 + 5),
-        svgHelper: await ethers.getContractFactory("PolygonETH"),
+        svgHelper: await ethers.getContractFactory("EthereumETH"),
         decimals: 18,
         rewardRatePerSecond: 100,
-        rewardTokenAddress: "0xeabc4b91d9375796aa4f69cc764a4ab509080a58",
+        rewardTokenAddress: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716",
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       {
-        tokenAddress: "0xdA5289fCAAF71d52a80A254da614a192b693e977",
+        tokenAddress: "0xb5B640E6414b6DeF4FC9B3C1EeF373925effeCcF",
         minCap: ethers.BigNumber.from(10).pow(6 + 2),
         maxCap: ethers.BigNumber.from(10).pow(6 + 4),
         depositConfigs: [
           {
-            chainId: 5,
+            chainId: 80001,
             minCap: ethers.BigNumber.from(10).pow(6 + 2),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
             maxCap: ethers.BigNumber.from(9).mul(ethers.BigNumber.from(10).pow(6 + 3)),
@@ -83,10 +83,10 @@ import { parseUnits } from "ethers/lib/utils";
         transferOverhead: 0,
         maxWalletLiquidityCap: ethers.BigNumber.from(10).pow(6 + 4),
         maxLiquidityCap: ethers.BigNumber.from(10).pow(6 + 5),
-        svgHelper: await ethers.getContractFactory("PolygonUSDC"),
+        svgHelper: await ethers.getContractFactory("EthereumUSDC"),
         decimals: 6,
         rewardRatePerSecond: 100,
-        rewardTokenAddress: "0xeabc4b91d9375796aa4f69cc764a4ab509080a58",
+        rewardTokenAddress: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716",
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
     ],
