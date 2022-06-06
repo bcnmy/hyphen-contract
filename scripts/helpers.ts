@@ -5,50 +5,16 @@ import {
   WhitelistPeriodManager,
   LiquidityProviders,
   TokenManager,
-  ExecutorManager,
   SvgHelperBase,
   HyphenLiquidityFarmingV2,
   ERC20Token,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
-import type { BigNumberish, ContractFactory } from "ethers";
+import type { BigNumberish } from "ethers";
+import type { IContracts, IAddTokenParameters, IDeployConfig } from "./types";
 
 const LPTokenName = "Hyphen Liquidity Token";
 const LPTokenSymbol = "Hyphen-LP";
-
-interface IAddTokenParameters {
-  tokenAddress: string;
-  minCap: BigNumberish;
-  maxCap: BigNumberish;
-  depositConfigs: { chainId: number; minCap: BigNumberish; maxCap: BigNumberish }[];
-  equilibriumFee: BigNumberish;
-  maxFee: BigNumberish;
-  transferOverhead: BigNumberish;
-  maxWalletLiquidityCap: BigNumberish;
-  maxLiquidityCap: BigNumberish;
-  svgHelper: ContractFactory;
-  decimals: number;
-  rewardTokenAddress: string;
-  rewardRatePerSecond: BigNumberish;
-  excessStateTransferFeePer: BigNumberish;
-}
-
-interface IContracts {
-  liquidityProviders: LiquidityProviders;
-  lpToken: LPToken;
-  tokenManager: TokenManager;
-  liquidityPool: LiquidityPool;
-  whitelistPeriodManager: WhitelistPeriodManager;
-  executorManager: ExecutorManager;
-  liquidityFarming: HyphenLiquidityFarmingV2;
-  svgHelperMap: Record<string, SvgHelperBase>;
-}
-interface IDeployConfig {
-  trustedForwarder: string;
-  bicoOwner: string;
-  pauser: string;
-  tokens: IAddTokenParameters[];
-}
 
 const wait = (time: number): Promise<void> => {
   return new Promise((resolve) => {
@@ -367,6 +333,5 @@ export {
   deploy,
   verifyContract,
   verifyImplementation,
-  IDeployConfig,
   deployToken,
 };
