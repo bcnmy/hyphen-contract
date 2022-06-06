@@ -40,7 +40,8 @@
   "dependencies": {
     "@openzeppelin/contracts": "4.3.0",
     "abdk-libraries-solidity": "^3.0.0",
-    "base64-sol": "^1.1.0"
+    "base64-sol": "^1.1.0",
+    "node-fetch": "2.6.1"
   },
   "scripts": {
     "compile": "hardhat compile",
