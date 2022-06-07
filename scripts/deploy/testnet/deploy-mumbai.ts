@@ -1,6 +1,6 @@
 import { ethers } from "hardhat";
-import { deploy, IDeployConfig } from "../../helpers";
 import { parseUnits } from "ethers/lib/utils";
+import type { IDeployConfig } from "../../types";
 
 (async () => {
   const config: IDeployConfig = {

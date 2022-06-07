@@ -9,9 +9,9 @@ import {
   HyphenLiquidityFarmingV2,
   ERC20Token,
   // eslint-disable-next-line node/no-missing-import
-} from "../typechain";
+} from "../../typechain";
 import type { BigNumberish } from "ethers";
-import type { IContracts, IAddTokenParameters, IDeployConfig } from "./types";
+import type { IContracts, IAddTokenParameters, IDeployConfig } from "../types";
 
 const LPTokenName = "Hyphen Liquidity Token";
 const LPTokenSymbol = "Hyphen-LP";

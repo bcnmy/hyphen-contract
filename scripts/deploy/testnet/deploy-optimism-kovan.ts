@@ -1,6 +1,7 @@
 import { ethers } from "hardhat";
 import { parseUnits } from "ethers/lib/utils";
-import { deploy, IDeployConfig, deployToken } from "../../helpers";
+import { deploy, deployToken } from "../deploy-utils";
+import type { IDeployConfig } from "../../types";
 
 (async () => {
   const usdc = await deployToken(

@@ -56,3 +56,10 @@ export interface IDeployConfig {
   pauser: string;
   tokens: IAddTokenParameters[];
 }
+
+export interface IBackendConfig {
+  baseUrl: string;
+  apiUsername: string;
+  apiPassword: string;
+  apiKey: string;
+}

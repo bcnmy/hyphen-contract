@@ -8,7 +8,7 @@ import {
   upgradeTokenManager,
   upgradeWhiteListPeriodManager,
 } from "../upgrade";
-import { verifyImplementation } from "../../helpers";
+import { verifyImplementation } from "../../deploy/deploy-utils";
 
 import type { IContractAddresses } from "../../types";
 

@@ -1,6 +1,7 @@
 import { ethers } from "hardhat";
 import { parseUnits } from "ethers/lib/utils";
-import { deploy, IDeployConfig } from "../../helpers";
+import { deploy } from "../deploy-utils";
+import type { IDeployConfig } from "../../types";
 
 (async () => {
   const config: IDeployConfig = {
@@ -71,7 +72,7 @@ import { deploy, IDeployConfig } from "../../helpers";
         svgHelper: await ethers.getContractFactory("BSCUSDC"),
         decimals: 18,
         rewardTokenAddress: "0x06250a4962558F0F3E69FC07F4c67BB9c9eAc739",
-        rewardRatePerSecond: parseUnits("0.005191", 18), 
+        rewardRatePerSecond: parseUnits("0.005191", 18),
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       // BICO
@@ -96,7 +97,7 @@ import { deploy, IDeployConfig } from "../../helpers";
         equilibriumFee: ethers.utils.parseUnits("0.075", 8),
         maxFee: ethers.utils.parseUnits("0.5", 8),
         transferOverhead: 85949, // TODO
-        maxWalletLiquidityCap: parseUnits("8474.57", 18),  // not used
+        maxWalletLiquidityCap: parseUnits("8474.57", 18), // not used
         maxLiquidityCap: parseUnits("750000", 18),
         svgHelper: await ethers.getContractFactory("BSCBICO"),
         decimals: 18,
@@ -111,7 +112,7 @@ import { deploy, IDeployConfig } from "../../helpers";
         minCap: parseUnits("0.02", 18),
         maxCap: parseUnits("143", 18),
 
-        // when user is depositing on bsc: depositErc20/depositNative, 
+        // when user is depositing on bsc: depositErc20/depositNative,
         depositConfigs: [
           {
             chainId: 137,
@@ -140,7 +141,7 @@ import { deploy, IDeployConfig } from "../../helpers";
         svgHelper: await ethers.getContractFactory("BSCETH"),
         decimals: 18,
         rewardTokenAddress: "0x06250a4962558F0F3E69FC07F4c67BB9c9eAc739",
-        rewardRatePerSecond: parseUnits("0.002545", 18), // trevor 
+        rewardRatePerSecond: parseUnits("0.002545", 18), // trevor
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
     ],

@@ -1,5 +1,5 @@
 import { upgradeLiquidityPool } from "./upgrade";
-import { verifyImplementation } from "../helpers";
+import { verifyImplementation } from "../deploy/deploy-utils";
 import { ethers } from "hardhat";
 
 (async () => {
