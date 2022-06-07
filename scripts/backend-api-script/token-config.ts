@@ -5,30 +5,30 @@ import { getBackendConfig } from "./utils";
   let tokenConfig = [
     [
       {
-        tokenSymbol: "ETH",
+        tokenSymbol: "BICO",
         decimal: 18,
         chainId: 5,
-        tokenAddress: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        tokenAddress: "",
       },
       {
-        tokenSymbol: "ETH",
+        tokenSymbol: "BICO",
         decimal: 18,
-        chainId: 80001,
-        tokenAddress: "0xa6fa4fb5f76172d178d61b04b0ecd319c5d1c0aa",
+        chainId: 69,
+        tokenAddress: "0x439725d33Fe46f1C167F6116aeEd7d910E482D2E",
       },
     ],
     [
       {
-        tokenSymbol: "ETH",
+        tokenSymbol: "USDC",
         decimal: 18,
-        chainId: 4,
-        tokenAddress: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        chainId: 80001,
+        tokenAddress: "0xdA5289fCAAF71d52a80A254da614a192b693e977",
       },
       {
-        tokenSymbol: "ETH",
+        tokenSymbol: "USDC",
         decimal: 18,
-        chainId: 43113,
-        tokenAddress: "0x7fcdc2c1ef3e4a0bcc8155a558bb20a7218f2b05",
+        chainId: 69,
+        tokenAddress: "0x4995E4dd58Fa9eF9D80F3111777fdd4bC3300a7C",
       },
     ],
   ];
