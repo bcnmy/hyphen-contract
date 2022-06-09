@@ -37,6 +37,7 @@ contract LiquidityPool is
 {
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     uint256 private constant BASE_DIVISOR = 10000000000; // Basis Points * 100 for better accuracy
+    uint256 private constant TOKEN_PRICE_BASE_DIVISOR = 10**28;
 
     uint256 public baseGas;
 
@@ -451,7 +452,7 @@ contract LiquidityPool is
         liquidityProviders.addLPFee(tokenAddress, lpFee);
 
         uint256 totalGasUsed = initialGas + tokenInfo.transferOverhead + baseGas - gasleft();
-        uint256 gasFee = (totalGasUsed * nativeTokenPriceInTransferredToken * tx.gasprice) / BASE_DIVISOR;
+        uint256 gasFee = (totalGasUsed * nativeTokenPriceInTransferredToken * tx.gasprice) / TOKEN_PRICE_BASE_DIVISOR;
 
         gasFeeAccumulatedByToken[tokenAddress] += gasFee;
         gasFeeAccumulated[tokenAddress][_msgSender()] += gasFee;
