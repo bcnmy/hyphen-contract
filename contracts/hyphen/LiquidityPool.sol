@@ -521,6 +521,7 @@ contract LiquidityPool is
         } else {
             {
                 uint256 gasBeforeApproval = gasleft();
+                SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(tokenAddress), address(swapAdaptorMap[swapAdaptor]), 0);
                 SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(tokenAddress), address(swapAdaptorMap[swapAdaptor]), transferDetails[0]);
                 
                 swapGasOverhead += (gasBeforeApproval - gasleft());

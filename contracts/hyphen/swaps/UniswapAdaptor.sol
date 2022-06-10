@@ -8,6 +8,7 @@ pragma solidity 0.8.0;
 import "../interfaces/ISwapAdaptor.sol";
 import "../interfaces/ISwapRouter.sol";
 import "../lib/TransferHelper.sol";
+import "../interfaces/IWETH.sol";
 
 contract UniswapAdaptor is ISwapAdaptor {
 
@@ -48,7 +49,6 @@ contract UniswapAdaptor is ISwapAdaptor {
         if(swapArrayLength == 1) {
             if (swapRequests[0].operation == SwapOperation.ExactOutput ){
                 amountIn = _fixedOutputSwap (
-                    inputTokenAddress,
                     amountInMaximum,
                     receiver,
                     swapRequests[0]
@@ -59,7 +59,6 @@ contract UniswapAdaptor is ISwapAdaptor {
                 }
             } else {
                 _fixedInputSwap (
-                    inputTokenAddress,
                     amountInMaximum,
                     receiver,
                     swapRequests[0]
@@ -67,14 +66,12 @@ contract UniswapAdaptor is ISwapAdaptor {
             }
         } else {
             amountIn = _fixedOutputSwap (
-                inputTokenAddress,
                 amountInMaximum,
                 receiver,
                 swapRequests[0]
             );
             if(amountIn < amountInMaximum){
                 amountOut = _fixedInputSwap (
-                    inputTokenAddress,
                     amountInMaximum - amountIn,
                     receiver,
                     swapRequests[1]
@@ -94,46 +91,79 @@ contract UniswapAdaptor is ISwapAdaptor {
         SwapRequest[] calldata swapRequests
     ) override external returns (uint256 amountOut) {
         require(swapRequests.length == 1 , "only 1 swap request allowed");
-        amountOut = _fixedInputSwap(NATIVE_WRAP_ADDRESS, amountInMaximum, receiver, swapRequests[0]);
+        amountOut = _fixedInputSwap(amountInMaximum, receiver, swapRequests[0]);
     }
 
     // Call uniswap router for a fixed output swap
     function _fixedOutputSwap(
-        address inputTokenAddress,
         uint256 amountInMaximum,
         address receiver,
         SwapRequest calldata swapRequests
     ) internal returns (uint256 amountIn) {
-        ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams({
-            tokenIn: inputTokenAddress,
-            tokenOut: swapRequests.tokenAddress,
-            fee: POOL_FEE,
-            recipient: receiver,
-            amountOut: swapRequests.amount,
-            amountInMaximum: amountInMaximum,
-            sqrtPriceLimitX96: 0
-        });
+        ISwapRouter.ExactOutputParams memory params;
+        if(swapRequests.tokenAddress == NATIVE_WRAP_ADDRESS){
+            params = ISwapRouter.ExactOutputParams({
+                path: swapRequests.path,
+                recipient: address(this),
+                amountOut: swapRequests.amount,
+                amountInMaximum: amountInMaximum
+            });
 
-        amountIn = swapRouter.exactOutputSingle(params);
+            amountIn = swapRouter.exactOutput(params);
+            unwrapWETH(swapRequests.amount, receiver);
+
+        } else {
+            params = ISwapRouter.ExactOutputParams({
+                path: swapRequests.path,
+                recipient: receiver,
+                amountOut: swapRequests.amount,
+                amountInMaximum: amountInMaximum
+            });
+
+            amountIn = swapRouter.exactOutput(params);
+        }
     }
 
-    // Call uniswap router for a fixed Input amount
+     // Call uniswap router for a fixed Input amount
      function _fixedInputSwap(
-        address inputTokenAddress,
         uint256 amount,
         address receiver,
         SwapRequest calldata swapRequests
     ) internal returns (uint256 amountOut) {
-         ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams({
-                tokenIn: inputTokenAddress,
-                tokenOut: swapRequests.tokenAddress,
-                fee: POOL_FEE,
+         ISwapRouter.ExactInputParams memory params ;
+         if(swapRequests.tokenAddress == NATIVE_WRAP_ADDRESS){
+            params = ISwapRouter.ExactInputParams({
+                path: swapRequests.path,
+                recipient: address(this),
+                amountIn: amount,
+                amountOutMinimum: 0
+            });
+            amountOut = swapRouter.exactInput(params);
+            unwrapWETH(amountOut, receiver);
+
+        } else {
+            params = ISwapRouter.ExactInputParams({
+                path: swapRequests.path,
                 recipient: receiver,
                 amountIn: amount,
-                amountOutMinimum: 0,
-                sqrtPriceLimitX96: 0
+                amountOutMinimum: 0
             });
-        amountOut = swapRouter.exactInputSingle(params);
+            amountOut = swapRouter.exactInput(params);
+        }
+
+    }
+
+    function unwrapWETH(uint256 amountMinimum, address recipient) internal {
+        uint256 balanceWETH9 = IERC20(NATIVE_WRAP_ADDRESS).balanceOf(address(this));
+        require(balanceWETH9 >= amountMinimum, 'Insufficient WETH9');
+
+        if (balanceWETH9 > 0) {
+            IWETH(NATIVE_WRAP_ADDRESS).withdraw(balanceWETH9);
+            TransferHelper.safeTransferETH(recipient, balanceWETH9);
+        }
+    }
+
+    receive() external payable {
+        require(msg.sender == NATIVE_WRAP_ADDRESS, 'Not WETH9');
     }
 }
