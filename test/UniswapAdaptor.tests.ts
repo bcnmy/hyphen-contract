@@ -23,50 +23,61 @@ describe("AdaptorTests", function () {
       tokenAddress: NATIVE, 
       percentage: "0", 
       amount: "20000000000000000",
-      operation: 0}];
+      operation: 0,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
+    }];
       
     const swapRequestFixedInput = [{
       tokenAddress: NATIVE, 
       percentage: "0", 
       amount: "20000000000000000000",
-      operation: 1}];
+      operation: 1,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
+    }];
 
     const gasAndSwapRequest = [{
       tokenAddress: NATIVE, 
       percentage: "0", 
       amount: "200000000000000",
-      operation: 1
+      operation: 1,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
     },
       {
         tokenAddress: "0x64Ef393b6846114Bad71E2cB2ccc3e10736b5716", 
         percentage: "0", 
         amount: "20000000000000000000",
-        operation: 1
+        operation: 1,
+        path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
     }];
 
     const invalidSwapRequest = [{
       tokenAddress: NATIVE, 
       percentage: "0", 
       amount: "20000000000000000000",
-      operation: 3}];
+      operation: 3,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
+    }];
   
     const swapNexitRequestThree = [{
       tokenAddress: NATIVE, 
       percentage: "0", 
       amount: "20000000000000000000",
-      operation: 1
+      operation: 1,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
     },
     {
       tokenAddress: NATIVE, 
       percentage: "0", 
       amount: "200000000000000",
-      operation: 1
+      operation: 1,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
     },
     {
       tokenAddress: NATIVE, 
       percentage: "0", 
       amount: "2000000000",
-      operation: 1
+      operation: 1,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
     }];  
   
     beforeEach(async function () {
@@ -96,7 +107,7 @@ describe("AdaptorTests", function () {
 
     it("Should Process GasToken swap & return remaining funds succefully", async function () {
       await token.approve(uniswapManager.address, minTokenCap);
-
+      
       await uniswapManager.swap(token.address, minTokenCap, await getReceiverAddress(), swapRequestFixedOutput);
       let allowanceAfterSwap = await token.allowance(owner.address, uniswapManager.address);
 
