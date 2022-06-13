@@ -36,7 +36,7 @@ describe("WhiteListPeriodManager", function () {
     await tokenManager.deployed();
 
     const erc20factory = await ethers.getContractFactory("ERC20Token");
-    token = (await upgrades.deployProxy(erc20factory, ["USDT", "USDT"])) as ERC20Token;
+    token = (await upgrades.deployProxy(erc20factory, ["USDT", "USDT", 18])) as ERC20Token;
     for (const signer of [owner, bob, charlie, dan, elon]) {
       await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
     }

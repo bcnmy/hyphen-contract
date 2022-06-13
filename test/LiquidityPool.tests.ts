@@ -98,7 +98,7 @@ describe("LiquidityPoolTests", function () {
     await liquidityProviders.setLiquidityPool(liquidityPool.address);
 
     const erc20factory = await ethers.getContractFactory("ERC20Token");
-    token = (await upgrades.deployProxy(erc20factory, ["USDT", "USDT"])) as ERC20Token;
+    token = (await upgrades.deployProxy(erc20factory, ["USDT", "USDT", 18])) as ERC20Token;
     tokenAddress = token.address;
 
     // Add supported ERC20 token

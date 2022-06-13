@@ -9,6 +9,7 @@ import {
   ExecutorManager,
   TokenManager,
   HyphenLiquidityFarming,
+  HyphenLiquidityFarmingV2,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -28,7 +29,7 @@ const getElapsedTime = async (callable: any): Promise<number> => {
   return end - start;
 };
 
-describe("LiquidityFarmingTests", function () {
+describe("LiquidityFarmingV2Tests", function () {
   let owner: SignerWithAddress, pauser: SignerWithAddress, bob: SignerWithAddress;
   let charlie: SignerWithAddress, tf: SignerWithAddress, executor: SignerWithAddress;
   let token: ERC20Token, token2: ERC20Token;
@@ -38,7 +39,7 @@ describe("LiquidityFarmingTests", function () {
   let liquidityPool: LiquidityPool;
   let executorManager: ExecutorManager;
   let tokenManager: TokenManager;
-  let farmingContract: HyphenLiquidityFarming;
+  let farmingContract: HyphenLiquidityFarmingV2;
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   let BASE: BigNumber = BigNumber.from(10).pow(18);
@@ -119,32 +120,19 @@ describe("LiquidityFarmingTests", function () {
     ])) as LiquidityPool;
     await liquidityProviders.setLiquidityPool(liquidityPool.address);
 
-    const farmingFactory = await ethers.getContractFactory("HyphenLiquidityFarming");
+    const farmingFactory = await ethers.getContractFactory("HyphenLiquidityFarmingV2");
     farmingContract = (await upgrades.deployProxy(farmingFactory, [
       tf.address,
       pauser.address,
       liquidityProviders.address,
       lpToken.address,
-    ])) as HyphenLiquidityFarming;
+    ])) as HyphenLiquidityFarmingV2;
     await wlpm.setIsExcludedAddressStatus([farmingContract.address], [true]);
-  });
-
-  it("Should be able to create reward pools", async function () {
-    for (const signer of [owner, bob, charlie]) {
-      await lpToken.connect(signer).setApprovalForAll(farmingContract.address, true);
-      for (const tk of [token, token2]) {
-        await tk.connect(signer).approve(farmingContract.address, ethers.constants.MaxUint256);
-      }
-    }
-
-    await expect(farmingContract.initalizeRewardPool(token.address, token2.address, 10))
-      .to.emit(farmingContract, "LogRewardPoolInitialized")
-      .withArgs(token.address, token2.address, 10);
   });
 
   describe("Deposit", async () => {
     beforeEach(async function () {
-      await farmingContract.initalizeRewardPool(token.address, token2.address, 10);
+      await farmingContract.setRewardPerSecond(token.address, token2.address, 10);
 
       for (const signer of [owner, bob, charlie]) {
         await lpToken.connect(signer).setApprovalForAll(farmingContract.address, true);
@@ -164,13 +152,13 @@ describe("LiquidityFarmingTests", function () {
 
     it("Should be able to deposit lp tokens", async function () {
       await farmingContract.deposit(1, owner.address);
-      expect(await farmingContract.pendingToken(token.address)).to.equal(0);
+      expect(await farmingContract.pendingToken(token.address, token2.address)).to.equal(0);
       expect(await farmingContract.getNftIdsStaked(owner.address)).to.deep.equal([1].map(BigNumber.from));
     });
 
     it("Should be able to deposit lp tokens on behalf of another account", async function () {
       await farmingContract.deposit(1, bob.address);
-      expect(await farmingContract.pendingToken(1)).to.equal(0);
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(0);
       expect(await farmingContract.getNftIdsStaked(bob.address)).to.deep.equal([1].map(BigNumber.from));
       expect((await farmingContract.getNftIdsStaked(owner.address)).length).to.equal(0);
     });
@@ -185,24 +173,24 @@ describe("LiquidityFarmingTests", function () {
       const time = await getElapsedTime(async () => {
         await advanceTime(100);
       });
-      expect(await farmingContract.pendingToken(1)).to.equal(time * 10);
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(time * 10);
     });
 
     it("Should be able to create deposits in different tokens", async function () {
-      await farmingContract.initalizeRewardPool(token2.address, token.address, 10);
+      await farmingContract.setRewardPerSecond(token2.address, token.address, 10);
       await farmingContract.deposit(1, owner.address);
       const time = await getElapsedTime(async () => {
         await advanceTime(100);
         await farmingContract.deposit(2, owner.address);
         await advanceTime(100);
       });
-      expect(await farmingContract.pendingToken(1)).to.equal(time * 10);
-      expect(await farmingContract.pendingToken(2)).to.equal(1000);
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(time * 10);
+      expect(await farmingContract.pendingToken(2, token.address)).to.equal(1000);
       expect(await farmingContract.getNftIdsStaked(owner.address)).to.deep.equal([1, 2].map(BigNumber.from));
     });
 
     it("Should be able to fetch correct nft index", async function () {
-      await farmingContract.initalizeRewardPool(token2.address, token.address, 10);
+      await farmingContract.setRewardPerSecond(token2.address, token.address, 10);
       await farmingContract.deposit(1, owner.address);
       await farmingContract.deposit(2, owner.address);
       await farmingContract.connect(bob).deposit(3, bob.address);
@@ -225,7 +213,7 @@ describe("LiquidityFarmingTests", function () {
 
   describe("Withdraw", async () => {
     beforeEach(async function () {
-      await farmingContract.initalizeRewardPool(token.address, token2.address, 10);
+      await farmingContract.setRewardPerSecond(token.address, token2.address, 10);
 
       for (const signer of [owner, bob, charlie]) {
         await lpToken.connect(signer).setApprovalForAll(farmingContract.address, true);
@@ -241,6 +229,7 @@ describe("LiquidityFarmingTests", function () {
 
     it("Should be able to withdraw nft", async function () {
       await farmingContract.deposit(1, owner.address);
+      await token2.transfer(farmingContract.address, 10000000);
       expect(await farmingContract.getNftIdsStaked(owner.address)).to.deep.equal([1].map(BigNumber.from));
       await expect(farmingContract.withdraw(1, owner.address)).to.emit(farmingContract, "LogWithdraw");
       expect(await lpToken.ownerOf(1)).to.equal(owner.address);
@@ -255,8 +244,8 @@ describe("LiquidityFarmingTests", function () {
 
   describe("Rewards", async () => {
     beforeEach(async function () {
-      await farmingContract.initalizeRewardPool(token.address, token2.address, 10);
-      await farmingContract.initalizeRewardPool(token2.address, token.address, 15);
+      await farmingContract.setRewardPerSecond(token.address, token2.address, 10);
+      await farmingContract.setRewardPerSecond(token2.address, token.address, 15);
 
       for (const signer of [owner, bob, charlie]) {
         await lpToken.connect(signer).setApprovalForAll(farmingContract.address, true);
@@ -271,8 +260,10 @@ describe("LiquidityFarmingTests", function () {
       await liquidityProviders.addTokenLiquidity(token.address, 10);
       await farmingContract.deposit(1, owner.address);
       await advanceTime(100);
-      expect((await farmingContract.pendingToken(1)).toNumber()).to.be.greaterThan(0);
-      await expect(farmingContract.connect(bob).extractRewards(1, bob.address)).to.be.revertedWith("ERR__NOT_OWNER");
+      expect((await farmingContract.pendingToken(1, token2.address)).toNumber()).to.be.greaterThan(0);
+      await expect(farmingContract.connect(bob).extractRewards(1, [token2.address], bob.address)).to.be.revertedWith(
+        "ERR__NOT_OWNER"
+      );
     });
 
     it("Should prevent others from withdrawing using v2", async function () {
@@ -280,7 +271,9 @@ describe("LiquidityFarmingTests", function () {
       await liquidityProviders.connect(bob).addTokenLiquidity(token.address, 10);
       await farmingContract.deposit(1, owner.address);
       await farmingContract.connect(bob).deposit(2, bob.address);
-      await expect(farmingContract.connect(bob).withdrawV2(1, bob.address, 0)).to.be.revertedWith("ERR__NOT_OWNER");
+      await expect(farmingContract.connect(bob).withdrawAtIndex(1, bob.address, 0)).to.be.revertedWith(
+        "ERR__NOT_OWNER"
+      );
     });
 
     it("Should be able to calculate correct rewards correctly", async function () {
@@ -304,14 +297,16 @@ describe("LiquidityFarmingTests", function () {
       });
       await advanceTime(900);
 
-      expect(await farmingContract.pendingToken(1)).to.equal(
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(
         Math.floor(10 * (100 + time1 + 300 + time2 + 500 / 4 + time3 / 4 + 900 / 4))
       );
-      expect(await farmingContract.pendingToken(2)).to.equal(Math.floor(15 * (300 + time2 + 500 + time3 + 900 / 4)));
-      expect(await farmingContract.pendingToken(3)).to.equal(
+      expect(await farmingContract.pendingToken(2, token.address)).to.equal(
+        Math.floor(15 * (300 + time2 + 500 + time3 + 900 / 4))
+      );
+      expect(await farmingContract.pendingToken(3, token2.address)).to.equal(
         Math.floor(10 * ((500 * 3) / 4 + (time3 * 3) / 4 + (900 * 3) / 4))
       );
-      expect(await farmingContract.pendingToken(4)).to.equal(Math.floor(15 * ((900 * 3) / 4)));
+      expect(await farmingContract.pendingToken(4, token.address)).to.equal(Math.floor(15 * ((900 * 3) / 4)));
     });
 
     it("Should be able to calculate correct rewards correctly - 2", async function () {
@@ -335,14 +330,16 @@ describe("LiquidityFarmingTests", function () {
       });
       await advanceTime(900);
 
-      expect(await farmingContract.pendingToken(1)).to.equal(
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(
         Math.floor(100 * 10 + time1 * 10 + 300 * 10 + time2 * 10 + (500 * 10) / 3 + (time3 * 10) / 3 + (900 * 10) / 3)
       );
-      expect(await farmingContract.pendingToken(2)).to.equal(Math.floor(15 * (300 + time2 + 500 + time3 + 900 / 3)));
-      expect(await farmingContract.pendingToken(3)).to.equal(
+      expect(await farmingContract.pendingToken(2, token.address)).to.equal(
+        Math.floor(15 * (300 + time2 + 500 + time3 + 900 / 3))
+      );
+      expect(await farmingContract.pendingToken(3, token2.address)).to.equal(
         Math.floor((500 * 2 * 10) / 3 + (time3 * 2 * 10) / 3 + (900 * 2 * 10) / 3)
       );
-      expect(await farmingContract.pendingToken(4)).to.equal(Math.floor(15 * ((900 * 2) / 3)));
+      expect(await farmingContract.pendingToken(4, token.address)).to.equal(Math.floor(15 * ((900 * 2) / 3)));
     });
 
     it("Should be able to calculate correct rewards correctly - 3", async function () {
@@ -366,14 +363,16 @@ describe("LiquidityFarmingTests", function () {
       });
       await advanceTime(900);
 
-      expect(await farmingContract.pendingToken(1)).to.equal(
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(
         Math.floor(100 * 10 + time1 * 10 + 300 * 10 + time2 * 10 + (500 * 10) / 7 + (time3 * 10) / 7 + (900 * 10) / 7)
       );
-      expect(await farmingContract.pendingToken(2)).to.equal(Math.floor(15 * (300 + time2 + 500 + time3 + 900 / 7)));
-      expect(await farmingContract.pendingToken(3)).to.equal(
+      expect(await farmingContract.pendingToken(2, token.address)).to.equal(
+        Math.floor(15 * (300 + time2 + 500 + time3 + 900 / 7))
+      );
+      expect(await farmingContract.pendingToken(3, token2.address)).to.equal(
         Math.floor((500 * 6 * 10) / 7 + (time3 * 6 * 10) / 7 + (900 * 6 * 10) / 7)
       );
-      expect(await farmingContract.pendingToken(4)).to.equal(Math.floor(15 * ((900 * 6) / 7)));
+      expect(await farmingContract.pendingToken(4, token.address)).to.equal(Math.floor(15 * ((900 * 6) / 7)));
     });
 
     it("Should be able to send correct amount of rewards", async function () {
@@ -416,31 +415,27 @@ describe("LiquidityFarmingTests", function () {
       await token.transfer(farmingContract.address, ethers.BigNumber.from(10).pow(18));
       await token2.transfer(farmingContract.address, ethers.BigNumber.from(10).pow(18));
 
-      await expect(() => farmingContract.extractRewards(1, owner.address)).to.changeTokenBalances(
+      await expect(() => farmingContract.extractRewards(1, [token2.address], owner.address)).to.changeTokenBalances(
         token2,
         [farmingContract, owner],
         [-expectedRewards[0], expectedRewards[0]]
       );
-      await expect(() => farmingContract.extractRewards(2, owner.address)).to.changeTokenBalances(
+      await expect(() => farmingContract.extractRewards(2, [token.address], owner.address)).to.changeTokenBalances(
         token,
         [farmingContract, owner],
         [-expectedRewards[1], expectedRewards[1]]
       );
-      await expect(() => farmingContract.connect(bob).extractRewards(3, bob.address)).to.changeTokenBalances(
-        token2,
-        [farmingContract, bob],
-        [-expectedRewards[2], expectedRewards[2]]
-      );
-      await expect(() => farmingContract.connect(bob).extractRewards(4, bob.address)).to.changeTokenBalances(
-        token,
-        [farmingContract, bob],
-        [-expectedRewards[3], expectedRewards[3]]
-      );
+      await expect(() =>
+        farmingContract.connect(bob).extractRewards(3, [token2.address], bob.address)
+      ).to.changeTokenBalances(token2, [farmingContract, bob], [-expectedRewards[2], expectedRewards[2]]);
+      await expect(() =>
+        farmingContract.connect(bob).extractRewards(4, [token.address], bob.address)
+      ).to.changeTokenBalances(token, [farmingContract, bob], [-expectedRewards[3], expectedRewards[3]]);
 
-      expect((await farmingContract.pendingToken(1)).toNumber()).to.greaterThan(0);
-      expect((await farmingContract.pendingToken(2)).toNumber()).to.greaterThan(0);
-      expect((await farmingContract.pendingToken(3)).toNumber()).to.greaterThan(0);
-      expect((await farmingContract.pendingToken(4)).toNumber()).to.equal(0);
+      expect((await farmingContract.pendingToken(1, token2.address)).toNumber()).to.greaterThan(0);
+      expect((await farmingContract.pendingToken(2, token.address)).toNumber()).to.greaterThan(0);
+      expect((await farmingContract.pendingToken(3, token2.address)).toNumber()).to.greaterThan(0);
+      expect((await farmingContract.pendingToken(4, token.address)).toNumber()).to.equal(0);
 
       expect((await farmingContract.nftInfo(1)).isStaked).to.be.true;
       expect((await farmingContract.nftInfo(2)).isStaked).to.be.true;
@@ -460,7 +455,7 @@ describe("LiquidityFarmingTests", function () {
       await advanceTime(100);
       await farmingContract.withdraw(2, owner.address);
 
-      expect(await farmingContract.pendingToken(1)).to.equal(
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(
         Math.floor(100 * 10 + 1 * 10 + (100 * 10) / 2 + (1 * 10) / 2)
       );
       expect((await farmingContract.nftInfo(1)).isStaked).to.be.true;
@@ -545,10 +540,10 @@ describe("LiquidityFarmingTests", function () {
       expect(await lpToken.ownerOf(3)).to.equal(bob.address);
       expect(await lpToken.ownerOf(4)).to.equal(bob.address);
 
-      expect(await farmingContract.pendingToken(1)).to.equal(0);
-      expect(await farmingContract.pendingToken(2)).to.equal(0);
-      expect(await farmingContract.pendingToken(3)).to.equal(0);
-      expect(await farmingContract.pendingToken(4)).to.equal(0);
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(0);
+      expect(await farmingContract.pendingToken(2, token.address)).to.equal(0);
+      expect(await farmingContract.pendingToken(3, token2.address)).to.equal(0);
+      expect(await farmingContract.pendingToken(4, token.address)).to.equal(0);
 
       expect((await farmingContract.nftInfo(1)).isStaked).to.be.false;
       expect((await farmingContract.nftInfo(2)).isStaked).to.be.false;
@@ -595,25 +590,25 @@ describe("LiquidityFarmingTests", function () {
       await token2.transfer(farmingContract.address, ethers.BigNumber.from(10).pow(18));
 
       let index = await farmingContract.getStakedNftIndex(owner.address, 1);
-      await expect(() => farmingContract.withdrawV2(1, owner.address, index)).to.changeTokenBalances(
+      await expect(() => farmingContract.withdrawAtIndex(1, owner.address, index)).to.changeTokenBalances(
         token2,
         [farmingContract, owner],
         [-expectedRewards[0], expectedRewards[0]]
       );
       index = await farmingContract.getStakedNftIndex(owner.address, 2);
-      await expect(() => farmingContract.withdrawV2(2, owner.address, index)).to.changeTokenBalances(
+      await expect(() => farmingContract.withdrawAtIndex(2, owner.address, index)).to.changeTokenBalances(
         token,
         [farmingContract, owner],
         [-expectedRewards[1], expectedRewards[1]]
       );
       index = await farmingContract.getStakedNftIndex(bob.address, 3);
-      await expect(() => farmingContract.connect(bob).withdrawV2(3, bob.address, index)).to.changeTokenBalances(
+      await expect(() => farmingContract.connect(bob).withdrawAtIndex(3, bob.address, index)).to.changeTokenBalances(
         token2,
         [farmingContract, bob],
         [-expectedRewards[2], expectedRewards[2]]
       );
       index = await farmingContract.getStakedNftIndex(bob.address, 4);
-      await expect(() => farmingContract.connect(bob).withdrawV2(4, bob.address, index)).to.changeTokenBalances(
+      await expect(() => farmingContract.connect(bob).withdrawAtIndex(4, bob.address, index)).to.changeTokenBalances(
         token,
         [farmingContract, bob],
         [-expectedRewards[3], expectedRewards[3]]
@@ -624,10 +619,10 @@ describe("LiquidityFarmingTests", function () {
       expect(await lpToken.ownerOf(3)).to.equal(bob.address);
       expect(await lpToken.ownerOf(4)).to.equal(bob.address);
 
-      expect(await farmingContract.pendingToken(1)).to.equal(0);
-      expect(await farmingContract.pendingToken(2)).to.equal(0);
-      expect(await farmingContract.pendingToken(3)).to.equal(0);
-      expect(await farmingContract.pendingToken(4)).to.equal(0);
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(0);
+      expect(await farmingContract.pendingToken(2, token.address)).to.equal(0);
+      expect(await farmingContract.pendingToken(3, token2.address)).to.equal(0);
+      expect(await farmingContract.pendingToken(4, token.address)).to.equal(0);
 
       expect((await farmingContract.nftInfo(1)).isStaked).to.be.false;
       expect((await farmingContract.nftInfo(2)).isStaked).to.be.false;
@@ -668,8 +663,8 @@ describe("LiquidityFarmingTests", function () {
 
   describe("Rewards - NATIVE", async () => {
     beforeEach(async function () {
-      await farmingContract.initalizeRewardPool(token.address, NATIVE, 10);
-      await farmingContract.initalizeRewardPool(token2.address, NATIVE, 15);
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 10);
+      await farmingContract.setRewardPerSecond(token2.address, NATIVE, 15);
 
       for (const signer of [owner, bob, charlie]) {
         await lpToken.connect(signer).setApprovalForAll(farmingContract.address, true);
@@ -730,8 +725,8 @@ describe("LiquidityFarmingTests", function () {
 
   describe("Reward Rate updation", async () => {
     beforeEach(async () => {
-      await farmingContract.initalizeRewardPool(token.address, NATIVE, 10);
-      await farmingContract.initalizeRewardPool(token2.address, NATIVE, 15);
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 10);
+      await farmingContract.setRewardPerSecond(token2.address, NATIVE, 15);
 
       for (const signer of [owner, bob, charlie]) {
         for (const tk of [token, token2]) {
@@ -758,51 +753,51 @@ describe("LiquidityFarmingTests", function () {
 
       await farmingContract.deposit(1, owner.address);
       await advanceTime(100);
-      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 10 * 100));
-      await farmingContract.setRewardPerSecond(token.address, 20);
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal((rewardOwner += 10 * 100));
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 20);
       await advanceTime(100);
-      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 10 * 1 + 20 * 100));
-      await farmingContract.setRewardPerSecond(token.address, 16);
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal((rewardOwner += 10 * 1 + 20 * 100));
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 16);
       await advanceTime(100);
-      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 20 * 1 + 16 * 100));
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal((rewardOwner += 20 * 1 + 16 * 100));
 
       await farmingContract.connect(bob).deposit(2, bob.address);
-      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 16));
-      expect(await farmingContract.pendingToken(2)).to.equal(rewardBob);
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal((rewardOwner += 16));
+      expect(await farmingContract.pendingToken(2, NATIVE)).to.equal(rewardBob);
       await advanceTime(150);
-      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += (16 * 150) / 2));
-      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += (16 * 150) / 2));
-      await farmingContract.setRewardPerSecond(token.address, 0);
-      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 16 / 2));
-      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += 16 / 2));
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal((rewardOwner += (16 * 150) / 2));
+      expect(await farmingContract.pendingToken(2, NATIVE)).to.equal((rewardBob += (16 * 150) / 2));
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 0);
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal((rewardOwner += 16 / 2));
+      expect(await farmingContract.pendingToken(2, NATIVE)).to.equal((rewardBob += 16 / 2));
       await advanceTime(1000);
-      expect(await farmingContract.pendingToken(1)).to.equal(rewardOwner);
-      expect(await farmingContract.pendingToken(2)).to.equal(rewardBob);
-      await farmingContract.setRewardPerSecond(token.address, 100);
-      expect(await farmingContract.pendingToken(1)).to.equal(rewardOwner);
-      expect(await farmingContract.pendingToken(2)).to.equal(rewardBob);
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal(rewardOwner);
+      expect(await farmingContract.pendingToken(2, NATIVE)).to.equal(rewardBob);
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 100);
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal(rewardOwner);
+      expect(await farmingContract.pendingToken(2, NATIVE)).to.equal(rewardBob);
       await advanceTime(500);
-      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += (100 * 500) / 2));
-      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += (100 * 500) / 2));
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal((rewardOwner += (100 * 500) / 2));
+      expect(await farmingContract.pendingToken(2, NATIVE)).to.equal((rewardBob += (100 * 500) / 2));
 
       await farmingContract.connect(charlie).deposit(3, charlie.address);
-      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 100 / 2));
-      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += 100 / 2));
-      expect(await farmingContract.pendingToken(3)).to.equal(rewardCharlie);
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal((rewardOwner += 100 / 2));
+      expect(await farmingContract.pendingToken(2, NATIVE)).to.equal((rewardBob += 100 / 2));
+      expect(await farmingContract.pendingToken(3, NATIVE)).to.equal(rewardCharlie);
       await advanceTime(500);
-      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += (100 * 500) / 4));
-      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += (100 * 500) / 4));
-      expect(await farmingContract.pendingToken(3)).to.equal((rewardCharlie += (100 * 500) / 2));
-      await farmingContract.setRewardPerSecond(token.address, 600);
-      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += 100 / 4));
-      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += 100 / 4));
-      expect(await farmingContract.pendingToken(3)).to.equal((rewardCharlie += 100 / 2));
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal((rewardOwner += (100 * 500) / 4));
+      expect(await farmingContract.pendingToken(2, NATIVE)).to.equal((rewardBob += (100 * 500) / 4));
+      expect(await farmingContract.pendingToken(3, NATIVE)).to.equal((rewardCharlie += (100 * 500) / 2));
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 600);
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal((rewardOwner += 100 / 4));
+      expect(await farmingContract.pendingToken(2, NATIVE)).to.equal((rewardBob += 100 / 4));
+      expect(await farmingContract.pendingToken(3, NATIVE)).to.equal((rewardCharlie += 100 / 2));
       await advanceTime(600);
-      expect(await farmingContract.pendingToken(1)).to.equal((rewardOwner += (600 * 600) / 4));
-      expect(await farmingContract.pendingToken(2)).to.equal((rewardBob += (600 * 600) / 4));
-      expect(await farmingContract.pendingToken(3)).to.equal((rewardCharlie += (600 * 600) / 2));
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal((rewardOwner += (600 * 600) / 4));
+      expect(await farmingContract.pendingToken(2, NATIVE)).to.equal((rewardBob += (600 * 600) / 4));
+      expect(await farmingContract.pendingToken(3, NATIVE)).to.equal((rewardCharlie += (600 * 600) / 2));
 
-      await expect(() => farmingContract.extractRewards(1, owner.address)).to.changeEtherBalances(
+      await expect(() => farmingContract.extractRewards(1, [NATIVE], owner.address)).to.changeEtherBalances(
         [farmingContract, owner],
         [-(rewardOwner + 600 / 4), rewardOwner + 600 / 4]
       );
@@ -820,10 +815,164 @@ describe("LiquidityFarmingTests", function () {
         [-(rewardCharlie + (600 * 2) / 3), rewardCharlie + (600 * 2) / 3]
       );
       rewardOwner += 600 / 3;
-      await expect(() => farmingContract.extractRewards(1, owner.address)).to.changeEtherBalances(
+      await expect(() => farmingContract.extractRewards(1, [NATIVE], owner.address)).to.changeEtherBalances(
         [farmingContract, owner],
         [-(rewardOwner + 600), rewardOwner + 600]
       );
+    });
+  });
+
+  describe("Multi Token Rewards", async function () {
+    beforeEach(async () => {
+      for (const signer of [owner, bob, charlie]) {
+        for (const tk of [token, token2]) {
+          await tk.connect(signer).approve(farmingContract.address, ethers.constants.MaxUint256);
+          await tk.connect(signer).approve(liquidityProviders.address, ethers.constants.MaxUint256);
+        }
+      }
+      await liquidityProviders.addTokenLiquidity(token.address, 10);
+      await lpToken.setApprovalForAll(farmingContract.address, true);
+    });
+
+    it("Should set rewards in multiple tokens correctly", async function () {
+      await farmingContract.setRewardPerSecond(token.address, token2.address, 10);
+      expect(await farmingContract.getRewardTokens(token.address)).to.deep.equal([token2.address]);
+      expect(await farmingContract.getRewardRatePerSecond(token.address, token2.address)).to.equal(10);
+      expect(await farmingContract.getRewardRatePerSecond(token.address, NATIVE)).to.equal(0);
+
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 20);
+      expect(await farmingContract.getRewardTokens(token.address)).to.deep.equal([token2.address, NATIVE]);
+      expect(await farmingContract.getRewardRatePerSecond(token.address, token2.address)).to.equal(10);
+      expect(await farmingContract.getRewardRatePerSecond(token.address, NATIVE)).to.equal(20);
+    });
+
+    it("Should calculate rewards in multiple tokens correctly", async function () {
+      await farmingContract.setRewardPerSecond(token.address, token2.address, 10);
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 20);
+      await farmingContract.deposit(1, owner.address);
+      await advanceTime(100);
+      expect(await farmingContract.pendingToken(1, token.address)).to.equal(0);
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(10 * 100);
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal(20 * 100);
+    });
+
+    it("Should extract rewards in multiple tokens correctly", async function () {
+      await token2.transfer(farmingContract.address, 10000000);
+      await owner.sendTransaction({ to: farmingContract.address, value: 1000000 });
+      await farmingContract.setRewardPerSecond(token.address, token2.address, 10);
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 20);
+      await farmingContract.deposit(1, owner.address);
+
+      await advanceTime(100);
+      await expect(() => farmingContract.extractRewards(1, [token2.address], owner.address)).to.changeTokenBalances(
+        token2,
+        [farmingContract, owner],
+        [-(10 * 101), 10 * 101]
+      );
+      await expect(() => farmingContract.extractRewards(1, [NATIVE], owner.address)).to.changeEtherBalances(
+        [farmingContract, owner],
+        [-(20 * 102), 20 * 102]
+      );
+      await advanceTime(100);
+      const token2Balance = await token2.balanceOf(owner.address);
+      await expect(() =>
+        farmingContract.extractRewards(1, [NATIVE, token2.address], owner.address)
+      ).to.changeEtherBalances([farmingContract, owner], [-(20 * 101), 20 * 101]);
+      expect(await token2.balanceOf(owner.address)).to.equal(token2Balance.add(10 * 102));
+    });
+
+    it("Should extract rewards in all tokens when withdrawing NFT", async function () {
+      await token2.transfer(farmingContract.address, 10000000);
+      await owner.sendTransaction({ to: farmingContract.address, value: 1000000 });
+      await farmingContract.setRewardPerSecond(token.address, token2.address, 10);
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 20);
+      await farmingContract.deposit(1, owner.address);
+
+      await advanceTime(100);
+      const token2Balance = await token2.balanceOf(owner.address);
+      await expect(() => farmingContract.withdraw(1, owner.address)).to.changeEtherBalances(
+        [farmingContract, owner],
+        [-(20 * 101), 20 * 101]
+      );
+      expect(await token2.balanceOf(owner.address)).to.equal(token2Balance.add(10 * 101));
+    });
+
+    it("Should be able to claim rewards in token added after staking", async function () {
+      await token2.transfer(farmingContract.address, 10000000);
+      await owner.sendTransaction({ to: farmingContract.address, value: 1000000 });
+
+      await farmingContract.setRewardPerSecond(token.address, token2.address, 10);
+      await farmingContract.deposit(1, owner.address);
+
+      await advanceTime(100);
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(100 * 10);
+
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 20);
+      await advanceTime(200);
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(301 * 10);
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal(200 * 20);
+      await farmingContract.setRewardPerSecond(token.address, token2.address, 0);
+
+      await advanceTime(500);
+      expect(await farmingContract.pendingToken(1, token2.address)).to.equal(302 * 10);
+      expect(await farmingContract.pendingToken(1, NATIVE)).to.equal(701 * 20);
+
+      const token2Balance = await token2.balanceOf(owner.address);
+      await expect(() => farmingContract.withdraw(1, owner.address)).to.changeEtherBalances(
+        [farmingContract, owner],
+        [-(20 * 702), 20 * 702]
+      );
+      expect(await token2.balanceOf(owner.address)).to.equal(token2Balance.add(10 * 302));
+    });
+  });
+
+  describe("Migration", async function () {
+    let farmingContractV1: HyphenLiquidityFarming;
+    beforeEach(async () => {
+      farmingContractV1 = (await upgrades.deployProxy(await ethers.getContractFactory("HyphenLiquidityFarming"), [
+        tf.address,
+        pauser.address,
+        liquidityProviders.address,
+        lpToken.address,
+      ])) as HyphenLiquidityFarming;
+      await wlpm.setIsExcludedAddressStatus([farmingContract.address], [true]);
+
+      for (const signer of [owner, bob, charlie]) {
+        for (const tk of [token, token2]) {
+          await tk.connect(signer).approve(farmingContract.address, ethers.constants.MaxUint256);
+          await tk.connect(signer).approve(farmingContractV1.address, ethers.constants.MaxUint256);
+          await tk.connect(signer).approve(liquidityProviders.address, ethers.constants.MaxUint256);
+        }
+      }
+      await liquidityProviders.addTokenLiquidity(token.address, 10);
+      await lpToken.setApprovalForAll(farmingContract.address, true);
+      await lpToken.setApprovalForAll(farmingContractV1.address, true);
+    });
+
+    it("Should migrate NFT from V1 to V2", async function () {
+      await token2.transfer(farmingContractV1.address, 10000000);
+      await token2.transfer(farmingContract.address, 10000000);
+      await owner.sendTransaction({ to: farmingContract.address, value: 1000000 });
+
+      await farmingContractV1.initalizeRewardPool(token.address, token2.address, 10);
+      await farmingContract.setRewardPerSecond(token.address, token2.address, 10);
+      await farmingContract.setRewardPerSecond(token.address, NATIVE, 20);
+      await farmingContractV1.deposit(1, owner.address);
+      await advanceTime(100);
+
+      await expect(() => farmingContractV1.migrateNftsToV2([1], farmingContract.address)).to.changeTokenBalances(
+        token2,
+        [farmingContractV1, owner],
+        [-(10 * 101), 10 * 101]
+      );
+
+      await advanceTime(100);
+      const token2Balance = await token2.balanceOf(owner.address);
+      await expect(() => farmingContract.withdraw(1, owner.address)).to.changeEtherBalances(
+        [farmingContract, owner],
+        [-(20 * 101), 20 * 101]
+      );
+      expect(await token2.balanceOf(owner.address)).to.equal(token2Balance.add(10 * 101));
     });
   });
 });
