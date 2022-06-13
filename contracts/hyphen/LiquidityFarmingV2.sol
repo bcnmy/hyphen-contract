@@ -129,7 +129,15 @@ contract HyphenLiquidityFarmingV2 is
         if (!rewardTokens[_baseToken].contains(_rewardToken)) {
             rewardTokens[_baseToken].add(_rewardToken);
         }
-        rewardRateLog[_baseToken][_rewardToken].push(RewardsPerSecondEntry(_rewardPerSecond, block.timestamp));
+        uint256 length = rewardRateLog[_baseToken][_rewardToken].length;
+        if (length > 0 && rewardRateLog[_baseToken][_rewardToken][length - 1].timestamp == block.timestamp) {
+            rewardRateLog[_baseToken][_rewardToken][length - 1] = RewardsPerSecondEntry(
+                _rewardPerSecond,
+                block.timestamp
+            );
+        } else {
+            rewardRateLog[_baseToken][_rewardToken].push(RewardsPerSecondEntry(_rewardPerSecond, block.timestamp));
+        }
 
         emit LogRewardPerSecond(_baseToken, _rewardToken, _rewardPerSecond);
     }
@@ -416,7 +424,7 @@ contract HyphenLiquidityFarmingV2 is
         (address baseToken, , uint256 amount) = lpToken.tokenMetadata(_nftId);
         amount /= liquidityProviders.BASE_DIVISOR();
 
-        if(!rewardTokens[baseToken].contains(_rewardToken)) {
+        if (!rewardTokens[baseToken].contains(_rewardToken)) {
             return 0;
         }
 
