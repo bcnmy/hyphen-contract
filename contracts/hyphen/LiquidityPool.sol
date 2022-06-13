@@ -38,6 +38,7 @@ contract LiquidityPool is
 {
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     uint256 private constant BASE_DIVISOR = 10000000000; // Basis Points * 100 for better accuracy
+    uint256 private constant TOKEN_PRICE_BASE_DIVISOR = 10**28;
 
     uint256 public baseGas;
 
@@ -615,7 +616,7 @@ contract LiquidityPool is
         uint256 gasUsed,
         address sender
     ) internal returns (uint256) {
-        uint256 gasFee = (gasUsed * nativeTokenPriceInTransferredToken * tx.gasprice) / BASE_DIVISOR;
+        uint256 gasFee = (gasUsed * nativeTokenPriceInTransferredToken * tx.gasprice) / TOKEN_PRICE_BASE_DIVISOR;
 
         gasFeeAccumulatedByToken[tokenAddress] += gasFee;
         gasFeeAccumulated[tokenAddress][sender] += gasFee;
