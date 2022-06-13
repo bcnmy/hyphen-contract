@@ -17,7 +17,7 @@ import type { IDeployConfig } from "../../types";
         depositConfigs: [
           {
             chainId: 1,
-            minCap: parseUnits("10", 6),
+            minCap: parseUnits("100", 6),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
             maxCap: parseUnits("200000", 6),
           },
@@ -59,21 +59,21 @@ import type { IDeployConfig } from "../../types";
         depositConfigs: [
           {
             chainId: 1,
-            minCap: parseUnits("10", 18),
+            minCap: parseUnits("50", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("530000", 18),
+            maxCap: parseUnits("500000", 18),
           },
           {
             chainId: 137,
             minCap: parseUnits("10", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("300000", 18),
+            maxCap: parseUnits("500000", 18),
           },
           {
             chainId: 56,
             minCap: parseUnits("10", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("300000", 18),
+            maxCap: parseUnits("500000", 18),
           },
         ],
         equilibriumFee: parseUnits("0.075", 8),
@@ -95,9 +95,9 @@ import type { IDeployConfig } from "../../types";
         depositConfigs: [
           {
             chainId: 1,
-            minCap: parseUnits("0.0039", 18),
+            minCap: parseUnits("0.02", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("130", 18),
+            maxCap: parseUnits("100", 18),
           },
           {
             chainId: 137,
