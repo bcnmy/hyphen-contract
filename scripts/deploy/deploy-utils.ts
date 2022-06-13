@@ -5,49 +5,16 @@ import {
   WhitelistPeriodManager,
   LiquidityProviders,
   TokenManager,
-  ExecutorManager,
   SvgHelperBase,
-  HyphenLiquidityFarming,
+  HyphenLiquidityFarmingV2,
+  ERC20Token,
   // eslint-disable-next-line node/no-missing-import
-} from "../typechain";
-import type { BigNumberish, ContractFactory } from "ethers";
+} from "../../typechain";
+import type { BigNumberish } from "ethers";
+import type { IContracts, IAddTokenParameters, IDeployConfig } from "../types";
 
 const LPTokenName = "Hyphen Liquidity Token";
 const LPTokenSymbol = "Hyphen-LP";
-
-interface IAddTokenParameters {
-  tokenAddress: string;
-  minCap: BigNumberish;
-  maxCap: BigNumberish;
-  depositConfigs: { chainId: number; minCap: BigNumberish; maxCap: BigNumberish }[];
-  equilibriumFee: BigNumberish;
-  maxFee: BigNumberish;
-  transferOverhead: BigNumberish;
-  maxWalletLiquidityCap: BigNumberish;
-  maxLiquidityCap: BigNumberish;
-  svgHelper: ContractFactory;
-  decimals: number;
-  rewardTokenAddress: string;
-  rewardRatePerSecond: BigNumberish;
-  excessStateTransferFeePer: BigNumberish;
-}
-
-interface IContracts {
-  liquidityProviders: LiquidityProviders;
-  lpToken: LPToken;
-  tokenManager: TokenManager;
-  liquidityPool: LiquidityPool;
-  whitelistPeriodManager: WhitelistPeriodManager;
-  executorManager: ExecutorManager;
-  liquidityFarming: HyphenLiquidityFarming;
-  svgHelperMap: Record<string, SvgHelperBase>;
-}
-interface IDeployConfig {
-  trustedForwarder: string;
-  bicoOwner: string;
-  pauser: string;
-  tokens: IAddTokenParameters[];
-}
 
 const wait = (time: number): Promise<void> => {
   return new Promise((resolve) => {
@@ -160,14 +127,14 @@ async function deployCoreContracts(trustedForwarder: string, pauser: string): Pr
   console.log("WhitelistPeriodManager Proxy deployed to:", whitelistPeriodManager.address);
 
   await wait(5000);
-  const LiquidityFarmingFactory = await ethers.getContractFactory("HyphenLiquidityFarming");
+  const LiquidityFarmingFactory = await ethers.getContractFactory("HyphenLiquidityFarmingV2");
   console.log("Deploying LiquidityFarmingFactory...");
   const liquidityFarming = (await upgrades.deployProxy(LiquidityFarmingFactory, [
     trustedForwarder,
     pauser,
     liquidityProviders.address,
     lpToken.address,
-  ])) as HyphenLiquidityFarming;
+  ])) as HyphenLiquidityFarmingV2;
   await liquidityFarming.deployed();
   console.log("LiquidityFarmingFactory Proxy deployed to:", liquidityFarming.address);
   await wait(5000);
@@ -275,7 +242,7 @@ const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters
 
   console.log(`Initializing reward pool for ${token.tokenAddress}...`);
   await (
-    await contracts.liquidityFarming.initalizeRewardPool(
+    await contracts.liquidityFarming.setRewardPerSecond(
       token.tokenAddress,
       token.rewardTokenAddress,
       token.rewardRatePerSecond
@@ -283,6 +250,29 @@ const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters
   ).wait();
 
   console.log("Added token support for", token.tokenAddress);
+};
+
+const deployToken = async (
+  name: string,
+  symbol: string,
+  decimals: number,
+  initialMintAddresses: string[],
+  initialMintAmountPerAddress: BigNumberish
+) => {
+  const [signer] = await ethers.getSigners();
+  const erc20factory = await ethers.getContractFactory("ERC20Token", signer);
+  const token = (await upgrades.deployProxy(erc20factory, [name, symbol, decimals])) as ERC20Token;
+  await token.deployed();
+  console.log(`Deployed token ${name} at ${token.address}`);
+
+  for (const address of initialMintAddresses) {
+    await (await token.mint(address, initialMintAmountPerAddress)).wait();
+    console.log(`Minted ${initialMintAmountPerAddress} ${name} to ${address}`);
+  }
+
+  await verifyImplementation(token.address);
+
+  return token;
 };
 
 const getImplementationAddress = async (proxyAddress: string) => {
@@ -343,5 +333,5 @@ export {
   deploy,
   verifyContract,
   verifyImplementation,
-  IDeployConfig,
+  deployToken,
 };

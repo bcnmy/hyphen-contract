@@ -36,10 +36,9 @@ describe("LiquidityPoolTests", function () {
   let tokenAddress: string;
   let tag: string = "HyphenUI";
   
-
+  const NATIVE_WRAP_ADDRESS = "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const UNISWAP_ROUTER_V3 = "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45";
   const minTokenCap = getLocaleString(10 * 1e18);
   const maxTokenCap = getLocaleString(200000 * 1e18);
   const minNativeTokenCap = getLocaleString(1e17);
@@ -59,55 +58,64 @@ describe("LiquidityPoolTests", function () {
     tokenAddress: NATIVE, 
     percentage: "2000000000", 
     amount: "0",
-    operation: 1}];
+    operation: 1,
+    path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"}];
   
   const depositNswapRequestTwo = [{
     tokenAddress: NATIVE, 
     percentage: "2000000000", 
     amount: "0",
-    operation: 1
+    operation: 1,
+    path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
   },
   {
     tokenAddress: NATIVE, 
     percentage: "900000000000", 
     amount: "0",
-    operation: 2
+    operation: 2,
+    path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
   }];
 
   const swapNexitRequestOne = [{
     tokenAddress: NATIVE, 
     percentage: "0", 
     amount: "20000000000000000",
-    operation: 1}];
+    operation: 1,
+    path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"}];
     
   const swapNexitRequestTwo = [{
     tokenAddress: NATIVE, 
     percentage: "0", 
     amount: "20000000000000000000",
-    operation: 1}];
+    operation: 1,
+    path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"}];
   const invalidSwapRequest = [{
     tokenAddress: NATIVE, 
     percentage: "0", 
     amount: "20000000000000000000",
-    operation: 3}];
+    operation: 3,
+    path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"}];
 
   const swapNexitRequestThree = [{
     tokenAddress: NATIVE, 
     percentage: "0", 
     amount: "20000000000000000000",
-    operation: 1
+    operation: 1,
+    path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
   },
   {
     tokenAddress: NATIVE, 
     percentage: "0", 
     amount: "200000000000000",
-    operation: 1
+    operation: 1,
+    path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
   },
   {
     tokenAddress: NATIVE, 
     percentage: "0", 
     amount: "2000000000",
-    operation: 1
+    operation: 1,
+    path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6"
   }];
 
   beforeEach(async function () {
@@ -124,7 +132,7 @@ describe("LiquidityPoolTests", function () {
     await executorManager.deployed();
 
     const mockAdaptorFactory = await ethers.getContractFactory("MockAdaptor");
-    mockAdaptor = await mockAdaptorFactory.deploy("0xE592427A0AEce92De3Edee1F18E0157C05861564");
+    mockAdaptor = await mockAdaptorFactory.deploy("0xE592427A0AEce92De3Edee1F18E0157C05861564", NATIVE_WRAP_ADDRESS);
     await mockAdaptor.deployed();
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
@@ -157,7 +165,7 @@ describe("LiquidityPoolTests", function () {
     await liquidityProviders.setLiquidityPool(liquidityPool.address);
 
     const erc20factory = await ethers.getContractFactory("ERC20Token");
-    token = (await upgrades.deployProxy(erc20factory, ["USDT", "USDT"])) as ERC20Token;
+    token = (await upgrades.deployProxy(erc20factory, ["USDT", "USDT", 18])) as ERC20Token;
     tokenAddress = token.address;
 
     // Add supported ERC20 token

@@ -29,3 +29,15 @@ export async function upgradeLiquidityFarming(proxyAddress: string) {
   await contract.deployed();
   console.log("LiquidityFarming Upgraded");
 }
+
+export async function upgradeLiquidityFarmingV2(proxyAddress: string) {
+  const contract = await upgrades.upgradeProxy(proxyAddress, await ethers.getContractFactory("HyphenLiquidityFarmingV2"));
+  await contract.deployed();
+  console.log("LiquidityFarmingV2 Upgraded");
+}
+
+export async function upgradeTokenManager(proxyAddress: string) {
+  const contract = await upgrades.upgradeProxy(proxyAddress, await ethers.getContractFactory("TokenManager"));
+  await contract.deployed();
+  console.log("TokenManager Upgraded");
+}
