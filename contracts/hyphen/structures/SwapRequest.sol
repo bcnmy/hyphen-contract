@@ -8,4 +8,5 @@ struct SwapRequest {
     uint256 percentage;
     uint256 amount;
     SwapOperation operation;
+    bytes path;
 }

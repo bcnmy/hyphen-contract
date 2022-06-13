@@ -4,13 +4,15 @@ import "../interfaces/ISwapRouter.sol";
 import "../lib/TransferHelper.sol";
 
 contract MockAdaptorFail is ISwapAdaptor {
+    uint24 public constant POOL_FEE = 3000;
+    address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    
+    address public immutable NATIVE_WRAP_ADDRESS;
     ISwapRouter public immutable swapRouter;
 
-    // For this example, we will set the pool fee to 0.3%.
-    uint24 public constant POOL_FEE = 3000;
-
-    constructor(ISwapRouter _swapRouter) {
-        swapRouter = _swapRouter; // "0xE592427A0AEce92De3Edee1F18E0157C05861564"
+    constructor(ISwapRouter _swapRouter, address nativeWrapAddress) {
+        NATIVE_WRAP_ADDRESS = nativeWrapAddress;
+        swapRouter = _swapRouter; // "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
     }
 
     function swap(
@@ -28,5 +30,13 @@ contract MockAdaptorFail is ISwapAdaptor {
         SwapRequest[] memory swapRequests
     ) external override returns (uint256 amountIn) {
         revert("Insufitient funds");
+    }
+
+    function unwrap(uint256 amountMinimum, address recipient) internal {
+       
+    }
+
+    receive() external payable {
+        require(msg.sender == NATIVE_WRAP_ADDRESS, 'Not WETH9');
     }
 }
