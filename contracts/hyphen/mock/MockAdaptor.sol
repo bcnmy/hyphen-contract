@@ -53,11 +53,11 @@ contract MockAdaptor is ISwapAdaptor {
     function swapNative(
         uint256 amountInMaximum,
         address receiver,
-        SwapRequest[] calldata swapRequests
+        SwapRequest[] memory swapRequests
     ) override external returns (uint256 amountOut) {
     }
 
-    function unwrapWETH(uint256 amountMinimum, address recipient) internal {
+    function unwrap(uint256 amountMinimum, address recipient) internal {
        
     }
 

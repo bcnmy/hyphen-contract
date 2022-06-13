@@ -32,7 +32,7 @@ contract MockAdaptorFail is ISwapAdaptor {
         revert("Insufitient funds");
     }
 
-    function unwrapWETH(uint256 amountMinimum, address recipient) internal {
+    function unwrap(uint256 amountMinimum, address recipient) internal {
        
     }
 

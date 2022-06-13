@@ -33,7 +33,7 @@ contract UniswapAdaptor is ISwapAdaptor {
         address inputTokenAddress,
         uint256 amountInMaximum,
         address receiver,
-        SwapRequest[] calldata swapRequests
+        SwapRequest[] memory swapRequests
     ) override external returns (uint256 amountOut) {
 
         require(inputTokenAddress != NATIVE, "wrong function");
@@ -88,7 +88,7 @@ contract UniswapAdaptor is ISwapAdaptor {
     function swapNative(
         uint256 amountInMaximum,
         address receiver,
-        SwapRequest[] calldata swapRequests
+        SwapRequest[] memory swapRequests
     ) override external returns (uint256 amountOut) {
         require(swapRequests.length == 1 , "only 1 swap request allowed");
         amountOut = _fixedInputSwap(amountInMaximum, receiver, swapRequests[0]);
@@ -98,7 +98,7 @@ contract UniswapAdaptor is ISwapAdaptor {
     function _fixedOutputSwap(
         uint256 amountInMaximum,
         address receiver,
-        SwapRequest calldata swapRequests
+        SwapRequest memory swapRequests
     ) internal returns (uint256 amountIn) {
         ISwapRouter.ExactOutputParams memory params;
         if(swapRequests.tokenAddress == NATIVE_WRAP_ADDRESS){
@@ -110,7 +110,7 @@ contract UniswapAdaptor is ISwapAdaptor {
             });
 
             amountIn = swapRouter.exactOutput(params);
-            unwrapWETH(swapRequests.amount, receiver);
+            unwrap(swapRequests.amount, receiver);
 
         } else {
             params = ISwapRouter.ExactOutputParams({
@@ -128,7 +128,7 @@ contract UniswapAdaptor is ISwapAdaptor {
      function _fixedInputSwap(
         uint256 amount,
         address receiver,
-        SwapRequest calldata swapRequests
+        SwapRequest memory swapRequests
     ) internal returns (uint256 amountOut) {
          ISwapRouter.ExactInputParams memory params ;
          if(swapRequests.tokenAddress == NATIVE_WRAP_ADDRESS){
@@ -139,7 +139,7 @@ contract UniswapAdaptor is ISwapAdaptor {
                 amountOutMinimum: 0
             });
             amountOut = swapRouter.exactInput(params);
-            unwrapWETH(amountOut, receiver);
+            unwrap(amountOut, receiver);
 
         } else {
             params = ISwapRouter.ExactInputParams({
@@ -153,7 +153,7 @@ contract UniswapAdaptor is ISwapAdaptor {
 
     }
 
-    function unwrapWETH(uint256 amountMinimum, address recipient) internal {
+    function unwrap(uint256 amountMinimum, address recipient) internal {
         uint256 balanceWETH9 = IERC20(NATIVE_WRAP_ADDRESS).balanceOf(address(this));
         require(balanceWETH9 >= amountMinimum, 'Insufficient WETH9');
 
