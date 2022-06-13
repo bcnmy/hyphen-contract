@@ -67,7 +67,7 @@ import type { IDeployConfig } from "../../types";
             chainId: 137,
             minCap: parseUnits("10", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("500000", 18),
+            maxCap: parseUnits("300000", 18),
           },
           {
             chainId: 56,
@@ -97,7 +97,7 @@ import type { IDeployConfig } from "../../types";
             chainId: 1,
             minCap: parseUnits("0.02", 18),
             // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
-            maxCap: parseUnits("100", 18),
+            maxCap: parseUnits("130", 18),
           },
           {
             chainId: 137,
