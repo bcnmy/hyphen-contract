@@ -107,6 +107,7 @@ contract LiquidityPool is
         uint256 indexed gasUsed,
         uint256 indexed gasPrice,
         uint256 indexed nativeTokenPriceInTransferredToken,
+        uint256 tokenGasBaseFee,
         uint256 gasFeeInTransferredToken
     );
 
@@ -494,14 +495,16 @@ contract LiquidityPool is
         address payable receiver,
         bytes calldata depositHash,
         uint256 nativeTokenPriceInTransferredToken,
-        uint256 fromChainId
+        uint256 fromChainId,
+        uint256 tokenGasBaseFee
     ) external nonReentrant onlyExecutor whenNotPaused {
-        uint256[4] memory transferDetails = _sendFundsToUser(
+        uint256[4] memory transferDetails = _calculateAmountAndDecreaseAvailableLiquidity(
             tokenAddress,
             amount,
             receiver,
             depositHash,
-            nativeTokenPriceInTransferredToken
+            nativeTokenPriceInTransferredToken,
+            tokenGasBaseFee
         );
         if (tokenAddress == NATIVE) {
             (bool success, ) = receiver.call{value: transferDetails[0]}("");
@@ -529,20 +532,22 @@ contract LiquidityPool is
         address payable receiver,
         bytes calldata depositHash,
         uint256 nativeTokenPriceInTransferredToken,
+        uint256 tokenGasBaseFee,
         uint256 fromChainId,
         uint256 swapGasOverhead,
         SwapRequest[] calldata swapRequests,
-        string calldata swapAdaptor
+        string memory swapAdaptor
     ) external nonReentrant onlyExecutor whenNotPaused {
         require(swapRequests.length > 0, "Wrong method call");
         require(swapAdaptorMap[swapAdaptor] != address(0), "Swap adaptor not found");
 
-        uint256[4] memory transferDetails = _sendFundsToUser(
+        uint256[4] memory transferDetails = _calculateAmountAndDecreaseAvailableLiquidity(
             tokenAddress,
             amount,
             receiver,
             depositHash,
-            nativeTokenPriceInTransferredToken
+            nativeTokenPriceInTransferredToken,
+            tokenGasBaseFee
         );
 
         if (tokenAddress == NATIVE) {
@@ -552,19 +557,31 @@ contract LiquidityPool is
         } else {
             {
                 uint256 gasBeforeApproval = gasleft();
-                SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(tokenAddress), address(swapAdaptorMap[swapAdaptor]), 0);
-                SafeERC20Upgradeable.safeApprove(IERC20Upgradeable(tokenAddress), address(swapAdaptorMap[swapAdaptor]), transferDetails[0]);
-                
+                SafeERC20Upgradeable.safeApprove(
+                    IERC20Upgradeable(tokenAddress),
+                    address(swapAdaptorMap[swapAdaptor]),
+                    0
+                );
+                SafeERC20Upgradeable.safeApprove(
+                    IERC20Upgradeable(tokenAddress),
+                    address(swapAdaptorMap[swapAdaptor]),
+                    transferDetails[0]
+                );
+
                 swapGasOverhead += (gasBeforeApproval - gasleft());
+            }
+            {
                 uint256 swapGasFee = calculateGasFee(
                     tokenAddress,
                     nativeTokenPriceInTransferredToken,
                     swapGasOverhead,
+                    0,
                     _msgSender()
                 );
                 transferDetails[0] -= swapGasFee; // Deduct swap gas fee from amount to be sent
                 transferDetails[3] += swapGasFee; // Add swap gas fee to gas fee
             }
+
             ISwapAdaptor(swapAdaptorMap[swapAdaptor]).swap(tokenAddress, transferDetails[0], receiver, swapRequests);
         }
 
@@ -581,12 +598,13 @@ contract LiquidityPool is
         );
     }
 
-    function _sendFundsToUser(
+    function _calculateAmountAndDecreaseAvailableLiquidity(
         address tokenAddress,
         uint256 amount,
         address payable receiver,
         bytes calldata depositHash,
-        uint256 nativeTokenPriceInTransferredToken
+        uint256 nativeTokenPriceInTransferredToken,
+        uint256 tokenGasBaseFee
     ) internal returns (uint256[4] memory) {
         uint256 initialGas = gasleft();
         TokenConfig memory config = tokenManager.getTransferConfig(tokenAddress);
@@ -601,7 +619,8 @@ contract LiquidityPool is
             initialGas,
             tokenAddress,
             amount,
-            nativeTokenPriceInTransferredToken
+            nativeTokenPriceInTransferredToken,
+            tokenGasBaseFee
         );
 
         liquidityProviders.decreaseCurrentLiquidity(tokenAddress, transferDetails[0]);
@@ -622,7 +641,8 @@ contract LiquidityPool is
         uint256 initialGas,
         address tokenAddress,
         uint256 amount,
-        uint256 nativeTokenPriceInTransferredToken
+        uint256 nativeTokenPriceInTransferredToken,
+        uint256 tokenGasBaseFee
     ) internal returns (uint256[4] memory) {
         TokenInfo memory tokenInfo = tokenManager.getTokensInfo(tokenAddress);
         uint256 transferFeePerc = _getTransferFee(tokenAddress, amount, tokenInfo);
@@ -641,19 +661,31 @@ contract LiquidityPool is
         liquidityProviders.addLPFee(tokenAddress, lpFee);
 
         uint256 totalGasUsed = initialGas + tokenInfo.transferOverhead + baseGas - gasleft();
-        uint256 gasFee = calculateGasFee(tokenAddress, nativeTokenPriceInTransferredToken, totalGasUsed, _msgSender());
-        uint256 amountToTransfer = amount - (transferFeeAmount + gasFee);
-        return [amountToTransfer, lpFee, transferFeeAmount, gasFee];
+        uint256 gasFee = calculateGasFee(
+            tokenAddress,
+            nativeTokenPriceInTransferredToken,
+            totalGasUsed,
+            tokenGasBaseFee,
+            _msgSender()
+        );
+        require(transferFeeAmount + gasFee <= amount, "Insufficient funds to cover transfer fee");
+        unchecked {
+            uint256 amountToTransfer = amount - (transferFeeAmount + gasFee);
+            return [amountToTransfer, lpFee, transferFeeAmount, gasFee];
+        }
     }
 
     function calculateGasFee(
         address tokenAddress,
         uint256 nativeTokenPriceInTransferredToken,
         uint256 gasUsed,
+        uint256 tokenGasBaseFee,
         address sender
     ) internal returns (uint256) {
-        uint256 gasFee = (gasUsed * nativeTokenPriceInTransferredToken * tx.gasprice) / TOKEN_PRICE_BASE_DIVISOR;
-        emit GasFeeCalculated(gasUsed, tx.gasprice, nativeTokenPriceInTransferredToken, gasFee);
+        uint256 gasFee = (gasUsed * nativeTokenPriceInTransferredToken * tx.gasprice) /
+            TOKEN_PRICE_BASE_DIVISOR +
+            tokenGasBaseFee;
+        emit GasFeeCalculated(gasUsed, tx.gasprice, nativeTokenPriceInTransferredToken, tokenGasBaseFee, gasFee);
 
         gasFeeAccumulatedByToken[tokenAddress] += gasFee;
         gasFeeAccumulated[tokenAddress][sender] += gasFee;
