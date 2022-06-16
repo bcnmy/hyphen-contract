@@ -97,6 +97,15 @@ const config: HardhatUserConfig = {
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       gasPrice: 50000000000,
     },
+    optimismEthereum: {
+      url: process.env.OPTIMISM_ETHEREUM_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: 1000000,
+    },
+    optimismKovan: {
+      url: process.env.OPTIMISM_KOVAN_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
@@ -104,14 +113,16 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: {
-      goerli: process.env.ETHERSCAN_API_KEY,
-      polygonMumbai: process.env.POLYGONSCAN_API_KEY,
-      avalancheFujiTestnet: process.env.SNOWTRACE_API_KEY,
-      mainnet: process.env.ETHERSCAN_API_KEY,
-      polygon: process.env.POLYGONSCAN_API_KEY,
-      avalanche: process.env.SNOWTRACE_API_KEY,
-      bsc: process.env.BSCSCAN_API_KEY,
-      bscTestnet: process.env.BSCSCAN_API_KEY,
+      goerli: process.env.ETHERSCAN_API_KEY || "",
+      polygonMumbai: process.env.POLYGONSCAN_API_KEY || "",
+      avalancheFujiTestnet: process.env.SNOWTRACE_API_KEY || "",
+      mainnet: process.env.ETHERSCAN_API_KEY || "",
+      polygon: process.env.POLYGONSCAN_API_KEY || "",
+      avalanche: process.env.SNOWTRACE_API_KEY || "",
+      bsc: process.env.BSCSCAN_API_KEY || "",
+      bscTestnet: process.env.BSCSCAN_API_KEY || "",
+      optimisticEthereum: process.env.OPTIMISM_ETHERSCAN_API_KEY || "",
+      optimisticKovan: process.env.OPTIMISM_KOVAN_ETHERSCAN_API_KEY || "",
     },
   },
   contractSizer: {

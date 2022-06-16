@@ -5,9 +5,9 @@ import type { IDeployConfig } from "../../types";
 
 (async () => {
   const config: IDeployConfig = {
-    trustedForwarder: "",
+    trustedForwarder: "0x22f9a22EA02eB2fE0B76e4685c5D7Ae718717084",
     bicoOwner: "0xd76b82204be75ab9610b04cf27c4f4a34291d5e6",
-    pauser: "",
+    pauser: "0x129443cA2a9Dec2020808a2868b38dDA457eaCC7",
     tokens: [
       // USDC
       {
@@ -48,12 +48,12 @@ import type { IDeployConfig } from "../../types";
         svgHelper: await ethers.getContractFactory("OPTUSDC"),
         decimals: 6,
         rewardTokenAddress: "0xd6909e9e702024eb93312b989ee46794c0fb1c9d",
-        rewardRatePerSecond: parseUnits("0.001485", 18),
+        rewardRatePerSecond: parseUnits("0.001668", 18),
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       // BICO
       {
-        tokenAddress: "",
+        tokenAddress: "0xd6909e9e702024eb93312b989ee46794c0fb1c9d",
         minCap: parseUnits("10", 18),
         maxCap: parseUnits("510000", 18),
         depositConfigs: [
@@ -126,7 +126,7 @@ import type { IDeployConfig } from "../../types";
         svgHelper: await ethers.getContractFactory("OPTETH"),
         decimals: 18,
         rewardTokenAddress: "0xd6909e9e702024eb93312b989ee46794c0fb1c9d",
-        rewardRatePerSecond: parseUnits("0.001378", 18),
+        rewardRatePerSecond: parseUnits("0.001035", 18),
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
     ],

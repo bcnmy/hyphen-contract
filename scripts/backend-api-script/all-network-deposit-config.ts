@@ -6,7 +6,7 @@ import { getBackendConfig } from "./utils";
     {
       chainId: 1,
       depositConfig: {
-        toChainIds: [10],
+        toChainIds: [10,10,10],
         tokenAddresses: [
           "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", // USDC
           "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", // ETH
@@ -31,7 +31,7 @@ import { getBackendConfig } from "./utils";
     {
       chainId: 137,
       depositConfig: {
-        toChainIds: [10],
+        toChainIds: [10,10,10],
         tokenAddresses: [
           "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174", // USDC
           "0x7ceb23fd6bc0add59e62ac25578270cff1b9f619", // ETH
@@ -56,7 +56,7 @@ import { getBackendConfig } from "./utils";
     {
       chainId: 43114,
       depositConfig: {
-        toChainIds: [10],
+        toChainIds: [10,10],
         tokenAddresses: [
           "0xa7d7079b0fead91f3e65f86e8915cb59c1a4c664", // USDC
           "0x49d5c2bdffac6ce2bfdb6640f4f80f226bc10bab", // ETH

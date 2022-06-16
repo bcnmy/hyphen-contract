@@ -23,7 +23,7 @@ import { getBackendConfig } from "./utils";
         tokenSymbol: "USDC",
         decimal: 6,
         chainId: 137,
-        tokenAddress: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
+        tokenAddress: "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
       },
       {
         tokenSymbol: "USDC",
@@ -51,7 +51,7 @@ import { getBackendConfig } from "./utils";
         tokenSymbol: "USDC",
         decimal: 18,
         chainId: 56,
-        tokenAddress: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+        tokenAddress: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
       },
       {
         tokenSymbol: "USDC",
@@ -80,7 +80,7 @@ import { getBackendConfig } from "./utils";
         tokenSymbol: "BICO",
         decimal: 18,
         chainId: 137,
-        tokenAddress: "0x91c89A94567980f0e9723b487b0beD586eE96aa7",
+        tokenAddress: "0x91c89a94567980f0e9723b487b0bed586ee96aa7",
       },
       {
         tokenSymbol: "BICO",
@@ -94,7 +94,7 @@ import { getBackendConfig } from "./utils";
         tokenSymbol: "BICO",
         decimal: 18,
         chainId: 56,
-        tokenAddress: "0x06250a4962558F0F3E69FC07F4c67BB9c9eAc739",
+        tokenAddress: "0x06250a4962558f0f3e69fc07f4c67bb9c9eac739",
       },
       {
         tokenSymbol: "BICO",
@@ -137,7 +137,7 @@ import { getBackendConfig } from "./utils";
         tokenSymbol: "ETH",
         decimal: 18,
         chainId: 56,
-        tokenAddress: "0x2170Ed0880ac9A755fd29B2688956BD959F933F8",
+        tokenAddress: "0x2170ed0880ac9a755fd29b2688956bd959f933f8",
       },
       {
         tokenSymbol: "ETH",
@@ -162,5 +162,5 @@ import { getBackendConfig } from "./utils";
     ],
   ];
 
-  setTokenConfig(tokenConfig, getBackendConfig("staging"));
+  setTokenConfig(tokenConfig, getBackendConfig("prod"));
 })();
