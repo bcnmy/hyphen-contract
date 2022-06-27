@@ -132,8 +132,8 @@ const config: HardhatUserConfig = {
       bscTestnet: process.env.BSCSCAN_API_KEY || "",
       optimisticEthereum: process.env.OPTIMISM_ETHERSCAN_API_KEY || "",
       optimisticKovan: process.env.OPTIMISM_KOVAN_ETHERSCAN_API_KEY || "",
-      arbitrumOne: process.env.OPTIMISM_ETHERSCAN_API_KEY || "",
-      arbitrumTestnet: process.env.OPTIMISM_ETHERSCAN_API_KEY || "",
+      arbitrumOne: process.env.ARBITRUM_ETHERSCAN_API_KEY || "",
+      arbitrumTestnet: process.env.ARBITRUM_RINKEBY_ETHERSCAN_API_KEY || "",
     },
   },
   contractSizer: {
