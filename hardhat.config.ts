@@ -106,14 +106,15 @@ const config: HardhatUserConfig = {
       url: process.env.OPTIMISM_KOVAN_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
-    arbitrum: {
+    arbitrumOne: {
       url: process.env.ARBITRUM_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       gasPrice: 1000000,
     },
-    arbitrumRinkeby: {
+    arbitrumTestnet: {
       url: process.env.ARBITRUM_RINKEBY_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      gas: 250000000,
     },
   },
   gasReporter: {

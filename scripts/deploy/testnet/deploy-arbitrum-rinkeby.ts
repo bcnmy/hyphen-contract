@@ -21,10 +21,9 @@ import type { IDeployConfig } from "../../types";
 
   const config: IDeployConfig = {
     // We don't support gasless on Optimism Yet
-    trustedForwarder: bico.address,
-
-    bicoOwner: "0x46b65ae065341D034fEA45D76c6fA936EAfBfdeb",
-    pauser: "0x46b65ae065341D034fEA45D76c6fA936EAfBfdeb",
+    trustedForwarder: "0x67454E169d613a8e9BA6b06af2D267696EAaAf41",
+    bicoOwner: "",
+    pauser: "",
     tokens: [
       // USDC
       {
@@ -128,6 +127,12 @@ import type { IDeployConfig } from "../../types";
         minCap: ethers.BigNumber.from(10).pow(18 - 2),
         maxCap: ethers.BigNumber.from(10).pow(18 + 2),
         depositConfigs: [
+          {
+            chainId: 5,
+            minCap: ethers.BigNumber.from(10).pow(18 - 3),
+            // Max Cap needs to be less than the maxTransfer Fee on destination chain id to cover for incentive amount
+            maxCap: ethers.BigNumber.from(9).mul(ethers.BigNumber.from(10).pow(18)),
+          },
           {
             chainId: 43113,
             minCap: ethers.BigNumber.from(10).pow(18 - 2),
