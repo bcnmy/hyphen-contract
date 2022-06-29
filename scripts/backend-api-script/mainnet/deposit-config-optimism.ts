@@ -1,5 +1,5 @@
-import { setConfig } from "./set-deposit-config";
-import { getBackendConfig } from "./utils";
+import { setConfig } from "../set-deposit-config";
+import { getBackendConfig } from "../utils";
 
 (async () => {
   let deposit_config = [
