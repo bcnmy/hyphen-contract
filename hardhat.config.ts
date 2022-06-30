@@ -106,6 +106,16 @@ const config: HardhatUserConfig = {
       url: process.env.OPTIMISM_KOVAN_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
+    arbitrumOne: {
+      url: process.env.ARBITRUM_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: 1000000,
+    },
+    arbitrumTestnet: {
+      url: process.env.ARBITRUM_RINKEBY_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      gas: 250000000,
+    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
@@ -123,6 +133,8 @@ const config: HardhatUserConfig = {
       bscTestnet: process.env.BSCSCAN_API_KEY || "",
       optimisticEthereum: process.env.OPTIMISM_ETHERSCAN_API_KEY || "",
       optimisticKovan: process.env.OPTIMISM_KOVAN_ETHERSCAN_API_KEY || "",
+      arbitrumOne: process.env.ARBITRUM_ETHERSCAN_API_KEY || "",
+      arbitrumTestnet: process.env.ARBITRUM_RINKEBY_ETHERSCAN_API_KEY || "",
     },
   },
   contractSizer: {
