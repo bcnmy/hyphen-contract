@@ -49,7 +49,7 @@ import type { IDeployConfig } from "../../types";
         svgHelper: await ethers.getContractFactory("ArbitrumUSDC"),
         decimals: 6,
         rewardTokenAddress: "0xa68Ec98D7ca870cF1Dd0b00EBbb7c4bF60A8e74d",
-        rewardRatePerSecond: parseUnits("0.001451", 18),
+        rewardRatePerSecond: parseUnits("0.001604", 18),
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       // BICO
@@ -130,7 +130,7 @@ import type { IDeployConfig } from "../../types";
         svgHelper: await ethers.getContractFactory("ArbitrumETH"),
         decimals: 18,
         rewardTokenAddress: "0xa68Ec98D7ca870cF1Dd0b00EBbb7c4bF60A8e74d",
-        rewardRatePerSecond: parseUnits("0.00144", 18),
+        rewardRatePerSecond: parseUnits("0.001459", 18),
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
     ],
