@@ -15,7 +15,7 @@ import { getBackendConfig } from "../utils";
         tokenConfigs: [
           {
             min: "100000000",
-            max: "200000000000",
+            max: "52000000000",
           },
           {
             min: "20000000000000000",
@@ -39,8 +39,8 @@ import { getBackendConfig } from "../utils";
         ],
         tokenConfigs: [
           {
-            min: "10000000",
-            max: "200000000000",
+            min: "100000000",
+            max: "52000000000",
           },
           {
             min: "3900000000000000",
@@ -64,8 +64,8 @@ import { getBackendConfig } from "../utils";
         ],
         tokenConfigs: [
           {
-            min: "10000000",
-            max: "200000000000",
+            min: "100000000",
+            max: "52000000000",
           },
           {
             min: "3900000000000000",

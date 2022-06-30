@@ -11,7 +11,7 @@ import type { IDeployConfig } from "../../types";
     tokens: [
       // USDC
       {
-        tokenAddress: "",
+        tokenAddress: "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8",
         minCap: parseUnits("10", 6),
         maxCap: parseUnits("221813", 6),
         depositConfigs: [
