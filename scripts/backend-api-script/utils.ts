@@ -1,6 +1,6 @@
 import type { IBackendConfig } from "../types";
 
-export const getBackendConfig = (env: "staging" | "integration" | "prod"): IBackendConfig => {
+export const getBackendConfig = (env: "staging" | "integration" | "prod" | "local"): IBackendConfig => {
   const config = {
     apiKey: process.env[`${env.toUpperCase()}_API_KEY`] as string,
     apiUsername: process.env[`${env.toUpperCase()}_API_USERNAME`] as string,

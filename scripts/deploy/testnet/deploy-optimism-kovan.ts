@@ -4,27 +4,33 @@ import { deploy, deployToken } from "../deploy-utils";
 import type { IDeployConfig } from "../../types";
 
 (async () => {
-  const usdc = await deployToken(
-    "USDC",
-    "USDC",
-    6,
-    ["0xDA861C9DccFf6d1fEf7Cae71B5b538AF25063404"],
-    ethers.BigNumber.from(10).pow(20)
-  );
-  const bico = await deployToken(
-    "BICO",
-    "BICO",
-    18,
-    ["0xDA861C9DccFf6d1fEf7Cae71B5b538AF25063404"],
-    ethers.BigNumber.from(10).pow(30)
-  );
+  // const usdc = await deployToken(
+  //   "USDC",
+  //   "USDC",
+  //   6,
+  //   ["0xDA861C9DccFf6d1fEf7Cae71B5b538AF25063404"],
+  //   ethers.BigNumber.from(10).pow(20)
+  // );
+  // const bico = await deployToken(
+  //   "BICO",
+  //   "BICO",
+  //   18,
+  //   ["0xDA861C9DccFf6d1fEf7Cae71B5b538AF25063404"],
+  //   ethers.BigNumber.from(10).pow(30)
+  // );
+  const usdc = {
+    address: "0x4995E4dd58Fa9eF9D80F3111777fdd4bC3300a7C",
+  };
+  const bico = {
+    address: "0x439725d33Fe46f1C167F6116aeEd7d910E482D2E",
+  };
 
   const config: IDeployConfig = {
     // We don't support gasless on Optimism Yet
     trustedForwarder: bico.address,
 
-    bicoOwner: "0x46b65ae065341D034fEA45D76c6fA936EAfBfdeb",
-    pauser: "0x46b65ae065341D034fEA45D76c6fA936EAfBfdeb",
+    bicoOwner: "0xe0E67a6F478D7ED604Cf528bDE6C3f5aB034b59D",
+    pauser: "0xe0E67a6F478D7ED604Cf528bDE6C3f5aB034b59D",
     tokens: [
       // USDC
       {

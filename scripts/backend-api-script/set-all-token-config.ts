@@ -3,7 +3,7 @@ import { setTokenConfig } from "./add-supported-token";
 import { getBackendConfig } from "./utils";
 
 (async () => {
-  const backendConfig = getBackendConfig("staging");
+  const backendConfig = getBackendConfig("local");
   const tokenData = (await axios.get(`${backendConfig.baseUrl}/api/v1/configuration/tokens`)).data.message as any;
   const promises = [];
   for (const token of tokenData) {

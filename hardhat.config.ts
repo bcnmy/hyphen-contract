@@ -127,7 +127,7 @@ const config: HardhatUserConfig = {
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
-    runOnCompile: false,
+    runOnCompile: !!process.env.REPORT_SIZE,
   },
 };
 
