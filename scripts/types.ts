@@ -46,7 +46,9 @@ export interface IContractAddresses {
   liquidityPool: string;
   whitelistPeriodManager: string;
   executorManager: string;
-  liquidityFarming: string;
+  liquidityFarming?: string;
+  liquidityFarmingV1?: string;
+  liquidityFarmingV2?: string;
   svgHelperMap?: Record<string, string>;
 }
 
