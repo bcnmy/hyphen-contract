@@ -72,7 +72,7 @@ import { getBackendConfig } from "./utils";
         tokenSymbol: "BICO",
         decimal: 18,
         chainId: 10,
-        tokenAddress: "0x7f5c764cbc14f9669b88837ca1490cca17c31607",
+        tokenAddress: "0xd6909e9e702024eb93312b989ee46794c0fb1c9d",
       },
     ],
     [
@@ -86,7 +86,7 @@ import { getBackendConfig } from "./utils";
         tokenSymbol: "BICO",
         decimal: 18,
         chainId: 10,
-        tokenAddress: "0x7f5c764cbc14f9669b88837ca1490cca17c31607",
+        tokenAddress: "0xd6909e9e702024eb93312b989ee46794c0fb1c9d",
       },
     ],
     [
@@ -100,7 +100,7 @@ import { getBackendConfig } from "./utils";
         tokenSymbol: "BICO",
         decimal: 18,
         chainId: 10,
-        tokenAddress: "0x7f5c764cbc14f9669b88837ca1490cca17c31607",
+        tokenAddress: "0xd6909e9e702024eb93312b989ee46794c0fb1c9d",
       },
     ],
     // ETH
