@@ -82,6 +82,14 @@ const config: HardhatUserConfig = {
       url: process.env.BSC_TESTNET_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
+    optimismEthereum: {
+      url: process.env.OPTIMISM_ETHEREUM_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+    optimismKovan: {
+      url: process.env.OPTIMISM_KOVAN_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
     bsc: {
       url: process.env.BSC_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
@@ -140,7 +148,7 @@ const config: HardhatUserConfig = {
   contractSizer: {
     alphaSort: true,
     disambiguatePaths: false,
-    runOnCompile: false,
+    runOnCompile: !!process.env.REPORT_SIZE,
   },
 };
 

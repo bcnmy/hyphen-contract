@@ -157,10 +157,8 @@ import { getBackendConfig } from "./utils";
         tokenSymbol: "ETH",
         decimal: 18,
         chainId: 10,
-        tokenAddress: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       },
     ],
   ];
-
-  setTokenConfig(tokenConfig, getBackendConfig("prod"));
+  setTokenConfig(tokenConfig, getBackendConfig("staging"));
 })();

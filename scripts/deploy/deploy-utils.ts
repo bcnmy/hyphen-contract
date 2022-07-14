@@ -91,7 +91,7 @@ async function deployCoreContracts(trustedForwarder: string, pauser: string): Pr
   console.log("LPToken Proxy deployed to:", lpToken.address);
 
   await wait(5000);
-  
+
   const LiquidityProviders = await ethers.getContractFactory("LiquidityProviders");
   console.log("Deploying LiquidityProviders...");
   const liquidityProviders = (await upgrades.deployProxy(LiquidityProviders, [
