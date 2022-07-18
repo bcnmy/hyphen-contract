@@ -5,11 +5,6 @@ import { getProviderMapByChain } from "../deploy/deploy-utils";
 (async () => {
   const contracts = await getContractAddresses(process.env.PROD_API_URL!);
   const provider = await getProviderMapByChain();
-  await Promise.all(
-    Object.entries(provider).map(async ([chainId, provider]) => {
-      console.log(chainId, (await provider.getNetwork()).chainId);
-    })
-  );
   const result = (
     await Promise.all(
       Object.entries(contracts).map(
