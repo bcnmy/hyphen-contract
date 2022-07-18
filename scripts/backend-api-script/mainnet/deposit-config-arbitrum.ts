@@ -43,7 +43,7 @@ import { getBackendConfig } from "../utils";
             max: "200000000000",
           },
           {
-            min: "3900000000000000",
+            min: "20000000000000000",
             max: "135000000000000000000",
           },
           {
@@ -67,7 +67,7 @@ import { getBackendConfig } from "../utils";
             max: "200000000000",
           },
           {
-            min: "3900000000000000",
+            min: "20000000000000000",
             max: "135000000000000000000",
           }
         ],
@@ -88,7 +88,7 @@ import { getBackendConfig } from "../utils";
             max: "200000000000000000000000",
           },
           {
-            min: "3900000000000000",
+            min: "20000000000000000",
             max: "135000000000000000000",
           },
           {
@@ -113,7 +113,7 @@ import { getBackendConfig } from "../utils";
             max: "200000000000000000000000",
           },
           {
-            min: "3900000000000000",
+            min: "20000000000000000",
             max: "135000000000000000000",
           },
           {
@@ -125,5 +125,5 @@ import { getBackendConfig } from "../utils";
     }
   ];
 
-  setConfig(deposit_config, getBackendConfig("staging"));
+  setConfig(deposit_config, getBackendConfig("prod"));
 })();

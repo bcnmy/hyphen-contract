@@ -97,15 +97,6 @@ const config: HardhatUserConfig = {
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       gasPrice: 50000000000,
     },
-    optimismEthereum: {
-      url: process.env.OPTIMISM_ETHEREUM_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: 1000000,
-    },
-    optimismKovan: {
-      url: process.env.OPTIMISM_KOVAN_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-    },
     arbitrumOne: {
       url: process.env.ARBITRUM_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
