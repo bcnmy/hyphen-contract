@@ -11,8 +11,19 @@ import {
 import { verifyImplementation } from "../../deploy/deploy-utils";
 
 import type { IContractAddresses } from "../../types";
+import { providers } from "ethers";
 
-export const getContractAddresses = async (baseUrl: string, chainId: number): Promise<IContractAddresses> => {
+export const getProviderMapByChain = async (baseUrl: string): Promise<Record<number, providers.JsonRpcProvider>> => {
+  const response = (await axios.get(`${baseUrl}/api/v1/configuration/networks`)).data.message as any[];
+  return Object.fromEntries(response.map(({ chainId, rpc }) => [chainId, new ethers.providers.JsonRpcProvider(rpc)]));
+};
+
+export const getContractAddresses = async (baseUrl: string): Promise<Record<number, IContractAddresses>> => {
+  const response = (await axios.get(`${baseUrl}/api/v1/configuration/networks`)).data.message as any[];
+  return Object.fromEntries(response.map(({ chainId, contracts }) => [chainId, contracts.hyphen]));
+};
+
+export const getContractAddressesByChain = async (baseUrl: string, chainId: number): Promise<IContractAddresses> => {
   const response = (await axios.get(`${baseUrl}/api/v1/configuration/networks`)).data.message as any[];
   const chain = response.filter((c) => c.chainId === chainId)[0];
   return chain.contracts.hyphen;
