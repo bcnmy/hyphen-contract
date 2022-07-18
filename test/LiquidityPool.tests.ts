@@ -8,11 +8,12 @@ import {
   LPToken,
   WhitelistPeriodManager,
   TokenManager,
+  MockAdaptor,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, BigNumberish } from "ethers";
-import { parseEther } from "ethers/lib/utils";
+import { sign } from "crypto";
 
 let { getLocaleString } = require("./utils");
 
@@ -26,6 +27,7 @@ describe("LiquidityPoolTests", function () {
   let wlpm: WhitelistPeriodManager;
   let liquidityProviders: LiquidityProvidersTest;
   let tokenManager: TokenManager;
+  let mockAdaptor: MockAdaptor;
 
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   let equilibriumFee = 10000000;
@@ -34,6 +36,7 @@ describe("LiquidityPoolTests", function () {
   let tokenAddress: string;
   let tag: string = "HyphenUI";
 
+  const NATIVE_WRAP_ADDRESS = "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const minTokenCap = getLocaleString(10 * 1e18);
@@ -41,19 +44,95 @@ describe("LiquidityPoolTests", function () {
   const minNativeTokenCap = getLocaleString(1e17);
   const maxNativeTokenCap = getLocaleString(25 * 1e18);
 
-  const communityPerWalletMaxCap = getLocaleString(1000 * 1e18);
   const commuintyPerTokenMaxCap = getLocaleString(500000 * 1e18);
   const tokenMaxCap = getLocaleString(1000000 * 1e18);
   const baseDivisor = ethers.BigNumber.from(10).pow(10);
 
-  const communityPerWalletNativeMaxCap = getLocaleString(1 * 1e18);
   const commuintyPerTokenNativeMaxCap = getLocaleString(100 * 1e18);
   const tokenNativeMaxCap = getLocaleString(200 * 1e18);
 
   const DEPOSIT_EVENT = "Deposit";
-  const ASSET_SENT = "AssetSent";
-  const DEPOSIT_TOPIC_ID = "0x5fe47ed6d4225326d3303476197d782ded5a4e9c14f479dc9ec4992af4e85d59";
+  const DEPOSIT_AND_SWAP_EVENT = "DepositAndSwap";
   const dummyDepositHash = "0xf408509b00caba5d37325ab33a92f6185c9b5f007a965dfbeff7b81ab1ec871a";
+  const depositNswapRequestOne = [
+    {
+      tokenAddress: NATIVE,
+      percentage: "2000000000",
+      amount: "0",
+      operation: 1,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6",
+    },
+  ];
+
+  const depositNswapRequestTwo = [
+    {
+      tokenAddress: NATIVE,
+      percentage: "2000000000",
+      amount: "0",
+      operation: 1,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6",
+    },
+    {
+      tokenAddress: NATIVE,
+      percentage: "900000000000",
+      amount: "0",
+      operation: 2,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6",
+    },
+  ];
+
+  const swapNexitRequestOne = [
+    {
+      tokenAddress: NATIVE,
+      percentage: "0",
+      amount: "20000000000000000",
+      operation: 1,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6",
+    },
+  ];
+
+  const swapNexitRequestTwo = [
+    {
+      tokenAddress: NATIVE,
+      percentage: "0",
+      amount: "20000000000000000000",
+      operation: 1,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6",
+    },
+  ];
+  const invalidSwapRequest = [
+    {
+      tokenAddress: NATIVE,
+      percentage: "0",
+      amount: "20000000000000000000",
+      operation: 3,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6",
+    },
+  ];
+
+  const swapNexitRequestThree = [
+    {
+      tokenAddress: NATIVE,
+      percentage: "0",
+      amount: "20000000000000000000",
+      operation: 1,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6",
+    },
+    {
+      tokenAddress: NATIVE,
+      percentage: "0",
+      amount: "200000000000000",
+      operation: 1,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6",
+    },
+    {
+      tokenAddress: NATIVE,
+      percentage: "0",
+      amount: "2000000000",
+      operation: 1,
+      path: "0x64ef393b6846114bad71e2cb2ccc3e10736b5716000bb8b4fbf271143f4fbf7b91a5ded31805e42b2208d6",
+    },
+  ];
 
   beforeEach(async function () {
     [owner, pauser, charlie, bob, tf, proxyAdmin, executor] = await ethers.getSigners();
@@ -67,6 +146,10 @@ describe("LiquidityPoolTests", function () {
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
     executorManager = await executorManagerFactory.deploy();
     await executorManager.deployed();
+
+    const mockAdaptorFactory = await ethers.getContractFactory("MockAdaptor");
+    mockAdaptor = await mockAdaptorFactory.deploy("0xE592427A0AEce92De3Edee1F18E0157C05861564", NATIVE_WRAP_ADDRESS);
+    await mockAdaptor.deployed();
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
     lpToken = (await upgrades.deployProxy(lpTokenFactory, [
@@ -157,7 +240,11 @@ describe("LiquidityPoolTests", function () {
     await liquidityProviders.connect(sender).addTokenLiquidity(tokenAddress, tokenValue);
   }
 
-  async function addNativeLiquidity(tokenValue: string, sender: SignerWithAddress) {
+  async function setSwapAdaptor(name: string, adaptorAddress: string) {
+    await liquidityPool.connect(owner).setSwapAdaptor(name, adaptorAddress);
+  }
+
+  async function addNativeLiquidity(tokenValue: BigNumberish, sender: SignerWithAddress) {
     await liquidityProviders.connect(sender).addNativeLiquidity({
       value: tokenValue,
     });
@@ -189,6 +276,24 @@ describe("LiquidityPoolTests", function () {
       value: tokenValue,
     });
   }
+  async function depositNativeAndSwap(tokenValue: string, receiver: string, toChainId: number, swapRequest: any) {
+    return await liquidityPool.connect(owner).depositNativeAndSwap(receiver, toChainId, tag, swapRequest, {
+      value: tokenValue,
+    });
+  }
+
+  async function depositAndSwapERC20Token(
+    tokenAddress: string,
+    tokenValue: string,
+    receiver: string,
+    toChainId: number,
+    swapRequest: any
+  ) {
+    await token.approve(liquidityPool.address, tokenValue);
+    return await liquidityPool
+      .connect(owner)
+      .depositAndSwapErc20(tokenAddress, receiver, toChainId, tokenValue, tag, swapRequest);
+  }
 
   async function sendFundsToUser(
     tokenAddress: string,
@@ -206,6 +311,32 @@ describe("LiquidityPoolTests", function () {
         depositHash ? depositHash : dummyDepositHash,
         tokenGasPrice,
         137
+      );
+  }
+
+  async function swapAndSendFundsToUser(
+    tokenAddress: string,
+    amount: string,
+    receiver: string,
+    depositHash?: string,
+    tokenGasPrice: BigNumberish = 0,
+    swapGasOverhead: BigNumberish = 0,
+    swapRequest?: any,
+    swapAdapter?: string
+  ) {
+    return await liquidityPool
+      .connect(executor)
+      .swapAndSendFundsToUser(
+        tokenAddress,
+        amount,
+        receiver,
+        depositHash ? depositHash : dummyDepositHash,
+        tokenGasPrice,
+        0,
+        137,
+        swapGasOverhead,
+        swapRequest,
+        swapAdapter ? swapAdapter : ""
       );
   }
 
@@ -304,6 +435,31 @@ describe("LiquidityPoolTests", function () {
       .withArgs(await getOwnerAddress(), tokenAddress, receiver, toChainId, tokenValue, 0, tag);
     let tokenLiquidityAfter = (await token.balanceOf(liquidityPool.address)).toString();
     expect(parseInt(tokenLiquidityAfter)).to.equal(parseInt(tokenLiquidityBefore) + parseInt(tokenValue));
+  });
+
+  it("Should deposit ERC20 and Swap data successfully without rewards", async () => {
+    //Deposit Token
+    const tokenValue = minTokenCap;
+    let receiver = await getReceiverAddress();
+    let toChainId = 1;
+    let tokenLiquidityBefore = (await token.balanceOf(liquidityPool.address)).toString();
+    let tx = await depositAndSwapERC20Token(tokenAddress, tokenValue, receiver, toChainId, depositNswapRequestOne);
+
+    expect(tx)
+      .to.emit(liquidityPool, DEPOSIT_AND_SWAP_EVENT)
+      .withArgs(await getOwnerAddress(), tokenAddress, receiver, toChainId, tokenValue, 0, tag);
+    let tokenLiquidityAfter = (await token.balanceOf(liquidityPool.address)).toString();
+    expect(parseInt(tokenLiquidityAfter)).to.equal(parseInt(tokenLiquidityBefore) + parseInt(tokenValue));
+  });
+
+  it("Should revert if swap percentage > 100", async () => {
+    //Deposit Token
+    const tokenValue = minTokenCap;
+    let receiver = await getReceiverAddress();
+    let toChainId = 1;
+
+    await expect(depositAndSwapERC20Token(tokenAddress, tokenValue, receiver, toChainId, depositNswapRequestTwo)).to.be
+      .reverted;
   });
 
   it("Should not get reward during deposit if current liquidity = provided liquidity", async () => {
@@ -551,14 +707,34 @@ describe("LiquidityPoolTests", function () {
     const tokenLiquidityBefore = await ethers.provider.getBalance(liquidityPool.address);
 
     //Deposit Native
-    await liquidityPool.connect(owner).depositNative(await getReceiverAddress(), 1, tag, {
-      value: tokenValue,
-    });
+    await depositNative(tokenValue, await getReceiverAddress(), 1);
     const tokenLiquidityAfter = await ethers.provider.getBalance(liquidityPool.address);
 
     expect(parseInt(tokenLiquidityAfter.toString())).to.equal(
       parseInt(tokenLiquidityBefore.toString()) + parseInt(tokenValue)
     );
+  });
+
+  it("Should deposit native and Swap data successfully without rewards", async () => {
+    const tokenValue = minTokenCap;
+    const tokenLiquidityBefore = await ethers.provider.getBalance(liquidityPool.address);
+
+    //Deposit Native
+    await depositNativeAndSwap(tokenValue, await getReceiverAddress(), 1, depositNswapRequestOne);
+    const tokenLiquidityAfter = await ethers.provider.getBalance(liquidityPool.address);
+
+    expect(parseInt(tokenLiquidityAfter.toString())).to.equal(
+      parseInt(tokenLiquidityBefore.toString()) + parseInt(tokenValue)
+    );
+  });
+
+  it("Should revert if swap percentage > 100", async () => {
+    //Deposit Token
+    const tokenValue = minTokenCap;
+    let receiver = await getReceiverAddress();
+    let toChainId = 1;
+
+    await expect(depositNativeAndSwap(tokenValue, receiver, toChainId, depositNswapRequestTwo)).to.be.reverted;
   });
 
   it("Should setTokenTransferOverhead successfully", async () => {
@@ -861,6 +1037,178 @@ describe("LiquidityPoolTests", function () {
           );
         expect(await liquidityPool.incentivePool(token.address)).to.equal(incentivePoolFee);
       }
+    });
+
+    it("Should send GasToken & Remaining ERC20 to user successfully", async () => {
+      await addTokenLiquidity(tokenAddress, minTokenCap, owner);
+      const amount = minTokenCap;
+      const usdtBalanceBefore = await token.balanceOf(liquidityPool.address);
+      const suppliedLiquidity = await liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+
+      let transferFeeFromContract = await liquidityPool.getTransferFee(tokenAddress, amount);
+      await setSwapAdaptor("uniswap", mockAdaptor.address);
+      await swapAndSendFundsToUser(
+        token.address,
+        amount.toString(),
+        await getReceiverAddress(),
+        dummyDepositHash,
+        0,
+        "12876",
+        swapNexitRequestOne,
+        "uniswap"
+      );
+
+      let equilibriumLiquidity = suppliedLiquidity;
+      let resultingLiquidity = usdtBalanceBefore.sub(amount);
+      let numerator = suppliedLiquidity.mul(maxFee * equilibriumFee);
+      let denominator = equilibriumLiquidity.mul(equilibriumFee).add(resultingLiquidity.mul(maxFee - equilibriumFee));
+      let transferFee = numerator.div(denominator);
+
+      let estimatedValueTransferred = BigNumber.from(amount).sub(transferFee.mul(amount).div(10000000000));
+      const usdtBalanceAfter = await token.balanceOf(liquidityPool.address);
+      expect(transferFeeFromContract).to.equals(transferFee);
+
+      expect(usdtBalanceBefore.sub(estimatedValueTransferred)).to.equal(usdtBalanceAfter);
+    });
+
+    it("Should fail if swap amount is greater then transferred amount", async () => {
+      const mockAdaptorFailFactory = await ethers.getContractFactory("MockAdaptorFail", owner);
+      let mockAdaptorFail = await mockAdaptorFailFactory.deploy(
+        "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+        ethers.constants.AddressZero
+      );
+      await mockAdaptorFail.deployed();
+
+      await setSwapAdaptor("uniswap", mockAdaptorFail.address);
+      await addTokenLiquidity(tokenAddress, minTokenCap, owner);
+      const amount = minTokenCap;
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+
+      await expect(
+        swapAndSendFundsToUser(
+          token.address,
+          amount.toString(),
+          await getReceiverAddress(),
+          dummyDepositHash,
+          0,
+          "12876",
+          swapNexitRequestTwo,
+          "uniswap"
+        )
+      ).to.be.reverted;
+    });
+
+    it("Should fail if Array length is 0", async () => {
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+      await expect(
+        swapAndSendFundsToUser(
+          token.address,
+          minTokenCap.toString(),
+          await getReceiverAddress(),
+          dummyDepositHash,
+          0,
+          "12876",
+          [],
+          "uniswap"
+        )
+      ).to.be.revertedWith("Wrong method call");
+    });
+
+    it("Should fail if SwapAdaptor Not Found", async () => {
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+      await expect(
+        swapAndSendFundsToUser(
+          token.address,
+          minTokenCap.toString(),
+          await getReceiverAddress(),
+          dummyDepositHash,
+          0,
+          "12876",
+          swapNexitRequestTwo,
+          "anyRandomSwap"
+        )
+      ).to.be.revertedWith("Swap adaptor not found");
+    });
+
+    it("Should fail Swap Array > 3", async () => {
+      await addTokenLiquidity(tokenAddress, minTokenCap, owner);
+      await setSwapAdaptor("uniswap", mockAdaptor.address);
+
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+      await expect(
+        swapAndSendFundsToUser(
+          token.address,
+          minTokenCap.toString(),
+          await getReceiverAddress(),
+          dummyDepositHash,
+          0,
+          "12876",
+          swapNexitRequestThree,
+          "uniswap"
+        )
+      ).to.be.revertedWith("too many swap requests");
+    });
+
+    it("Should fail for Invalid Swap operation", async () => {
+      await addTokenLiquidity(tokenAddress, minTokenCap, owner);
+      await setSwapAdaptor("uniswap", mockAdaptor.address);
+
+      await executorManager.connect(owner).addExecutor(await executor.getAddress());
+      await expect(
+        swapAndSendFundsToUser(
+          token.address,
+          minTokenCap.toString(),
+          await getReceiverAddress(),
+          dummyDepositHash,
+          0,
+          "12876",
+          invalidSwapRequest,
+          "uniswap"
+        )
+      ).to.be.reverted;
+    });
+  });
+
+  describe("sendFundsToUserV2", () => {
+    beforeEach(async () => {
+      await addTokenLiquidity(token.address, ethers.BigNumber.from(minTokenCap).mul(10), owner);
+      await addNativeLiquidity(ethers.BigNumber.from(minTokenCap).mul(10), owner);
+      await executorManager.addExecutor(executor.address);
+    });
+
+    it("Should send ERC20 funds to users", async function () {
+      const amount = ethers.BigNumber.from(minTokenCap);
+      const fee = (await liquidityPool.getTransferFee(token.address, amount)).mul(amount).div(baseDivisor);
+      expect(fee.gt(0)).to.be.true;
+      await expect(() =>
+        liquidityPool.connect(executor).sendFundsToUserV2(token.address, amount, bob.address, dummyDepositHash, 0, 1, 0)
+      ).to.changeTokenBalances(token, [liquidityPool, bob], [amount.sub(fee).mul(-1), amount.sub(fee)]);
+    });
+
+    it("Should send NATIVE funds to users", async function () {
+      const amount = ethers.BigNumber.from(minTokenCap);
+      const fee = (await liquidityPool.getTransferFee(NATIVE, amount)).mul(amount).div(baseDivisor);
+      expect(fee.gt(0)).to.be.true;
+      await expect(() =>
+        liquidityPool.connect(executor).sendFundsToUserV2(NATIVE, amount, bob.address, dummyDepositHash, 0, 1, 0)
+      ).to.changeEtherBalances([liquidityPool, bob], [amount.sub(fee).mul(-1), amount.sub(fee)]);
+    });
+
+    it("Should account for token gas base fee in transaction", async function () {
+      const amount = ethers.BigNumber.from(minTokenCap);
+      const tokenGasBaseFee = 100000;
+      const fee = (await liquidityPool.getTransferFee(token.address, amount))
+        .mul(amount)
+        .div(baseDivisor)
+        .add(tokenGasBaseFee);
+      expect(fee.gt(0)).to.be.true;
+      await expect(() =>
+        liquidityPool
+          .connect(executor)
+          .sendFundsToUserV2(token.address, amount, bob.address, dummyDepositHash, 0, 1, tokenGasBaseFee)
+      ).to.changeTokenBalances(token, [liquidityPool, bob], [amount.sub(fee).mul(-1), amount.sub(fee)]);
+      expect(await liquidityPool.gasFeeAccumulated(token.address, executor.address)).to.equal(tokenGasBaseFee);
     });
   });
 });

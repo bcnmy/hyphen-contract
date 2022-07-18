@@ -4,7 +4,7 @@ import { upgradeAllContracts, getContractAddressesByChain } from "./upgrade-all"
 (async () => {
   const chainId = (await ethers.provider.getNetwork()).chainId;
   console.log(`Upgrading contracts on chain ${chainId}`);
-  const contracts = await getContractAddressesByChain(process.env.STAGING_API_URL as string, chainId);
+  const contracts = await getContractAddressesByChain(process.env.LOCAL_API_URL as string, chainId);
   console.log(`Contracts: ${JSON.stringify(contracts, null, 2)}`);
   await upgradeAllContracts(contracts);
 })();
