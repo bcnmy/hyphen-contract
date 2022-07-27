@@ -1,4 +1,5 @@
 import { run, ethers, upgrades } from "hardhat";
+import HardHatConfig from "../../hardhat.config";
 import {
   LiquidityPool,
   LPToken,
@@ -11,7 +12,9 @@ import {
   // eslint-disable-next-line node/no-missing-import
 } from "../../typechain";
 import type { BigNumberish } from "ethers";
+import { providers } from "ethers";
 import type { IContracts, IAddTokenParameters, IDeployConfig } from "../types";
+import { HttpNetworkUserConfig } from "hardhat/types";
 
 const LPTokenName = "Hyphen Liquidity Token";
 const LPTokenSymbol = "Hyphen-LP";
@@ -54,6 +57,7 @@ const deploy = async (deployConfig: IDeployConfig) => {
 
   await configure(contracts, deployConfig.bicoOwner);
   await verify(contracts, deployConfig);
+  await transferOwnership(contracts, deployConfig.bicoOwner);
 };
 
 async function deployCoreContracts(trustedForwarder: string, pauser: string): Promise<IContracts> {
@@ -77,6 +81,7 @@ async function deployCoreContracts(trustedForwarder: string, pauser: string): Pr
   console.log("TokenManager deployed to:", tokenManager.address);
 
   await wait(5000);
+
   const LPToken = await ethers.getContractFactory("LPToken");
   console.log("Deploying LPToken...");
   const lpToken = (await upgrades.deployProxy(LPToken, [
@@ -89,6 +94,7 @@ async function deployCoreContracts(trustedForwarder: string, pauser: string): Pr
   console.log("LPToken Proxy deployed to:", lpToken.address);
 
   await wait(5000);
+
   const LiquidityProviders = await ethers.getContractFactory("LiquidityProviders");
   console.log("Deploying LiquidityProviders...");
   const liquidityProviders = (await upgrades.deployProxy(LiquidityProviders, [
@@ -181,20 +187,6 @@ const configure = async (contracts: IContracts, bicoOwner: string) => {
   await (await contracts.lpToken.setWhiteListPeriodManager(contracts.whitelistPeriodManager.address)).wait();
   await wait(5000);
   console.log("Configured LPToken");
-
-  await (await contracts.tokenManager.transferOwnership(bicoOwner)).wait();
-  await wait(5000);
-  await (await contracts.lpToken.transferOwnership(bicoOwner)).wait();
-  await wait(5000);
-  await (await contracts.executorManager.transferOwnership(bicoOwner)).wait();
-  await wait(5000);
-  await (await contracts.liquidityProviders.transferOwnership(bicoOwner)).wait();
-  await wait(5000);
-  await (await contracts.liquidityPool.transferOwnership(bicoOwner)).wait();
-  await wait(5000);
-  await (await contracts.whitelistPeriodManager.transferOwnership(bicoOwner)).wait();
-
-  console.log(`Transferred Ownership to ${bicoOwner}`);
 };
 
 const addTokenSupport = async (contracts: IContracts, token: IAddTokenParameters) => {
@@ -275,10 +267,13 @@ const deployToken = async (
   return token;
 };
 
-const getImplementationAddress = async (proxyAddress: string) => {
+const getImplementationAddress = async (
+  proxyAddress: string,
+  provider: providers.JsonRpcProvider = ethers.provider
+) => {
   return ethers.utils.hexlify(
     ethers.BigNumber.from(
-      await ethers.provider.send("eth_getStorageAt", [
+      await provider.send("eth_getStorageAt", [
         proxyAddress,
         "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc",
         "latest",
@@ -337,6 +332,40 @@ const verify = async (
   await verifyImplementation(contracts.liquidityFarming.address);
 };
 
+const transferOwnership = async (contracts: IContracts, bicoOwner: string) => {
+  await (await contracts.tokenManager.transferOwnership(bicoOwner)).wait();
+  await wait(5000);
+  await (await contracts.lpToken.transferOwnership(bicoOwner)).wait();
+  await wait(5000);
+  await (await contracts.executorManager.transferOwnership(bicoOwner)).wait();
+  await wait(5000);
+  await (await contracts.liquidityProviders.transferOwnership(bicoOwner)).wait();
+  await wait(5000);
+  await (await contracts.liquidityPool.transferOwnership(bicoOwner)).wait();
+  await wait(5000);
+  await (await contracts.whitelistPeriodManager.transferOwnership(bicoOwner)).wait();
+  console.log(`Transferred Ownership to ${bicoOwner}`);
+};
+
+const getProviderMapByChain = async (): Promise<Record<number, providers.JsonRpcProvider>> =>
+  Object.fromEntries(
+    await Promise.all(
+      Object.entries(HardHatConfig.networks!)
+        .map(([, network]) => (network as HttpNetworkUserConfig).url)
+        .filter((url) => url)
+        .map(async (url) => {
+          try {
+            const provider = new providers.JsonRpcProvider(url);
+            const chainId = (await provider.getNetwork()).chainId;
+            return [chainId, provider];
+          } catch (e) {
+            console.log(`Failed to connect to ${url}`);
+            return [];
+          }
+        })
+    )
+  );
+
 export {
   deployCoreContracts as deployContracts,
   configure,
@@ -347,4 +376,6 @@ export {
   verifyImplementation,
   deployToken,
   getProxyAdmin,
+  getImplementationAddress,
+  getProviderMapByChain,
 };
