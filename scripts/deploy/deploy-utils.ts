@@ -312,12 +312,12 @@ const verify = async (
     await verifyContract(contracts.svgHelperMap[token.tokenAddress].address, [token.decimals]);
   }
   await verifyContract(contracts.executorManager.address, []);
-  await verifyImplementation(contracts.tokenManager.address);
-  await verifyImplementation(contracts.lpToken.address);
-  await verifyImplementation(contracts.liquidityProviders.address);
-  await verifyImplementation(contracts.liquidityPool.address);
-  await verifyImplementation(contracts.whitelistPeriodManager.address);
-  await verifyImplementation(contracts.liquidityFarming.address);
+  await verifyContract(contracts.tokenManager.address, []);
+  await verifyContract(contracts.lpToken.address, []);
+  await verifyContract(contracts.liquidityProviders.address, []);
+  await verifyContract(contracts.liquidityPool.address, []);
+  await verifyContract(contracts.whitelistPeriodManager.address, []);
+  await verifyContract(contracts.liquidityFarming.address, []);
 };
 
 const transferOwnership = async (contracts: IContracts, bicoOwner: string) => {
