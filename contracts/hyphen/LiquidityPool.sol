@@ -802,16 +802,4 @@ contract LiquidityPool is
     receive() external payable {
         emit EthReceived(_msgSender(), msg.value);
     }
-
-    event GasFeeAccumulated(uint256 amount, address token, address executor);
-
-    function setGasFeeAccumulated(
-        uint256 amount,
-        address token,
-        address executor
-    ) external {
-        gasFeeAccumulated[token][executor] = amount;
-        gasFeeAccumulatedByToken[token] = gasFeeAccumulatedByToken[token] + amount;
-        emit GasFeeAccumulated(amount, token, executor);
-    }
 }
