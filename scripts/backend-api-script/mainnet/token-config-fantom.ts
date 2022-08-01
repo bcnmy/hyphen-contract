@@ -100,7 +100,7 @@ import { getBackendConfig } from "../utils";
         tokenSymbol: "BICO",
         decimal: 18,
         chainId: 250,
-        tokenAddress: "",
+        tokenAddress: "0x524cabe5b2f66cbd6f6b08def086f18f8dde033a",
       },
     ],
     [
@@ -114,7 +114,7 @@ import { getBackendConfig } from "../utils";
         tokenSymbol: "BICO",
         decimal: 18,
         chainId: 250,
-        tokenAddress: "",
+        tokenAddress: "0x524cabe5b2f66cbd6f6b08def086f18f8dde033a",
       },
     ],
     [
@@ -128,7 +128,7 @@ import { getBackendConfig } from "../utils";
         tokenSymbol: "BICO",
         decimal: 18,
         chainId: 250,
-        tokenAddress: "",
+        tokenAddress: "0x524cabe5b2f66cbd6f6b08def086f18f8dde033a",
       },
     ],
     [
@@ -142,7 +142,7 @@ import { getBackendConfig } from "../utils";
         tokenSymbol: "BICO",
         decimal: 18,
         chainId: 250,
-        tokenAddress: "",
+        tokenAddress: "0x524cabe5b2f66cbd6f6b08def086f18f8dde033a",
       },
     ],
     [
@@ -156,7 +156,7 @@ import { getBackendConfig } from "../utils";
         tokenSymbol: "BICO",
         decimal: 18,
         chainId: 250,
-        tokenAddress: "",
+        tokenAddress: "0x524cabe5b2f66cbd6f6b08def086f18f8dde033a",
       },
     ],
   ];

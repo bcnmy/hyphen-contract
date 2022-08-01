@@ -53,13 +53,13 @@ import type { IDeployConfig } from "../../types";
         maxLiquidityCap: parseUnits("500000", 6),
         svgHelper: await ethers.getContractFactory("FantomUSDC"),
         decimals: 6,
-        rewardTokenAddress: "", // please cross-check this address
+        rewardTokenAddress: "0x524cabe5b2f66cbd6f6b08def086f18f8dde033a",
         rewardRatePerSecond: parseUnits("0.001801", 18),
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
       // BICO
       {
-        tokenAddress: "", // please cross-check this address
+        tokenAddress: "0x524cabe5b2f66cbd6f6b08def086f18f8dde033a",
         minCap: parseUnits("10", 18),
         maxCap: parseUnits("510000", 18),
         depositConfigs: [
@@ -84,7 +84,7 @@ import type { IDeployConfig } from "../../types";
             maxCap: parseUnits("500000", 18),
           },
           {
-            chainId: 42161, // Optimism
+            chainId: 42161, // arbitrum
             minCap: parseUnits("10", 18),
             maxCap: parseUnits("500000", 18),
           },
@@ -96,7 +96,7 @@ import type { IDeployConfig } from "../../types";
         maxLiquidityCap: parseUnits("750000", 18),
         svgHelper: await ethers.getContractFactory("FantomBICO"),
         decimals: 18,
-        rewardTokenAddress: "", // please cross-check this address
+        rewardTokenAddress: "0x524cabe5b2f66cbd6f6b08def086f18f8dde033a", // please cross-check this address
         rewardRatePerSecond: parseUnits("0", 18),
         excessStateTransferFeePer: parseUnits("0.045", 8),
       },
