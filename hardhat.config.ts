@@ -82,14 +82,6 @@ const config: HardhatUserConfig = {
       url: process.env.BSC_TESTNET_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     },
-    optimismEthereum: {
-      url: process.env.OPTIMISM_ETHEREUM_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-    },
-    optimismKovan: {
-      url: process.env.OPTIMISM_KOVAN_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-    },
     bsc: {
       url: process.env.BSC_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
@@ -115,6 +107,14 @@ const config: HardhatUserConfig = {
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       gas: 250000000,
     },
+    fantom: {
+      url: process.env.FANTOM_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
+    fantomTestnet: {
+      url: process.env.FANTOM_TESTNET_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
@@ -134,6 +134,8 @@ const config: HardhatUserConfig = {
       optimisticKovan: process.env.OPTIMISM_KOVAN_ETHERSCAN_API_KEY || "",
       arbitrumOne: process.env.ARBITRUM_ETHERSCAN_API_KEY || "",
       arbitrumTestnet: process.env.ARBITRUM_RINKEBY_ETHERSCAN_API_KEY || "",
+      opera: process.env.FTMSCAN_API_KEY || "",
+      ftmTestnet: process.env.FTMSCAN_API_KEY || "",
     },
   },
   contractSizer: {
