@@ -110,10 +110,12 @@ const config: HardhatUserConfig = {
     fantom: {
       url: process.env.FANTOM_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: 4000000000,
     },
     fantomTestnet: {
       url: process.env.FANTOM_TESTNET_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: 2000000000,
     },
   },
   gasReporter: {
