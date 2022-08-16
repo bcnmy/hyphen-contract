@@ -57,6 +57,16 @@ export interface IDeployConfig {
   tokens: IAddTokenParameters[];
 }
 
+export interface ITokenConfig {
+  bicoOwner: string;
+  svgToken: ISvgToken[];
+}
+
+export interface ISvgToken {
+  tokenAddress: string;
+  svgHelper: ContractFactory;
+  decimals: number;
+}
 export interface IBackendConfig {
   baseUrl: string;
   apiUsername: string;
