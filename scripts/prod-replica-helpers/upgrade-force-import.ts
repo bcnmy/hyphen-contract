@@ -1,4 +1,4 @@
-import { getContractAddresses } from "../upgrades/upgrade-all/upgrade-all";
+import { getContractAddresses, getContractAddressesByChain } from "../upgrades/upgrade-all/upgrade-all";
 import { ethers, upgrades } from "hardhat";
 import { IContractAddresses } from "../types";
 
@@ -32,7 +32,7 @@ const forceImportForUpgrade = async (contracts: IContractAddresses) => {
 
 (async () => {
   const chainId = (await ethers.provider.getNetwork()).chainId;
-  const contracts = await getContractAddresses(process.env.PROD_API_URL as string, chainId);
+  const contracts = await getContractAddressesByChain(process.env.PROD_API_URL as string, chainId);
   console.log(`Forcing Import for Contracts on chain ${chainId}: ${JSON.stringify(contracts, null, 2)}`);
   await forceImportForUpgrade(contracts);
 })();
