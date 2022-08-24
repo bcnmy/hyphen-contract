@@ -1,4 +1,4 @@
-import { getContractAddresses } from "../upgrades/upgrade-all/upgrade-all";
+import { getContractAddressesByChain } from "../upgrades/upgrade-all/upgrade-all";
 import { ethers } from "hardhat";
 import {
   ExecutorManager__factory,
@@ -82,7 +82,7 @@ const transferOwnership = async (contracts: IContractAddresses, newOwner: string
   await setNativeBalance(NEW_OWNER_ADDRESS, ethers.utils.parseEther("100"));
 
   const chainId = (await ethers.provider.getNetwork()).chainId;
-  const contracts = await getContractAddresses(process.env.PROD_API_URL as string, chainId);
+  const contracts = await getContractAddressesByChain(process.env.PROD_API_URL as string, chainId);
   console.log(`Contracts on chain ${chainId}: ${JSON.stringify(contracts, null, 2)}`);
 
   await transferOwnership(contracts, NEW_OWNER_ADDRESS);
