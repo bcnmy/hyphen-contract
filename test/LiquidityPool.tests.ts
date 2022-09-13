@@ -36,6 +36,7 @@ describe("LiquidityPoolTests", function () {
   let tokenAddress: string;
   let tag: string = "HyphenUI";
 
+  const TOKEN_PRICE_BASE_DIVISOR = BigNumber.from(10).pow(28);
   const NATIVE_WRAP_ADDRESS = "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -295,22 +296,23 @@ describe("LiquidityPoolTests", function () {
       .depositAndSwapErc20(tokenAddress, receiver, toChainId, tokenValue, tag, swapRequest);
   }
 
-  async function sendFundsToUser(
+  async function sendFundsToUserV2(
     tokenAddress: string,
     amount: string,
     receiver: string,
-    tokenGasPrice: string,
+    relativeNativeTokenPrice: string,
     depositHash?: string
   ) {
     return await liquidityPool
       .connect(executor)
-      .sendFundsToUser(
+      .sendFundsToUserV2(
         tokenAddress,
         amount,
         receiver,
         depositHash ? depositHash : dummyDepositHash,
-        tokenGasPrice,
-        137
+        relativeNativeTokenPrice,
+        137,
+        0
       );
   }
 
@@ -502,7 +504,7 @@ describe("LiquidityPoolTests", function () {
       await addTokenLiquidity(tokenAddress, liquidityToBeAdded, owner);
       await executorManager.addExecutor(executor.address);
       // Send funds to put pool into deficit state so current liquidity < provided liquidity
-      let tx = await sendFundsToUser(tokenAddress, amountToWithdraw, receiver, "0");
+      let tx = await sendFundsToUserV2(tokenAddress, amountToWithdraw, receiver, "0");
       await tx.wait();
       let rewardAmoutFromContract = await liquidityPool.getRewardAmount(amountToDeposit, tokenAddress);
       let incentivePoolAmount = await liquidityPool.incentivePool(tokenAddress);
@@ -544,7 +546,7 @@ describe("LiquidityPoolTests", function () {
       await executorManager.addExecutor(executor.address);
 
       // Send funds to put pool into deficit state so current liquidity < provided liquidity
-      let tx = await sendFundsToUser(tokenAddress, amountToWithdraw, receiver, "0");
+      let tx = await sendFundsToUserV2(tokenAddress, amountToWithdraw, receiver, "0");
       await tx.wait();
       let rewardAmoutFromContract = await liquidityPool.getRewardAmount(amountToDeposit, tokenAddress);
       let incentivePoolAmount = await liquidityPool.incentivePool(tokenAddress);
@@ -576,7 +578,7 @@ describe("LiquidityPoolTests", function () {
       let toChainId = 1;
       await executorManager.addExecutor(executor.address);
       // Send funds to put pool into deficit state so current liquidity < provided liquidity
-      let tx = await sendFundsToUser(NATIVE, amountToWithdraw, receiver, "0");
+      let tx = await sendFundsToUserV2(NATIVE, amountToWithdraw, receiver, "0");
       await tx.wait();
 
       const amountToDeposit = BigNumber.from(minTokenCap)
@@ -617,11 +619,11 @@ describe("LiquidityPoolTests", function () {
       let toChainId = 1;
       await executorManager.addExecutor(executor.address);
       // Send funds to put pool into deficit state so current liquidity < provided liquidity
-      let tx = await sendFundsToUser(NATIVE, amountToWithdraw, receiver, "0");
+      let tx = await sendFundsToUserV2(NATIVE, amountToWithdraw, receiver, "0");
       await tx.wait();
 
       let rewardPoolBeforeTransfer = await liquidityPool.incentivePool(NATIVE);
-      tx = await sendFundsToUser(
+      tx = await sendFundsToUserV2(
         NATIVE,
         amountToWithdraw,
         receiver,
@@ -678,7 +680,7 @@ describe("LiquidityPoolTests", function () {
       let toChainId = 1;
       await executorManager.addExecutor(executor.address);
       // Send funds to put pool into deficit state so current liquidity < provided liquidity
-      let tx = await sendFundsToUser(NATIVE, amountToWithdraw.toString(), receiver, "0");
+      let tx = await sendFundsToUserV2(NATIVE, amountToWithdraw.toString(), receiver, "0");
       await tx.wait();
 
       let rewardPoolBeforeTransfer = await liquidityPool.incentivePool(NATIVE);
@@ -687,7 +689,7 @@ describe("LiquidityPoolTests", function () {
 
       let excessFeePercentage = transferFeePercentage.sub(BigNumber.from("10000000"));
       let expectedRewardAmount = amountToWithdraw.mul(excessFeePercentage).div(1e10);
-      tx = await sendFundsToUser(
+      tx = await sendFundsToUserV2(
         NATIVE,
         amountToWithdraw.toString(),
         receiver,
@@ -755,7 +757,7 @@ describe("LiquidityPoolTests", function () {
     let transferFeeFromContract = await liquidityPool.getTransferFee(tokenAddress, amount);
     await liquidityPool
       .connect(executor)
-      .sendFundsToUser(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash, 0, 137);
+      .sendFundsToUserV2(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash, 0, 137, 0);
 
     let equilibriumLiquidity = suppliedLiquidity;
     let resultingLiquidity = usdtBalanceBefore.sub(amount);
@@ -777,7 +779,7 @@ describe("LiquidityPoolTests", function () {
     await expect(
       liquidityPool
         .connect(executor)
-        .sendFundsToUser(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash, 0, 137)
+        .sendFundsToUserV2(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash, 0, 137, 0)
     ).to.be.reverted;
   });
 
@@ -787,7 +789,7 @@ describe("LiquidityPoolTests", function () {
     await expect(
       liquidityPool
         .connect(bob)
-        .sendFundsToUser(token.address, "1000000", await getReceiverAddress(), dummyDepositHash, 0, 137)
+        .sendFundsToUserV2(token.address, "1000000", await getReceiverAddress(), dummyDepositHash, 0, 137, 0)
     ).to.be.reverted;
   });
 
@@ -795,7 +797,9 @@ describe("LiquidityPoolTests", function () {
     const dummyDepositHash = "0xf408509b00caba5d37325ab33a92f6185c9b5f007a965dfbeff7b81ab1ec871a";
     await executorManager.connect(owner).addExecutors([await executor.getAddress()]);
     await expect(
-      liquidityPool.connect(executor).sendFundsToUser(token.address, "1000000", ZERO_ADDRESS, dummyDepositHash, 0, 137)
+      liquidityPool
+        .connect(executor)
+        .sendFundsToUserV2(token.address, "1000000", ZERO_ADDRESS, dummyDepositHash, 0, 137, 0)
     ).to.be.reverted;
   });
 
@@ -918,7 +922,15 @@ describe("LiquidityPoolTests", function () {
 
     await liquidityPool
       .connect(executor)
-      .sendFundsToUser(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash, 1, 137);
+      .sendFundsToUserV2(
+        token.address,
+        amount.toString(),
+        await getReceiverAddress(),
+        dummyDepositHash,
+        TOKEN_PRICE_BASE_DIVISOR.mul(10),
+        137,
+        0
+      );
 
     const gasFeeAccumulated = await liquidityPool.gasFeeAccumulated(token.address, executor.address);
     expect(gasFeeAccumulated.gt(0)).to.be.true;
@@ -935,9 +947,16 @@ describe("LiquidityPoolTests", function () {
     const amount = minTokenCap;
     await executorManager.connect(owner).addExecutor(await executor.getAddress());
 
-    await liquidityPool
-      .connect(executor)
-      .sendFundsToUser(NATIVE, amount.toString(), await getReceiverAddress(), dummyDepositHash, 1, 137);
+    await liquidityPool.connect(executor).sendFundsToUserV2(
+      NATIVE,
+      amount.toString(),
+      await getReceiverAddress(),
+      dummyDepositHash,
+
+      TOKEN_PRICE_BASE_DIVISOR.mul(10),
+      137,
+      0
+    );
 
     const gasFeeAccumulated = await liquidityPool.gasFeeAccumulated(NATIVE, executor.address);
     expect(gasFeeAccumulated.gt(0)).to.be.true;
@@ -986,7 +1005,7 @@ describe("LiquidityPoolTests", function () {
       await expect(
         liquidityPool
           .connect(executor)
-          .sendFundsToUser(token.address, amount, await getReceiverAddress(), dummyDepositHash, 0, 137)
+          .sendFundsToUserV2(token.address, amount, await getReceiverAddress(), dummyDepositHash, 0, 137, 0)
       )
         .to.emit(liquidityPool, "AssetSent")
         .withArgs(
@@ -1021,7 +1040,7 @@ describe("LiquidityPoolTests", function () {
         await expect(
           liquidityPool
             .connect(executor)
-            .sendFundsToUser(token.address, amount, await getReceiverAddress(), hash, 0, 137)
+            .sendFundsToUserV2(token.address, amount, await getReceiverAddress(), hash, 0, 137, 0)
         )
           .to.emit(liquidityPool, "AssetSent")
           .withArgs(
@@ -1209,6 +1228,65 @@ describe("LiquidityPoolTests", function () {
           .sendFundsToUserV2(token.address, amount, bob.address, dummyDepositHash, 0, 1, tokenGasBaseFee)
       ).to.changeTokenBalances(token, [liquidityPool, bob], [amount.sub(fee).mul(-1), amount.sub(fee)]);
       expect(await liquidityPool.gasFeeAccumulated(token.address, executor.address)).to.equal(tokenGasBaseFee);
+    });
+  });
+
+  describe("CCMP", async function () {
+    beforeEach(async () => {
+      await addTokenLiquidity(token.address, ethers.BigNumber.from(minTokenCap).mul(10), owner);
+      await addNativeLiquidity(ethers.BigNumber.from(minTokenCap).mul(10), owner);
+      await executorManager.addExecutor(executor.address);
+      await liquidityPool.setCCMPExecutor(charlie.address);
+    });
+
+    it("Should allow only CCMPExecutor to call CCMP Functions", async function () {
+      await expect(liquidityPool.depositErc20FromCCMP(137, token.address, bob.address, 1)).to.be.revertedWith(
+        "Only CCMPExecutor is allowed"
+      );
+      await expect(liquidityPool.depositNativeFromCCMP(bob.address, 137)).to.be.revertedWith(
+        "Only CCMPExecutor is allowed"
+      );
+      await expect(liquidityPool.sendFundsToUserFromCCMP(token.address, 1, bob.address)).to.be.revertedWith(
+        "Only CCMPExecutor is allowed"
+      );
+    });
+
+    it("Executor be able to deposit ERC20 from CCMP", async function () {
+      // Assume tokens have already been transferred to this contract by CCMP Executor
+      await expect(() =>
+        liquidityPool.connect(charlie).depositErc20FromCCMP(1, token.address, bob.address, minTokenCap)
+      ).to.changeTokenBalances(token, [liquidityPool, charlie], [0, 0]);
+    });
+
+    it("Executor be able to deposit Native from CCMP", async function () {
+      await expect(() =>
+        liquidityPool.connect(charlie).depositNativeFromCCMP(bob.address, 1, { value: minTokenCap })
+      ).to.changeEtherBalances([liquidityPool, charlie], [minTokenCap, BigNumber.from(minTokenCap).mul(-1)]);
+    });
+
+    it("Should be able to send funds to user on exit chain", async function () {
+      const providedLiquidity = ethers.BigNumber.from(minTokenCap).mul(10);
+      const amount = ethers.BigNumber.from(minTokenCap);
+      const resultingLiquidity = providedLiquidity.sub(amount);
+
+      const expectedFeePerNum = providedLiquidity.mul(providedLiquidity).mul(equilibriumFee).mul(maxFee);
+      const expectedFeePerDen = providedLiquidity
+        .mul(providedLiquidity)
+        .mul(equilibriumFee)
+        .add(resultingLiquidity.mul(resultingLiquidity).mul(maxFee - equilibriumFee));
+      const expectedFeePer = expectedFeePerNum.div(expectedFeePerDen);
+
+      const expectedTransferFee = amount.mul(expectedFeePer).div(baseDivisor);
+
+      const expectedTransferredAmount = amount.sub(expectedTransferFee);
+
+      await expect(() =>
+        liquidityPool.connect(charlie).sendFundsToUserFromCCMP(token.address, amount, bob.address)
+      ).to.changeTokenBalances(
+        token,
+        [liquidityPool, bob],
+        [expectedTransferredAmount.mul(-1), expectedTransferredAmount]
+      );
     });
   });
 });

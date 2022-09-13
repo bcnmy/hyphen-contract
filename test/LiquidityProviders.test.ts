@@ -11,7 +11,7 @@ import {
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { BigNumber, ContractTransaction } from "ethers";
+import { BigNumber } from "ethers";
 
 let { getLocaleString } = require("./utils");
 
@@ -101,7 +101,7 @@ describe("LiquidityProviderTests", function () {
   async function sendFundsToUser(tokenAddress: string, amount: string, receiver: string, tokenGasPrice: string) {
     return await liquidityPool
       .connect(executor)
-      .sendFundsToUser(tokenAddress, amount, receiver, dummyDepositHash, tokenGasPrice, 137);
+      .sendFundsToUserV2(tokenAddress, amount, receiver, dummyDepositHash, tokenGasPrice, 137, 0);
   }
 
   beforeEach(async function () {
