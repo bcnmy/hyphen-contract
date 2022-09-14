@@ -90,6 +90,10 @@ const config: HardhatUserConfig = {
       url: process.env.OPTIMISM_KOVAN_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
     },
+    optimismGoerli: {
+      url: process.env.OPTIMISM_GOERLI_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
+    },
     bsc: {
       url: process.env.BSC_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
@@ -115,6 +119,10 @@ const config: HardhatUserConfig = {
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       gas: 250000000,
     },
+    arbitrumGoerli: {
+      url: process.env.ARBITRUM_GOERLI_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    },
     fantom: {
       url: process.env.FANTOM_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
@@ -132,7 +140,6 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: {
-
       goerli: process.env.ETHERSCAN_API_KEY || "",
       polygonMumbai: process.env.POLYGONSCAN_API_KEY || "",
       avalancheFujiTestnet: process.env.SNOWTRACE_API_KEY || "",
@@ -143,6 +150,7 @@ const config: HardhatUserConfig = {
       bscTestnet: process.env.BSCSCAN_API_KEY || "",
       optimisticEthereum: process.env.OPTIMISM_ETHERSCAN_API_KEY || "",
       optimisticKovan: process.env.OPTIMISM_KOVAN_ETHERSCAN_API_KEY || "",
+      optimisticGoerli: process.env.OPTIMISM_ETHERSCAN_API_KEY || "",
       arbitrumOne: process.env.ARBITRUM_ETHERSCAN_API_KEY || "",
       arbitrumTestnet: process.env.ARBITRUM_RINKEBY_ETHERSCAN_API_KEY || "",
       opera: process.env.FTMSCAN_API_KEY || "",
