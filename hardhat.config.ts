@@ -77,6 +77,7 @@ const config: HardhatUserConfig = {
     polygon: {
       url: process.env.POLYGON_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      gasPrice: 35000000000
     },
     bscTestnet: {
       url: process.env.BSC_TESTNET_URL || "",
@@ -95,7 +96,7 @@ const config: HardhatUserConfig = {
     mainnet: {
       url: process.env.MAINNET_URL || "",
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: 50000000000,
+      gasPrice: 35000000000,
     },
     arbitrumOne: {
       url: process.env.ARBITRUM_URL || "",
