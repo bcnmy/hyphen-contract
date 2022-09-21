@@ -183,14 +183,9 @@ describe("LiquidityPoolTests", function () {
     const Fee = await feeLibFactory.deploy();
     await Fee.deployed();
 
-    const ccmpLibFactory = await ethers.getContractFactory("CCMP");
-    const CCMP = await ccmpLibFactory.deploy();
-    await CCMP.deployed();
-
     const liquidtyPoolFactory = await ethers.getContractFactory("LiquidityPool", {
       libraries: {
         Fee: Fee.address,
-        CCMP: CCMP.address,
       },
     });
     liquidityPool = (await upgrades.deployProxy(
@@ -349,6 +344,10 @@ describe("LiquidityPoolTests", function () {
       );
   }
 
+  function getSendFundsToUserFromCCMPCalldata(tokenSymbol: number, amount: string, receiver: string) {
+    return liquidityPool.interface.encodeFunctionData("sendFundsToUserFromCCMP", [tokenSymbol, amount, receiver]);
+  }
+
   async function swapAndsendFundsToUser(
     tokenAddress: string,
     amount: string,
@@ -381,7 +380,6 @@ describe("LiquidityPoolTests", function () {
     expect(await liquidityPool.isPauser(await pauser.getAddress())).to.equals(true);
   }
 
-  /*
   it("Should prevent non owners from changing token configuration", async () => {
     await expect(tokenManager.connect(bob).changeFee(token.address, 1, 1)).to.be.revertedWith(
       "Ownable: caller is not the owner"
@@ -1251,7 +1249,6 @@ describe("LiquidityPoolTests", function () {
       expect(await liquidityPool.gasFeeAccumulated(token.address, executor.address)).to.equal(tokenGasBaseFee);
     });
   });
-  */
 
   describe("CCMP", async function () {
     const abiCoder = new ethers.utils.AbiCoder();
@@ -1524,6 +1521,67 @@ describe("LiquidityPoolTests", function () {
           }
         )
       ).to.be.revertedWith("12");
+    });
+
+    it("Should be able to release tokens to user via CCMP", async function () {
+      const amount = ethers.BigNumber.from(minTokenCap);
+      const fromChainId = BigNumber.from(2).pow(255).sub(1);
+      const tokenSymbol = 1;
+      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, charlie.address);
+
+      const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
+      const transferFee = amount.mul(transferFeePer).div(baseDivisor);
+      const transferredAmount = amount.sub(transferFee);
+
+      expect(transferredAmount).to.be.gt(0);
+
+      await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
+      await liquidityPool.setTokenSymbol(token.address, tokenSymbol, chainId);
+      await liquidityPool.setTokenSymbol(token.address, tokenSymbol, fromChainId);
+
+      await expect(() =>
+        ccmpGatewayMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
+      ).to.changeTokenBalances(token, [liquidityPool, charlie], [transferredAmount.mul(-1), transferredAmount]);
+    });
+
+    it("Should revert if origin contract is invalid", async function () {
+      const amount = ethers.BigNumber.from(minTokenCap);
+      const fromChainId = BigNumber.from(2).pow(255).sub(1);
+      const tokenSymbol = 1;
+      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, charlie.address);
+
+      const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
+      const transferFee = amount.mul(transferFeePer).div(baseDivisor);
+      const transferredAmount = amount.sub(transferFee);
+
+      expect(transferredAmount).to.be.gt(0);
+
+      await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
+      await liquidityPool.setTokenSymbol(token.address, tokenSymbol, chainId);
+      await liquidityPool.setTokenSymbol(token.address, tokenSymbol, fromChainId);
+
+      await expect(
+        ccmpGatewayMock.callContract(liquidityPool.address, calldata, fromChainId, owner.address)
+      ).to.be.revertedWith("24");
+    });
+
+    it("Should revert if token symbol is not set", async function () {
+      const amount = ethers.BigNumber.from(minTokenCap);
+      const fromChainId = BigNumber.from(2).pow(255).sub(1);
+      const tokenSymbol = 1;
+      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, charlie.address);
+
+      const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
+      const transferFee = amount.mul(transferFeePer).div(baseDivisor);
+      const transferredAmount = amount.sub(transferFee);
+
+      expect(transferredAmount).to.be.gt(0);
+
+      await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
+
+      await expect(
+        ccmpGatewayMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
+      ).to.be.revertedWith("25");
     });
   });
 });

@@ -21,7 +21,6 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "./lib/Fee.sol";
-import "./lib/CCMP.sol";
 import "./metatx/ERC2771ContextUpgradeable.sol";
 import "../security/Pausable.sol";
 import "./structures/TokenConfig.sol";
@@ -290,8 +289,8 @@ contract LiquidityPool is
         address receiver,
         uint256 amount,
         string memory tag,
-        CCMP.CCMPMessagePayload[] calldata payloads,
-        CCMP.GasFeePaymentArgs calldata gasFeePaymentArgs,
+        ICCMPGateway.CCMPMessagePayload[] calldata payloads,
+        ICCMPGateway.GasFeePaymentArgs calldata gasFeePaymentArgs,
         bytes calldata ccmpArgs
     ) external payable tokenChecks(tokenAddress) whenNotPaused nonReentrant {
         uint256 rewardAmount = 0;
@@ -316,8 +315,8 @@ contract LiquidityPool is
         uint256 tokenSymbol,
         uint256 transferredAmount,
         address receiver,
-        CCMP.CCMPMessagePayload[] calldata payloads,
-        CCMP.GasFeePaymentArgs calldata gasFeePaymentArgs,
+        ICCMPGateway.CCMPMessagePayload[] calldata payloads,
+        ICCMPGateway.GasFeePaymentArgs calldata gasFeePaymentArgs,
         bytes calldata ccmpArgs
     ) internal {
         (string memory adaptorName, bytes memory routerArgs) = abi.decode(ccmpArgs, (string, bytes));
@@ -325,8 +324,10 @@ contract LiquidityPool is
         // Send Message to CCMP Gateway
         address toChainLiquidityPool = chainIdToLiquidityPoolAddress[toChainId];
         require(toChainLiquidityPool != address(0), "12");
-        CCMP.CCMPMessagePayload[] memory updatedPayloads = new CCMP.CCMPMessagePayload[](payloads.length + 1);
-        updatedPayloads[0] = CCMP.CCMPMessagePayload({
+        ICCMPGateway.CCMPMessagePayload[] memory updatedPayloads = new ICCMPGateway.CCMPMessagePayload[](
+            payloads.length + 1
+        );
+        updatedPayloads[0] = ICCMPGateway.CCMPMessagePayload({
             to: toChainLiquidityPool,
             _calldata: abi.encodeWithSelector(
                 this.sendFundsToUserFromCCMP.selector,
@@ -524,7 +525,8 @@ contract LiquidityPool is
         address payable receiver
     ) external whenNotPaused {
         // CCMP Verification
-        (address senderContract, uint256 sourceChainId) = CCMP.ccmpMsgOrigin(_ccmpGateway);
+
+        (address senderContract, uint256 sourceChainId) = _ccmpMsgOrigin();
         require(senderContract == chainIdToLiquidityPoolAddress[sourceChainId], "24");
 
         // Get local token address
@@ -652,7 +654,7 @@ contract LiquidityPool is
             }
             {
                 // Calculate Gas Fee
-                uint256 swapGasFee = calculateAndUpdateGasFee(
+                uint256 swapGasFee = _calculateAndUpdateGasFee(
                     tokenAddress,
                     nativeTokenPriceInTransferredToken,
                     swapGasOverhead,
@@ -732,7 +734,7 @@ contract LiquidityPool is
 
         // Calculate Gas Fee
         uint256 totalGasUsed = initialGas + tokenInfo.transferOverhead + baseGas - gasleft();
-        uint256 gasFee = calculateAndUpdateGasFee(
+        uint256 gasFee = _calculateAndUpdateGasFee(
             tokenAddress,
             nativeTokenPriceInTransferredToken,
             totalGasUsed,
@@ -746,7 +748,7 @@ contract LiquidityPool is
         }
     }
 
-    function calculateAndUpdateGasFee(
+    function _calculateAndUpdateGasFee(
         address tokenAddress,
         uint256 nativeTokenPriceInTransferredToken,
         uint256 gasUsed,
@@ -842,6 +844,20 @@ contract LiquidityPool is
         returns (bytes calldata)
     {
         return ERC2771ContextUpgradeable._msgData();
+    }
+
+    function _ccmpMsgOrigin() internal view returns (address sourceChainSender, uint256 sourceChainId) {
+        require(msg.sender == _ccmpGateway, "46");
+
+        /*
+         * Calldata Map:
+         * |-------?? bytes--------|------32 bytes-------|---------20 bytes -------|
+         * |---Original Calldata---|---Source Chain Id---|---Source Chain Sender---|
+         */
+        assembly {
+            sourceChainSender := shr(96, calldataload(sub(calldatasize(), 20)))
+            sourceChainId := calldataload(sub(calldatasize(), 52))
+        }
     }
 
     receive() external payable {}

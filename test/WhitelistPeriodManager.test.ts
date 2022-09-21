@@ -81,14 +81,9 @@ describe("WhiteListPeriodManager", function () {
     const Fee = await feeLibFactory.deploy();
     await Fee.deployed();
 
-    const ccmpLibFactory = await ethers.getContractFactory("CCMP");
-    const CCMP = await ccmpLibFactory.deploy();
-    await CCMP.deployed();
-
     const liquidtyPoolFactory = await ethers.getContractFactory("LiquidityPool", {
       libraries: {
         Fee: Fee.address,
-        CCMP: CCMP.address,
       },
     });
     liquidityPool = (await upgrades.deployProxy(

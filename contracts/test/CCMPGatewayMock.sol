@@ -7,8 +7,8 @@ contract CCMPGatewayMock is ICCMPGateway {
     struct sendMessageArgs {
         uint256 destinationChainId;
         string adaptorName;
-        CCMP.CCMPMessagePayload[] payloads;
-        CCMP.GasFeePaymentArgs gasFeePaymentArgs;
+        ICCMPGateway.CCMPMessagePayload[] payloads;
+        ICCMPGateway.GasFeePaymentArgs gasFeePaymentArgs;
         bytes routerArgs;
     }
 
@@ -19,8 +19,8 @@ contract CCMPGatewayMock is ICCMPGateway {
     function sendMessage(
         uint256 _destinationChainId,
         string calldata _adaptorName,
-        CCMP.CCMPMessagePayload[] calldata _payloads,
-        CCMP.GasFeePaymentArgs calldata _gasFeePaymentArgs,
+        ICCMPGateway.CCMPMessagePayload[] calldata _payloads,
+        ICCMPGateway.GasFeePaymentArgs calldata _gasFeePaymentArgs,
         bytes calldata _routerArgs
     ) external payable override returns (bool sent) {
         if (shouldRevert) {
@@ -39,11 +39,23 @@ contract CCMPGatewayMock is ICCMPGateway {
         }
     }
 
-    function lastCallPayload() external view returns (CCMP.CCMPMessagePayload[] memory) {
+    function lastCallPayload() external view returns (ICCMPGateway.CCMPMessagePayload[] memory) {
         return lastCallArgs.payloads;
     }
 
     function setRevertStatus(bool _shouldRevert) external {
         shouldRevert = _shouldRevert;
+    }
+
+    function callContract(
+        address to,
+        bytes calldata _calldata,
+        uint256 _fromChainId,
+        address _fromContractAddress
+    ) external {
+        (bool success, bytes memory returnData) = to.call(
+            abi.encodePacked(_calldata, _fromChainId, _fromContractAddress)
+        );
+        require(success, string(returnData));
     }
 }
