@@ -101,7 +101,7 @@ describe("LiquidityProviderTests", function () {
   async function sendFundsToUser(tokenAddress: string, amount: string, receiver: string, tokenGasPrice: string) {
     return await liquidityPool
       .connect(executor)
-      .sendFundsToUser(tokenAddress, amount, receiver, dummyDepositHash, tokenGasPrice, 137);
+      .sendFundsToUserV2(tokenAddress, amount, receiver, dummyDepositHash, tokenGasPrice, 137, 0);
   }
 
   beforeEach(async function () {
@@ -193,14 +193,34 @@ describe("LiquidityProviderTests", function () {
     );
     await wlpm.setAreWhiteListRestrictionsEnabled(false);
 
-    const lpFactory = await ethers.getContractFactory("LiquidityPool");
-    liquidityPool = (await upgrades.deployProxy(lpFactory, [
-      executorManager.address,
-      pauser.address,
-      tf.address,
-      tokenManager.address,
-      liquidityProviders.address,
-    ])) as LiquidityPool;
+    const feeLibFactory = await ethers.getContractFactory("Fee");
+    const Fee = await feeLibFactory.deploy();
+    await Fee.deployed();
+
+    const ccmpLibFactory = await ethers.getContractFactory("CCMP");
+    const CCMP = await ccmpLibFactory.deploy();
+    await CCMP.deployed();
+
+    const liquidtyPoolFactory = await ethers.getContractFactory("LiquidityPool", {
+      libraries: {
+        Fee: Fee.address,
+        CCMP: CCMP.address,
+      },
+    });
+    liquidityPool = (await upgrades.deployProxy(
+      liquidtyPoolFactory,
+      [
+        executorManager.address,
+        await pauser.getAddress(),
+        trustedForwarder,
+        tokenManager.address,
+        liquidityProviders.address,
+      ],
+      {
+        unsafeAllow: ["external-library-linking"],
+      }
+    )) as LiquidityPool;
+
     await liquidityProviders.setLiquidityPool(liquidityPool.address);
   });
 

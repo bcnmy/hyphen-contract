@@ -9,6 +9,7 @@ import {
   WhitelistPeriodManager,
   TokenManager,
   HyphenLiquidityFarming,
+  LiquidityPool__factory,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -187,7 +188,28 @@ describe("Upgradibility", function () {
   it("Should be able to upgrade contracts", async function () {
     const oldTokenManager = tokenManager.address;
 
-    (await upgrades.upgradeProxy(liquidityPool.address, await ethers.getContractFactory("LiquidityPool"))).deployed();
+    const feeLibFactory = await ethers.getContractFactory("Fee");
+    const Fee = await feeLibFactory.deploy();
+    await Fee.deployed();
+
+    const ccmpLibFactory = await ethers.getContractFactory("CCMP");
+    const CCMP = await ccmpLibFactory.deploy();
+    await CCMP.deployed();
+
+    const liquidtyPoolFactory = await ethers.getContractFactory("LiquidityPool", {
+      libraries: {
+        Fee: Fee.address,
+        CCMP: CCMP.address,
+      },
+    });
+
+    (
+      await upgrades.upgradeProxy(liquidityPool.address, liquidtyPoolFactory, {
+        unsafeAllow: ["external-library-linking"],
+      })
+    ).deployed();
+    liquidityPool = LiquidityPool__factory.connect(liquidityPool.address, owner);
+
     (
       await upgrades.upgradeProxy(liquidityProviders.address, await ethers.getContractFactory("LiquidityProviders"))
     ).deployed();
@@ -246,11 +268,13 @@ describe("Upgradibility", function () {
     const nativeBalance = await ethers.provider.getBalance(owner.address);
 
     await expect(
-      liquidityPool.connect(executor).sendFundsToUser(token.address, parseEther("1"), owner.address, depositHash1, 0, 1)
+      liquidityPool
+        .connect(executor)
+        .sendFundsToUserV2(token.address, parseEther("1"), owner.address, depositHash1, 0, 1, 0)
     ).to.not.be.reverted;
 
     await expect(
-      liquidityPool.connect(executor).sendFundsToUser(NATIVE, parseEther("1"), owner.address, depositHash2, 0, 1)
+      liquidityPool.connect(executor).sendFundsToUserV2(NATIVE, parseEther("1"), owner.address, depositHash2, 0, 1, 0)
     ).to.not.be.reverted;
 
     expect((await token.balanceOf(owner.address)).gte(tokenBalance)).to.be.true;
