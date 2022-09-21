@@ -35,6 +35,11 @@ const config: HardhatUserConfig = {
         settings: {
           evmVersion: "istanbul",
           optimizer: { enabled: true, runs: 200 },
+          outputSelection: {
+            "*": {
+              "*": ["storageLayout"],
+            },
+          },
         },
       },
       {
@@ -42,6 +47,11 @@ const config: HardhatUserConfig = {
         settings: {
           evmVersion: "istanbul",
           optimizer: { enabled: true, runs: 200 },
+          outputSelection: {
+            "*": {
+              "*": ["storageLayout"],
+            },
+          },
         },
       },
     ],
@@ -132,7 +142,6 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: {
-
       goerli: process.env.ETHERSCAN_API_KEY || "",
       polygonMumbai: process.env.POLYGONSCAN_API_KEY || "",
       avalancheFujiTestnet: process.env.SNOWTRACE_API_KEY || "",

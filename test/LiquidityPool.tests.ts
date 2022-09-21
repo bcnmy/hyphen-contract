@@ -13,8 +13,20 @@ import {
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, BigNumberish } from "ethers";
+import { CCMPGatewayMock } from "../typechain/CCMPGatewayMock";
 
 let { getLocaleString } = require("./utils");
+
+type GasFeePaymentArgs = {
+  feeTokenAddress: string;
+  feeAmount: BigNumberish;
+  relayer: string;
+};
+
+type CCMPMessagePayload = {
+  to: string;
+  _calldata: string;
+};
 
 describe("LiquidityPoolTests", function () {
   let owner: SignerWithAddress, pauser: SignerWithAddress, bob: SignerWithAddress;
@@ -27,6 +39,7 @@ describe("LiquidityPoolTests", function () {
   let liquidityProviders: LiquidityProvidersTest;
   let tokenManager: TokenManager;
   let mockAdaptor: MockAdaptor;
+  let ccmpGatewayMock: CCMPGatewayMock;
 
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   let equilibriumFee = 10000000;
@@ -244,6 +257,9 @@ describe("LiquidityPoolTests", function () {
 
     await liquidityProviders.setWhiteListPeriodManager(wlpm.address);
 
+    ccmpGatewayMock = (await (await ethers.getContractFactory("CCMPGatewayMock")).deploy()) as CCMPGatewayMock;
+    await liquidityPool.setCCMPGateway(ccmpGatewayMock.address);
+
     for (const signer of [owner, bob, charlie]) {
       await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
       await token
@@ -365,6 +381,7 @@ describe("LiquidityPoolTests", function () {
     expect(await liquidityPool.isPauser(await pauser.getAddress())).to.equals(true);
   }
 
+  /*
   it("Should prevent non owners from changing token configuration", async () => {
     await expect(tokenManager.connect(bob).changeFee(token.address, 1, 1)).to.be.revertedWith(
       "Ownable: caller is not the owner"
@@ -1193,7 +1210,7 @@ describe("LiquidityPoolTests", function () {
     });
   });
 
-  describe("sendFundsToUserV2V2", () => {
+  describe("sendFundsToUserV2", () => {
     beforeEach(async () => {
       await addTokenLiquidity(token.address, ethers.BigNumber.from(minTokenCap).mul(10), owner);
       await addNativeLiquidity(ethers.BigNumber.from(minTokenCap).mul(10), owner);
@@ -1232,6 +1249,281 @@ describe("LiquidityPoolTests", function () {
           .sendFundsToUserV2(token.address, amount, bob.address, dummyDepositHash, 0, 1, tokenGasBaseFee)
       ).to.changeTokenBalances(token, [liquidityPool, bob], [amount.sub(fee).mul(-1), amount.sub(fee)]);
       expect(await liquidityPool.gasFeeAccumulated(token.address, executor.address)).to.equal(tokenGasBaseFee);
+    });
+  });
+  */
+
+  describe("CCMP", async function () {
+    const abiCoder = new ethers.utils.AbiCoder();
+    const emptyBytes = abiCoder.encode(["string"], ["0x"]);
+    let chainId: number;
+
+    beforeEach(async () => {
+      await addTokenLiquidity(token.address, ethers.BigNumber.from(minTokenCap).mul(10), owner);
+      await addNativeLiquidity(ethers.BigNumber.from(minTokenCap).mul(10), owner);
+      await executorManager.addExecutor(executor.address);
+      chainId = (await ethers.provider.getNetwork()).chainId;
+    });
+
+    const getCCMPArgs = (adaptorName: string, routerArgs: string) =>
+      abiCoder.encode(["string", "bytes"], [adaptorName, routerArgs]);
+
+    const getExitCalldata = (tokenSymbol: number, amount: BigNumberish, receiver: string) =>
+      liquidityPool.interface.encodeFunctionData("sendFundsToUserFromCCMP", [tokenSymbol, amount, receiver]);
+
+    const compareLastCallPayloads = (a: CCMPMessagePayload[], b: CCMPMessagePayload[]): boolean => {
+      if (a.length !== b.length) {
+        console.log("lengths not equal");
+        return false;
+      }
+
+      for (let i = 0; i < a.length; i++) {
+        if (a[i].to != b[i].to) {
+          console.log(`to not equal at index ${i}. a: ${a[i].to}, b: ${b[i].to}`);
+          return false;
+        }
+
+        if (a[i]._calldata != b[i]._calldata) {
+          console.log(`calldata not equal at index ${i}. a: ${a[i]._calldata}, b: ${b[i]._calldata}`);
+          return false;
+        }
+      }
+
+      return true;
+    };
+
+    it("Should be able to accept deposits in ERC20", async function () {
+      const payloads: CCMPMessagePayload[] = [];
+      const gasFeePaymentArgs: GasFeePaymentArgs = {
+        feeTokenAddress: token.address,
+        feeAmount: 0,
+        relayer: owner.address,
+      };
+      const adaptorName = "wormhole";
+      const routerArgs = emptyBytes;
+      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
+      const destinationChainId = 1;
+      const tokenSymbol = 1;
+      const amount = BigNumber.from(minTokenCap);
+
+      await liquidityPool.setTokenSymbol(token.address, tokenSymbol, chainId);
+      await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
+
+      await expect(() =>
+        liquidityPool.depositAndCall(
+          destinationChainId,
+          token.address,
+          charlie.address,
+          amount,
+          "test",
+          payloads,
+          gasFeePaymentArgs,
+          ccmpArgs
+        )
+      ).to.changeTokenBalances(token, [liquidityPool, owner], [amount, amount.mul(-1)]);
+
+      const lastCallArgs = await ccmpGatewayMock.lastCallArgs();
+      const lastCallPayload = await ccmpGatewayMock.lastCallPayload();
+
+      expect(lastCallArgs.destinationChainId).to.equal(destinationChainId);
+      expect(lastCallArgs.adaptorName).to.equal(adaptorName);
+      expect(
+        compareLastCallPayloads(lastCallPayload, [
+          {
+            to: liquidityPool.address,
+            _calldata: getExitCalldata(tokenSymbol, amount, charlie.address),
+          },
+          ...payloads,
+        ])
+      ).to.be.true;
+      expect(lastCallArgs.gasFeePaymentArgs.relayer).to.equal(gasFeePaymentArgs.relayer);
+      expect(lastCallArgs.gasFeePaymentArgs.feeAmount).to.equal(gasFeePaymentArgs.feeAmount);
+      expect(lastCallArgs.gasFeePaymentArgs.feeTokenAddress).to.equal(gasFeePaymentArgs.feeTokenAddress);
+      expect(lastCallArgs.routerArgs).to.equal(routerArgs);
+    });
+
+    it("Should be able to accept deposits in Native", async function () {
+      const payloads: CCMPMessagePayload[] = [];
+      const gasFeePaymentArgs: GasFeePaymentArgs = {
+        feeTokenAddress: token.address,
+        feeAmount: 0,
+        relayer: owner.address,
+      };
+      const adaptorName = "wormhole";
+      const routerArgs = emptyBytes;
+      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
+      const destinationChainId = 1;
+      const tokenSymbol = 1;
+      const amount = ethers.BigNumber.from(minTokenCap);
+
+      await liquidityPool.setTokenSymbol(NATIVE, tokenSymbol, chainId);
+      await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
+
+      await expect(() =>
+        liquidityPool.depositAndCall(
+          destinationChainId,
+          NATIVE,
+          charlie.address,
+          amount,
+          "test",
+          payloads,
+          gasFeePaymentArgs,
+          ccmpArgs,
+          {
+            value: amount,
+          }
+        )
+      ).to.changeEtherBalances([liquidityPool, owner], [amount, amount.mul(-1)]);
+
+      const lastCallArgs = await ccmpGatewayMock.lastCallArgs();
+      const lastCallPayload = await ccmpGatewayMock.lastCallPayload();
+
+      expect(lastCallArgs.destinationChainId).to.equal(destinationChainId);
+      expect(lastCallArgs.adaptorName).to.equal(adaptorName);
+      expect(
+        compareLastCallPayloads(lastCallPayload, [
+          {
+            to: liquidityPool.address,
+            _calldata: getExitCalldata(tokenSymbol, amount, charlie.address),
+          },
+          ...payloads,
+        ])
+      ).to.be.true;
+      expect(lastCallArgs.gasFeePaymentArgs.relayer).to.equal(gasFeePaymentArgs.relayer);
+      expect(lastCallArgs.gasFeePaymentArgs.feeAmount).to.equal(gasFeePaymentArgs.feeAmount);
+      expect(lastCallArgs.gasFeePaymentArgs.feeTokenAddress).to.equal(gasFeePaymentArgs.feeTokenAddress);
+      expect(lastCallArgs.routerArgs).to.equal(routerArgs);
+    });
+
+    it("Should be include existing payloads while deposit", async function () {
+      const payloads: CCMPMessagePayload[] = [
+        {
+          to: owner.address,
+          _calldata: "0x1234",
+        },
+        {
+          to: owner.address,
+          _calldata: "0x1234",
+        },
+        {
+          to: owner.address,
+          _calldata: "0x1234",
+        },
+      ];
+      const gasFeePaymentArgs: GasFeePaymentArgs = {
+        feeTokenAddress: token.address,
+        feeAmount: 0,
+        relayer: owner.address,
+      };
+      const adaptorName = "wormhole";
+      const routerArgs = emptyBytes;
+      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
+      const destinationChainId = 1;
+      const tokenSymbol = 1;
+      const amount = ethers.BigNumber.from(minTokenCap);
+
+      await liquidityPool.setTokenSymbol(NATIVE, tokenSymbol, chainId);
+      await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
+
+      await expect(() =>
+        liquidityPool.depositAndCall(
+          destinationChainId,
+          NATIVE,
+          charlie.address,
+          amount,
+          "test",
+          payloads,
+          gasFeePaymentArgs,
+          ccmpArgs,
+          {
+            value: amount,
+          }
+        )
+      ).to.changeEtherBalances([liquidityPool, owner], [amount, amount.mul(-1)]);
+
+      const lastCallArgs = await ccmpGatewayMock.lastCallArgs();
+      const lastCallPayload = await ccmpGatewayMock.lastCallPayload();
+
+      expect(lastCallArgs.destinationChainId).to.equal(destinationChainId);
+      expect(lastCallArgs.adaptorName).to.equal(adaptorName);
+      expect(
+        compareLastCallPayloads(lastCallPayload, [
+          {
+            to: liquidityPool.address,
+            _calldata: getExitCalldata(tokenSymbol, amount, charlie.address),
+          },
+          ...payloads,
+        ])
+      ).to.be.true;
+      expect(lastCallArgs.gasFeePaymentArgs.relayer).to.equal(gasFeePaymentArgs.relayer);
+      expect(lastCallArgs.gasFeePaymentArgs.feeAmount).to.equal(gasFeePaymentArgs.feeAmount);
+      expect(lastCallArgs.gasFeePaymentArgs.feeTokenAddress).to.equal(gasFeePaymentArgs.feeTokenAddress);
+      expect(lastCallArgs.routerArgs).to.equal(routerArgs);
+    });
+
+    it("Should revert if token symbol is not registered", async function () {
+      const payloads: CCMPMessagePayload[] = [];
+      const gasFeePaymentArgs: GasFeePaymentArgs = {
+        feeTokenAddress: token.address,
+        feeAmount: 0,
+        relayer: owner.address,
+      };
+      const adaptorName = "wormhole";
+      const routerArgs = emptyBytes;
+      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
+      const destinationChainId = 1;
+      const tokenSymbol = 1;
+      const amount = ethers.BigNumber.from(minTokenCap);
+
+      await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
+
+      await expect(
+        liquidityPool.depositAndCall(
+          destinationChainId,
+          NATIVE,
+          charlie.address,
+          amount,
+          "test",
+          payloads,
+          gasFeePaymentArgs,
+          ccmpArgs,
+          {
+            value: amount,
+          }
+        )
+      ).to.be.revertedWith("11");
+    });
+
+    it("Should revert if destination chain liquidity pool not registered", async function () {
+      const payloads: CCMPMessagePayload[] = [];
+      const gasFeePaymentArgs: GasFeePaymentArgs = {
+        feeTokenAddress: token.address,
+        feeAmount: 0,
+        relayer: owner.address,
+      };
+      const adaptorName = "wormhole";
+      const routerArgs = emptyBytes;
+      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
+      const destinationChainId = 1;
+      const tokenSymbol = 1;
+      const amount = ethers.BigNumber.from(minTokenCap);
+      await liquidityPool.setTokenSymbol(NATIVE, tokenSymbol, chainId);
+
+      await expect(
+        liquidityPool.depositAndCall(
+          destinationChainId,
+          NATIVE,
+          charlie.address,
+          amount,
+          "test",
+          payloads,
+          gasFeePaymentArgs,
+          ccmpArgs,
+          {
+            value: amount,
+          }
+        )
+      ).to.be.revertedWith("12");
     });
   });
 });

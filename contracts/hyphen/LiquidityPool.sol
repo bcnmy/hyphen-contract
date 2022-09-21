@@ -151,7 +151,6 @@ contract LiquidityPool is
     event DepositAndCall(
         address indexed from,
         address indexed tokenAddress,
-        uint256 tokenSymbol,
         address indexed receiver,
         uint256 amount,
         uint256 reward,
@@ -292,6 +291,7 @@ contract LiquidityPool is
         uint256 amount,
         string memory tag,
         CCMP.CCMPMessagePayload[] calldata payloads,
+        CCMP.GasFeePaymentArgs calldata gasFeePaymentArgs,
         bytes calldata ccmpArgs
     ) external payable tokenChecks(tokenAddress) whenNotPaused nonReentrant {
         uint256 rewardAmount = 0;
@@ -302,20 +302,13 @@ contract LiquidityPool is
             rewardAmount = _depositErc20(_msgSender(), toChainId, tokenAddress, receiver, amount);
         }
 
-        uint256 tokenSymbol = tokenAddressToSymbol[tokenAddress][block.chainid];
-        require(tokenSymbol != 0, "11");
+        {
+            uint256 tokenSymbol = tokenAddressToSymbol[tokenAddress][block.chainid];
+            require(tokenSymbol != 0, "11");
+            _invokeCCMP(toChainId, tokenSymbol, amount + rewardAmount, receiver, payloads, gasFeePaymentArgs, ccmpArgs);
+        }
 
-        _invokeCCMP(toChainId, tokenSymbol, amount + rewardAmount, receiver, payloads, ccmpArgs);
-
-        emit DepositAndCall(
-            _msgSender(),
-            tokenAddress,
-            tokenSymbol,
-            receiver,
-            amount + rewardAmount,
-            rewardAmount,
-            tag
-        );
+        emit DepositAndCall(_msgSender(), tokenAddress, receiver, amount + rewardAmount, rewardAmount, tag);
     }
 
     function _invokeCCMP(
@@ -324,10 +317,10 @@ contract LiquidityPool is
         uint256 transferredAmount,
         address receiver,
         CCMP.CCMPMessagePayload[] calldata payloads,
+        CCMP.GasFeePaymentArgs calldata gasFeePaymentArgs,
         bytes calldata ccmpArgs
     ) internal {
-        (string memory adaptorName, CCMP.GasFeePaymentArgs memory gasFeePaymentArgs, bytes memory routerArgs) = abi
-            .decode(ccmpArgs, (string, CCMP.GasFeePaymentArgs, bytes));
+        (string memory adaptorName, bytes memory routerArgs) = abi.decode(ccmpArgs, (string, bytes));
 
         // Send Message to CCMP Gateway
         address toChainLiquidityPool = chainIdToLiquidityPoolAddress[toChainId];
@@ -342,7 +335,7 @@ contract LiquidityPool is
                 receiver
             )
         });
-        uint256 length = payloads.length;
+        uint256 length = updatedPayloads.length;
         for (uint256 i = 1; i < length; ) {
             updatedPayloads[i] = payloads[i - 1];
             unchecked {
