@@ -53,7 +53,7 @@ import { getBackendConfig } from "../utils";
       depositConfig:  {
         toChainIds: [250],
         tokenAddresses: [
-          "", // USDT
+          "0x55d398326f99059ff775485246999027b3197955", // USDT
         ],
         tokenConfigs: [
           {
@@ -68,7 +68,7 @@ import { getBackendConfig } from "../utils";
       depositConfig:  {
         toChainIds: [250],
         tokenAddresses: [
-          "", // USDT
+          "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58", // USDT
         ],
         tokenConfigs: [
           {
@@ -83,7 +83,7 @@ import { getBackendConfig } from "../utils";
       depositConfig:  {
         toChainIds: [250],
         tokenAddresses: [
-          "", // USDT
+          "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9", // USDT
         ],
         tokenConfigs: [
           {
