@@ -40,12 +40,12 @@ export interface IContracts {
 }
 
 export interface IContractAddresses {
-  liquidityProviders: string;
-  lpToken: string;
-  tokenManager: string;
-  liquidityPool: string;
-  whitelistPeriodManager: string;
-  executorManager: string;
+  liquidityProviders?: string;
+  lpToken?: string;
+  tokenManager?: string;
+  liquidityPool?: string;
+  whitelistPeriodManager?: string;
+  executorManager?: string;
   liquidityFarming?: string;
   liquidityFarmingV1?: string;
   liquidityFarmingV2?: string;
