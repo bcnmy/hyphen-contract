@@ -1,0 +1,249 @@
+//complete Polygon to all chains
+{
+	"chainId": 137,
+	"depositConfig" : {
+		"toChainIds" : [250, 10, 42161, 250],
+		"tokenAddresses" : [
+			"0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+			"0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+			"0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+			"0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+		],
+		"tokenConfigs" : [{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		}]
+	}
+}
+
+//complete Ethereum to all chains
+{
+	"chainId": 1,
+	"depositConfig" : {
+		"toChainIds" : [250, 10, 42161, 250],
+		"tokenAddresses" : [
+			"0xdac17f958d2ee523a2206206994597c13d831ec7",
+			"0xdac17f958d2ee523a2206206994597c13d831ec7",
+			"0xdac17f958d2ee523a2206206994597c13d831ec7",
+			"0xdac17f958d2ee523a2206206994597c13d831ec7"
+		],
+		"tokenConfigs" : [{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		}]
+	}
+}
+
+//complete- optimism to all chains
+{
+	"chainId": 10,
+	"depositConfig" : {
+		"toChainIds" : [1,137,43114,42161,250,56],
+		"tokenAddresses" : [
+			"0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+			"0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+			"0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+			"0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+			"0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+			"0x94b008aa00579c1307b0ef2c499ad98a8ce58e58"
+		],
+		"tokenConfigs" : [{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "50000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		}]
+	}
+}
+
+//complete - BSC to all chains
+{
+	"chainId": 56,
+	"depositConfig" : {
+		"toChainIds" : [250, 10, 42161, 43114],
+		"tokenAddresses" : [
+			"0x55d398326f99059ff775485246999027b3197955",
+			"0x55d398326f99059ff775485246999027b3197955",
+			"0x55d398326f99059ff775485246999027b3197955",
+			"0x55d398326f99059ff775485246999027b3197955"
+		],
+		"tokenConfigs" : [{
+			"min": "10000000000000000000",
+			"max": "60000000000000000000000"
+		},
+		{
+			"min": "10000000000000000000",
+			"max": "60000000000000000000000"
+		},
+		{
+			"min": "10000000000000000000",
+			"max": "60000000000000000000000"
+		},
+		{
+			"min": "10000000000000000000",
+			"max": "60000000000000000000000"
+		}]
+	}
+}
+
+// complete Avalance to all chains
+{
+	"chainId": 43114,
+	"depositConfig" : {
+		"toChainIds" : [1,137,42161,250,56,10],
+		"tokenAddresses" : [
+			"0xc7198437980c041c805a1edcba50c1ce5db95118",
+			"0xc7198437980c041c805a1edcba50c1ce5db95118",
+			"0xc7198437980c041c805a1edcba50c1ce5db95118",
+			"0xc7198437980c041c805a1edcba50c1ce5db95118",
+			"0xc7198437980c041c805a1edcba50c1ce5db95118",
+			"0xc7198437980c041c805a1edcba50c1ce5db95118"
+		],
+		"tokenConfigs" : [{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "50000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		}]
+	}
+}
+
+// complete Fantom to all chains
+{
+	"chainId": 250,
+	"depositConfig" : {
+		"toChainIds" : [1,137,43114,10,56,42161],
+		"tokenAddresses" : [
+			"0x049d68029688eabf473097a2fc38ef61633a3c7a",
+			"0x049d68029688eabf473097a2fc38ef61633a3c7a",
+			"0x049d68029688eabf473097a2fc38ef61633a3c7a",
+			"0x049d68029688eabf473097a2fc38ef61633a3c7a",
+			"0x049d68029688eabf473097a2fc38ef61633a3c7a",
+			"0x049d68029688eabf473097a2fc38ef61633a3c7a"
+		],
+		"tokenConfigs" : [{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "50000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		}]
+	}
+}
+
+// complete Arbitrum to all chains
+{
+	"chainId": 42161,
+	"depositConfig" : {
+		"toChainIds" : [1,137,43114,10,250,56],
+		"tokenAddresses" : [
+			"0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+			"0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+			"0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+			"0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+			"0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+			"0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9"
+		],
+		"tokenConfigs" : [{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "50000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		},
+		{
+			"min": "10000000",
+			"max": "60000000000"
+		}]
+	}
+}

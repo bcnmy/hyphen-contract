@@ -1,0 +1,106 @@
+[
+	// fantom
+{
+	"svgHelperAddress": "0x374e22be8c9d549b5cd1d3b5b6f7a469bab6145e",
+	"fromChainId": 250,
+	"tokenAddress": "0x049d68029688eabf473097a2fc38ef61633a3c7a",
+	"minCap": "10000000",
+	"maxCap": "60000000000",
+	"equilibriumFee": "7500000",
+	"maxFee": "50000000",
+	"transferOverhead": 82491,
+	"maxLiquidityCap": "1000000000000",
+	"maxWalletLiquidityCap": 0,
+	"rewardTokenAddress": "0x524cabe5b2f66cbd6f6b08def086f18f8dde033a",
+	"rewardRatePerSecond": "169000000000000",
+	"excessStateTransferFeePer": "4500000"
+}
+//ARBI
+{
+	"svgHelperAddress": "0x6ae108dde26de9ca70e70defb1913c8726136b37",
+	"fromChainId": 42161,
+	"tokenAddress": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+	"minCap": "10000000",
+	"maxCap": "70000000000",
+	"equilibriumFee": "7500000",
+	"maxFee": "50000000",
+	"transferOverhead": 82491,
+	"maxLiquidityCap": "1000000000000",
+	"maxWalletLiquidityCap": 0,
+	"rewardTokenAddress": "0xa68Ec98D7ca870cF1Dd0b00EBbb7c4bF60A8e74d",
+	"rewardRatePerSecond": "169000000000000",
+	"excessStateTransferFeePer": "4500000"
+}
+
+
+//OP
+{
+	"svgHelperAddress": "0xf18d745bb6db6dd5412113eba2c570f330f86835",
+	"fromChainId": 10,
+	"tokenAddress": "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+	"minCap": "10000000",
+	"maxCap": "70000000000",
+	"equilibriumFee": "7500000",
+	"maxFee": "50000000",
+	"transferOverhead": 82491,
+	"maxLiquidityCap": "1000000000000",
+	"maxWalletLiquidityCap": 0,
+	"rewardTokenAddress": "0xd6909e9e702024eb93312b989ee46794c0fb1c9d",
+	"rewardRatePerSecond": "169000000000000",
+	"excessStateTransferFeePer": "4500000"
+}
+
+//AVA
+{
+	"svgHelperAddress": "0x9bcf58cd6d22c532e77dcaa196fc45589042bc5b",
+	"fromChainId": 43114,
+	"tokenAddress": "0xc7198437980c041c805a1edcba50c1ce5db95118",
+	"minCap": "10000000",
+	"maxCap": "70000000000",
+	"equilibriumFee": "7500000",
+	"maxFee": "50000000",
+	"transferOverhead": 82491,
+	"maxLiquidityCap": "1000000000000",
+	"maxWalletLiquidityCap": 0,
+	"rewardTokenAddress": "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+	"rewardRatePerSecond": "3900000000000",
+	"excessStateTransferFeePer": "4500000"
+}
+
+
+
+
+// matic - polygon
+{
+	"svgHelperAddress": "",
+	"fromChainId": 137,
+	"tokenAddress": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+	"minCap": "10000000000000000000",
+	"maxCap": "58160000000000000000000",
+	"equilibriumFee": "7500000",
+	"maxFee": "50000000",
+	"transferOverhead": 0,
+	"maxLiquidityCap": "1000000000000000000000000",
+	"maxWalletLiquidityCap": 0,
+	"rewardTokenAddress": "0x91c89A94567980f0e9723b487b0beD586eE96aa7",
+	"rewardRatePerSecond": "0",
+	"excessStateTransferFeePer": "4500000"
+}
+
+
+// matic - ethereum
+{
+	"svgHelperAddress": "",
+	"fromChainId": 1,
+	"tokenAddress": "0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0",
+	"minCap": "100000000000000000000",
+	"maxCap": "58160000000000000000000",
+	"equilibriumFee": "7500000",
+	"maxFee": "50000000",
+	"transferOverhead": 0,
+	"maxLiquidityCap": "1000000000000000000000000",
+	"maxWalletLiquidityCap": 0,
+	"rewardTokenAddress": "0xf17e65822b568b3903685a7c9f496cf7656cc6c2",
+	"rewardRatePerSecond": "0",
+	"excessStateTransferFeePer": "4500000"
+}]
