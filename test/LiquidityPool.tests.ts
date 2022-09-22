@@ -39,7 +39,7 @@ describe("LiquidityPoolTests", function () {
   let liquidityProviders: LiquidityProvidersTest;
   let tokenManager: TokenManager;
   let mockAdaptor: MockAdaptor;
-  let ccmpGatewayMock: CCMPGatewayMock;
+  let ccmpMock: CCMPGatewayMock;
 
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   let equilibriumFee = 10000000;
@@ -252,8 +252,8 @@ describe("LiquidityPoolTests", function () {
 
     await liquidityProviders.setWhiteListPeriodManager(wlpm.address);
 
-    ccmpGatewayMock = (await (await ethers.getContractFactory("CCMPGatewayMock")).deploy()) as CCMPGatewayMock;
-    await liquidityPool.setCCMPGateway(ccmpGatewayMock.address);
+    ccmpMock = (await (await ethers.getContractFactory("CCMPGatewayMock")).deploy()) as CCMPGatewayMock;
+    await liquidityPool.setCCMPExecutor(ccmpMock.address);
 
     for (const signer of [owner, bob, charlie]) {
       await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
@@ -1319,8 +1319,8 @@ describe("LiquidityPoolTests", function () {
         )
       ).to.changeTokenBalances(token, [liquidityPool, owner], [amount, amount.mul(-1)]);
 
-      const lastCallArgs = await ccmpGatewayMock.lastCallArgs();
-      const lastCallPayload = await ccmpGatewayMock.lastCallPayload();
+      const lastCallArgs = await ccmpMock.lastCallArgs();
+      const lastCallPayload = await ccmpMock.lastCallPayload();
 
       expect(lastCallArgs.destinationChainId).to.equal(destinationChainId);
       expect(lastCallArgs.adaptorName).to.equal(adaptorName);
@@ -1372,8 +1372,8 @@ describe("LiquidityPoolTests", function () {
         )
       ).to.changeEtherBalances([liquidityPool, owner], [amount, amount.mul(-1)]);
 
-      const lastCallArgs = await ccmpGatewayMock.lastCallArgs();
-      const lastCallPayload = await ccmpGatewayMock.lastCallPayload();
+      const lastCallArgs = await ccmpMock.lastCallArgs();
+      const lastCallPayload = await ccmpMock.lastCallPayload();
 
       expect(lastCallArgs.destinationChainId).to.equal(destinationChainId);
       expect(lastCallArgs.adaptorName).to.equal(adaptorName);
@@ -1438,8 +1438,8 @@ describe("LiquidityPoolTests", function () {
         )
       ).to.changeEtherBalances([liquidityPool, owner], [amount, amount.mul(-1)]);
 
-      const lastCallArgs = await ccmpGatewayMock.lastCallArgs();
-      const lastCallPayload = await ccmpGatewayMock.lastCallPayload();
+      const lastCallArgs = await ccmpMock.lastCallArgs();
+      const lastCallPayload = await ccmpMock.lastCallPayload();
 
       expect(lastCallArgs.destinationChainId).to.equal(destinationChainId);
       expect(lastCallArgs.adaptorName).to.equal(adaptorName);
@@ -1540,7 +1540,7 @@ describe("LiquidityPoolTests", function () {
       await liquidityPool.setTokenSymbol(token.address, tokenSymbol, fromChainId);
 
       await expect(() =>
-        ccmpGatewayMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
+        ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
       ).to.changeTokenBalances(token, [liquidityPool, charlie], [transferredAmount.mul(-1), transferredAmount]);
     });
 
@@ -1561,7 +1561,7 @@ describe("LiquidityPoolTests", function () {
       await liquidityPool.setTokenSymbol(token.address, tokenSymbol, fromChainId);
 
       await expect(
-        ccmpGatewayMock.callContract(liquidityPool.address, calldata, fromChainId, owner.address)
+        ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, owner.address)
       ).to.be.revertedWith("24");
     });
 
@@ -1580,7 +1580,7 @@ describe("LiquidityPoolTests", function () {
       await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
 
       await expect(
-        ccmpGatewayMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
+        ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
       ).to.be.revertedWith("25");
     });
   });

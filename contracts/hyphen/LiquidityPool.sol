@@ -109,7 +109,7 @@ contract LiquidityPool is
     mapping(string => address) public swapAdaptorMap;
 
     // CCMP Integration
-    address public _ccmpGateway;
+    address public _ccmpExecutor;
     // Token Address => chainId => Symbol
     mapping(address => mapping(uint256 => uint256)) public tokenAddressToSymbol;
     // Symbol => chainId => Token Address
@@ -221,8 +221,8 @@ contract LiquidityPool is
         liquidityProviders = ILiquidityProviders(_liquidityProviders);
     }
 
-    function setCCMPGateway(address _newCCMPGateway) external onlyOwner {
-        _ccmpGateway = _newCCMPGateway;
+    function setCCMPExecutor(address _newCCMPExecutor) external onlyOwner {
+        _ccmpExecutor = _newCCMPExecutor;
     }
 
     function setTokenSymbol(
@@ -344,7 +344,7 @@ contract LiquidityPool is
             }
         }
 
-        ICCMPGateway(_ccmpGateway).sendMessage(toChainId, adaptorName, updatedPayloads, gasFeePaymentArgs, routerArgs);
+        ICCMPGateway(_ccmpExecutor).sendMessage(toChainId, adaptorName, updatedPayloads, gasFeePaymentArgs, routerArgs);
     }
 
     /**
@@ -847,7 +847,7 @@ contract LiquidityPool is
     }
 
     function _ccmpMsgOrigin() internal view returns (address sourceChainSender, uint256 sourceChainId) {
-        require(msg.sender == _ccmpGateway, "46");
+        require(msg.sender == _ccmpExecutor, "46");
 
         /*
          * Calldata Map:
