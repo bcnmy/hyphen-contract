@@ -254,6 +254,7 @@ describe("LiquidityPoolTests", function () {
 
     ccmpMock = (await (await ethers.getContractFactory("CCMPGatewayMock")).deploy()) as CCMPGatewayMock;
     await liquidityPool.setCCMPExecutor(ccmpMock.address);
+    await liquidityPool.setCCMPGateway(ccmpMock.address);
 
     for (const signer of [owner, bob, charlie]) {
       await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));

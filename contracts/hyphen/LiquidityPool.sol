@@ -116,6 +116,8 @@ contract LiquidityPool is
     mapping(uint256 => mapping(uint256 => address)) public symbolToTokenAddress;
     // Chain Id => Liquidity Pool Address
     mapping(uint256 => address) public chainIdToLiquidityPoolAddress;
+    // CCMP Gateway Address
+    address public _ccmpGateway;
 
     event AssetSent(
         address indexed asset,
@@ -223,6 +225,10 @@ contract LiquidityPool is
 
     function setCCMPExecutor(address _newCCMPExecutor) external onlyOwner {
         _ccmpExecutor = _newCCMPExecutor;
+    }
+
+    function setCCMPGateway(address _newCCMPGateway) external onlyOwner {
+        _ccmpGateway = _newCCMPGateway;
     }
 
     function setTokenSymbol(
@@ -337,6 +343,7 @@ contract LiquidityPool is
             )
         });
         uint256 length = updatedPayloads.length;
+        // TODO: Check gas usage
         for (uint256 i = 1; i < length; ) {
             updatedPayloads[i] = payloads[i - 1];
             unchecked {
@@ -344,7 +351,7 @@ contract LiquidityPool is
             }
         }
 
-        ICCMPGateway(_ccmpExecutor).sendMessage(toChainId, adaptorName, updatedPayloads, gasFeePaymentArgs, routerArgs);
+        ICCMPGateway(_ccmpGateway).sendMessage(toChainId, adaptorName, updatedPayloads, gasFeePaymentArgs, routerArgs);
     }
 
     /**
@@ -525,7 +532,6 @@ contract LiquidityPool is
         address payable receiver
     ) external whenNotPaused {
         // CCMP Verification
-
         (address senderContract, uint256 sourceChainId) = _ccmpMsgOrigin();
         require(senderContract == chainIdToLiquidityPoolAddress[sourceChainId], "24");
 
@@ -551,6 +557,7 @@ contract LiquidityPool is
         liquidityProviders.decreaseCurrentLiquidity(tokenAddress, amountToTransfer);
         _releaseFunds(tokenAddress, receiver, amountToTransfer);
 
+        // TODO: Delete duplicate event
         emit AssetSentFromCCMP(
             tokenAddress,
             tokenSymbol,
