@@ -59,8 +59,11 @@ describe("Upgradibility", function () {
   before(async function () {
     [owner, pauser, charlie, bob, tf, executor] = await ethers.getSigners();
 
-    const tokenManagerFactory = await ethers.getContractFactory("TokenManagerOld");
-    tokenManager = (await tokenManagerFactory.deploy(trustedForwarder)) as TokenManager;
+    const tokenManagerFactory = await ethers.getContractFactory("TokenManager");
+    tokenManager = (await upgrades.deployProxy(tokenManagerFactory, [
+      trustedForwarder,
+      pauser.address,
+    ])) as TokenManager;
 
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
     executorManager = await executorManagerFactory.deploy();
@@ -186,8 +189,6 @@ describe("Upgradibility", function () {
   }
 
   it("Should be able to upgrade contracts", async function () {
-    const oldTokenManager = tokenManager.address;
-
     const feeLibFactory = await ethers.getContractFactory("Fee");
     const Fee = await feeLibFactory.deploy();
     await Fee.deployed();
@@ -211,15 +212,7 @@ describe("Upgradibility", function () {
     (
       await upgrades.upgradeProxy(farmingContract.address, await ethers.getContractFactory("HyphenLiquidityFarming"))
     ).deployed();
-    tokenManager = (await upgrades.deployProxy(await ethers.getContractFactory("TokenManager"), [
-      tf.address,
-      pauser.address,
-    ])) as TokenManager;
-    await tokenManager.deployed();
 
-    expect(tokenManager.address).to.not.equal(oldTokenManager);
-
-    await liquidityPool.setTokenManager(tokenManager.address);
     await liquidityProviders.setTokenManager(tokenManager.address);
     await wlpm.setTokenManager(tokenManager.address);
 

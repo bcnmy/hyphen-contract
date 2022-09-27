@@ -344,8 +344,18 @@ describe("LiquidityPoolTests", function () {
       );
   }
 
-  function getSendFundsToUserFromCCMPCalldata(tokenSymbol: number, amount: string, receiver: string) {
-    return liquidityPool.interface.encodeFunctionData("sendFundsToUserFromCCMP", [tokenSymbol, amount, receiver]);
+  function getSendFundsToUserFromCCMPCalldata(
+    tokenSymbol: number,
+    amount: string,
+    tokenDecimals: number,
+    receiver: string
+  ) {
+    return liquidityPool.interface.encodeFunctionData("sendFundsToUserFromCCMP", [
+      tokenSymbol,
+      amount,
+      tokenDecimals,
+      receiver,
+    ]);
   }
 
   async function swapAndsendFundsToUser(
@@ -392,19 +402,6 @@ describe("LiquidityPoolTests", function () {
 
   it("Check if Pool is initialized properly", async () => {
     await checkStorage();
-  });
-
-  describe("Trusted Forwarder Changes", async () => {
-    it("Should change trustedForwarder successfully", async () => {
-      let newTrustedForwarder = "0xa6389C06cD27bB7Fb87B15F33BC8702494B43e05";
-      await liquidityPool.setTrustedForwarder(newTrustedForwarder);
-      expect(await liquidityPool.isTrustedForwarder(newTrustedForwarder)).to.equals(true);
-    });
-
-    it("Should fail when changing trustedForwarder from non-admin account", async () => {
-      let newTrustedForwarder = "0xa6389C06cD27bB7Fb87B15F33BC8702494B43e05";
-      expect(liquidityPool.connect(bob).setTrustedForwarder(newTrustedForwarder)).to.be.reverted;
-    });
   });
 
   it("Should addSupportedToken successfully", async () => {
@@ -986,21 +983,6 @@ describe("LiquidityPoolTests", function () {
     );
   });
 
-  it("Should revert on re-entrant calls to transfer", async function () {
-    const maliciousContract = await (
-      await ethers.getContractFactory("LiquidityProvidersMaliciousReentrant")
-    ).deploy(liquidityPool.address);
-    await addNativeLiquidity(ethers.BigNumber.from(10).pow(20).toString(), owner);
-    await liquidityPool.setLiquidityProviders(maliciousContract.address);
-
-    await expect(
-      owner.sendTransaction({
-        to: maliciousContract.address,
-        value: 1,
-      })
-    ).to.be.reverted;
-  });
-
   describe("Transfer Fee", async function () {
     it("Should calculate fee properly", async function () {
       const providedLiquidity = ethers.BigNumber.from(minTokenCap).mul(10);
@@ -1265,8 +1247,8 @@ describe("LiquidityPoolTests", function () {
     const getCCMPArgs = (adaptorName: string, routerArgs: string) =>
       abiCoder.encode(["string", "bytes"], [adaptorName, routerArgs]);
 
-    const getExitCalldata = (tokenSymbol: number, amount: BigNumberish, receiver: string) =>
-      liquidityPool.interface.encodeFunctionData("sendFundsToUserFromCCMP", [tokenSymbol, amount, receiver]);
+    const getExitCalldata = (tokenSymbol: number, amount: BigNumberish, decimals: number, receiver: string) =>
+      liquidityPool.interface.encodeFunctionData("sendFundsToUserFromCCMP", [tokenSymbol, amount, decimals, receiver]);
 
     const compareLastCallPayloads = (a: CCMPMessagePayload[], b: CCMPMessagePayload[]): boolean => {
       if (a.length !== b.length) {
@@ -1328,7 +1310,7 @@ describe("LiquidityPoolTests", function () {
         compareLastCallPayloads(lastCallPayload, [
           {
             to: liquidityPool.address,
-            _calldata: getExitCalldata(tokenSymbol, amount, charlie.address),
+            _calldata: getExitCalldata(tokenSymbol, amount, 18, charlie.address),
           },
           ...payloads,
         ])
@@ -1381,7 +1363,7 @@ describe("LiquidityPoolTests", function () {
         compareLastCallPayloads(lastCallPayload, [
           {
             to: liquidityPool.address,
-            _calldata: getExitCalldata(tokenSymbol, amount, charlie.address),
+            _calldata: getExitCalldata(tokenSymbol, amount, 18, charlie.address),
           },
           ...payloads,
         ])
@@ -1447,7 +1429,7 @@ describe("LiquidityPoolTests", function () {
         compareLastCallPayloads(lastCallPayload, [
           {
             to: liquidityPool.address,
-            _calldata: getExitCalldata(tokenSymbol, amount, charlie.address),
+            _calldata: getExitCalldata(tokenSymbol, amount, 18, charlie.address),
           },
           ...payloads,
         ])
@@ -1502,7 +1484,7 @@ describe("LiquidityPoolTests", function () {
         compareLastCallPayloads(lastCallPayload, [
           {
             to: liquidityPool.address,
-            _calldata: getExitCalldata(tokenSymbol, amount, charlie.address),
+            _calldata: getExitCalldata(tokenSymbol, amount, 18, charlie.address),
           },
           ...payloads,
         ])
@@ -1558,7 +1540,7 @@ describe("LiquidityPoolTests", function () {
         compareLastCallPayloads(lastCallPayload, [
           {
             to: liquidityPool.address,
-            _calldata: getExitCalldata(tokenSymbol, amount, charlie.address),
+            _calldata: getExitCalldata(tokenSymbol, amount, 18, charlie.address),
           },
           ...payloads,
         ])
@@ -1638,7 +1620,7 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const fromChainId = BigNumber.from(2).pow(255).sub(1);
       const tokenSymbol = 1;
-      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, charlie.address);
+      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address);
 
       const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
       const transferFee = amount.mul(transferFeePer).div(baseDivisor);
@@ -1659,7 +1641,7 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const fromChainId = BigNumber.from(2).pow(255).sub(1);
       const tokenSymbol = 1;
-      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, charlie.address);
+      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address);
 
       const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
       const transferFee = amount.mul(transferFeePer).div(baseDivisor);
@@ -1680,7 +1662,7 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const fromChainId = BigNumber.from(2).pow(255).sub(1);
       const tokenSymbol = 1;
-      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, charlie.address);
+      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address);
 
       const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
       const transferFee = amount.mul(transferFeePer).div(baseDivisor);

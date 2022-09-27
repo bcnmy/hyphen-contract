@@ -19,7 +19,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "./lib/Fee.sol";
 import "./metatx/ERC2771ContextUpgradeable.sol";
 import "../security/Pausable.sol";
@@ -30,6 +29,7 @@ import "../interfaces/IERC20Permit.sol";
 import "./interfaces/ITokenManager.sol";
 import "./interfaces/ISwapAdaptor.sol";
 import "./interfaces/ICCMPGateway.sol";
+import "./interfaces/IERC20WithDecimals.sol";
 
 /**
  * Error Codes:
@@ -80,6 +80,7 @@ import "./interfaces/ICCMPGateway.sol";
  * 45: ERR__INSUFFICIENT_BALANCE
  * 46: InvalidOrigin
  * 47: Token Mismatch
+ * 48: Invalid Decimals
  */
 
 contract LiquidityPool is
@@ -205,15 +206,6 @@ contract LiquidityPool is
         swapAdaptorMap[name] = _swapAdaptor;
     }
 
-    function setTrustedForwarder(address trustedForwarder) external onlyOwner {
-        _setTrustedForwarder(trustedForwarder);
-    }
-
-    function setLiquidityProviders(address _liquidityProviders) external onlyOwner {
-        require(_liquidityProviders != address(0), "7");
-        liquidityProviders = ILiquidityProviders(_liquidityProviders);
-    }
-
     function setCCMPContracts(address _newCCMPExecutor, address _newCCMPGateway) external onlyOwner {
         _ccmpExecutor = _newCCMPExecutor;
         _ccmpGateway = _newCCMPGateway;
@@ -230,11 +222,6 @@ contract LiquidityPool is
 
     function setLiquidityPoolAddress(uint256 chainId, address liquidityPoolAddress) external onlyOwner {
         chainIdToLiquidityPoolAddress[chainId] = liquidityPoolAddress;
-    }
-
-    function setTokenManager(address _tokenManager) external onlyOwner {
-        require(_tokenManager != address(0), "8");
-        tokenManager = ITokenManager(_tokenManager);
     }
 
     function setExecutorManager(address _executorManagerAddress) external onlyOwner {
@@ -299,10 +286,16 @@ contract LiquidityPool is
         }
 
         {
-            uint256 tokenSymbol = tokenAddressToSymbol[tokenAddress][block.chainid];
-            require(tokenSymbol != 0, "11");
             require(gasFeePaymentArgs.feeTokenAddress == tokenAddress, "47");
-            _invokeCCMP(toChainId, tokenSymbol, amount + rewardAmount, receiver, payloads, gasFeePaymentArgs, ccmpArgs);
+            _invokeCCMP(
+                toChainId,
+                tokenAddress,
+                amount + rewardAmount,
+                receiver,
+                payloads,
+                gasFeePaymentArgs,
+                ccmpArgs
+            );
         }
 
         emit DepositAndCall(_msgSender(), tokenAddress, receiver, amount + rewardAmount, rewardAmount, tag);
@@ -310,29 +303,29 @@ contract LiquidityPool is
 
     function _invokeCCMP(
         uint256 toChainId,
-        uint256 tokenSymbol,
+        address tokenAddress,
         uint256 transferredAmount,
         address receiver,
         ICCMPGateway.CCMPMessagePayload[] calldata payloads,
         ICCMPGateway.GasFeePaymentArgs calldata gasFeePaymentArgs,
         bytes calldata ccmpArgs
     ) internal {
-        (string memory adaptorName, bytes memory routerArgs) = abi.decode(ccmpArgs, (string, bytes));
         ICCMPGateway.CCMPMessagePayload[] memory updatedPayloads = new ICCMPGateway.CCMPMessagePayload[](
             payloads.length + 1
         );
 
         {
-            // Send Message to CCMP Gateway
-            address toChainLiquidityPool = chainIdToLiquidityPoolAddress[toChainId];
-            require(toChainLiquidityPool != address(0), "12");
+            require(tokenAddressToSymbol[tokenAddress][block.chainid] != 0, "11");
+            require(chainIdToLiquidityPoolAddress[toChainId] != address(0), "12");
+            require(_getTokenDecimals(tokenAddress) != 0, "48");
 
             updatedPayloads[0] = ICCMPGateway.CCMPMessagePayload({
-                to: toChainLiquidityPool,
+                to: chainIdToLiquidityPoolAddress[toChainId],
                 _calldata: abi.encodeWithSelector(
                     this.sendFundsToUserFromCCMP.selector,
-                    tokenSymbol,
+                    tokenAddressToSymbol[tokenAddress][block.chainid],
                     transferredAmount,
+                    _getTokenDecimals(tokenAddress),
                     receiver
                 )
             });
@@ -346,12 +339,19 @@ contract LiquidityPool is
             }
         }
 
+        // Decode adaptorName and router args from ccmpArgs
+        (string memory adaptorName, bytes memory routerArgs) = abi.decode(ccmpArgs, (string, bytes));
+
         // Send Fee with Call
         uint256 txValue = 0;
         if (gasFeePaymentArgs.feeTokenAddress == NATIVE) {
             txValue = gasFeePaymentArgs.feeAmount;
         } else {
-            IERC20Upgradeable(gasFeePaymentArgs.feeTokenAddress).approve(_ccmpGateway, gasFeePaymentArgs.feeAmount);
+            SafeERC20Upgradeable.safeApprove(
+                IERC20WithDecimals(gasFeePaymentArgs.feeTokenAddress),
+                _ccmpGateway,
+                gasFeePaymentArgs.feeAmount
+            );
         }
 
         ICCMPGateway(_ccmpGateway).sendMessage{value: txValue}(
@@ -428,7 +428,7 @@ contract LiquidityPool is
         }
         liquidityProviders.increaseCurrentLiquidity(tokenAddress, amount);
         SafeERC20Upgradeable.safeTransferFrom(
-            IERC20Upgradeable(tokenAddress),
+            IERC20WithDecimals(tokenAddress),
             sender,
             address(this),
             amount + extraFee
@@ -543,7 +543,8 @@ contract LiquidityPool is
 
     function sendFundsToUserFromCCMP(
         uint256 tokenSymbol,
-        uint256 amount,
+        uint256 sourceChainAmount,
+        uint256 sourceChainDecimals,
         address payable receiver
     ) external whenNotPaused {
         // CCMP Verification
@@ -553,6 +554,10 @@ contract LiquidityPool is
         // Get local token address
         address tokenAddress = symbolToTokenAddress[tokenSymbol][block.chainid];
         require(tokenAddress != address(0), "25");
+
+        uint256 tokenDecimals = _getTokenDecimals(tokenAddress);
+        require(tokenDecimals & sourceChainDecimals != 0, "48");
+        uint256 amount = (sourceChainAmount * (10**tokenDecimals)) / (10**sourceChainDecimals);
 
         _verifyExitParams(tokenAddress, amount, receiver);
 
@@ -573,6 +578,10 @@ contract LiquidityPool is
         _releaseFunds(tokenAddress, receiver, amountToTransfer);
 
         emit AssetSent(tokenAddress, amount, amountToTransfer, receiver, "", sourceChainId, lpFee, incentivePoolFee, 0);
+    }
+
+    function _getTokenDecimals(address _tokenAddress) private view returns (uint256) {
+        return _tokenAddress == NATIVE ? 18 : IERC20WithDecimals(_tokenAddress).decimals();
     }
 
     function sendFundsToUserV2(
@@ -616,7 +625,7 @@ contract LiquidityPool is
             (bool success, ) = receiver.call{value: amount}("");
             require(success, "30");
         } else {
-            SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), receiver, amount);
+            SafeERC20Upgradeable.safeTransfer(IERC20WithDecimals(tokenAddress), receiver, amount);
         }
     }
 
@@ -652,12 +661,12 @@ contract LiquidityPool is
             {
                 uint256 gasBeforeApproval = gasleft();
                 SafeERC20Upgradeable.safeApprove(
-                    IERC20Upgradeable(tokenAddress),
+                    IERC20WithDecimals(tokenAddress),
                     address(swapAdaptorMap[swapAdaptor]),
                     0
                 );
                 SafeERC20Upgradeable.safeApprove(
-                    IERC20Upgradeable(tokenAddress),
+                    IERC20WithDecimals(tokenAddress),
                     address(swapAdaptorMap[swapAdaptor]),
                     transferDetails[0]
                 );
@@ -801,7 +810,7 @@ contract LiquidityPool is
     function withdrawErc20GasFee(address tokenAddress) external onlyExecutor whenNotPaused nonReentrant {
         require(tokenAddress != NATIVE, "38");
         uint256 gasFeeAccumulatedByExecutor = _updateGasFeeAccumulated(tokenAddress, _msgSender());
-        SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), _msgSender(), gasFeeAccumulatedByExecutor);
+        SafeERC20Upgradeable.safeTransfer(IERC20WithDecimals(tokenAddress), _msgSender(), gasFeeAccumulatedByExecutor);
     }
 
     function withdrawNativeGasFee() external onlyExecutor whenNotPaused nonReentrant {
@@ -832,7 +841,7 @@ contract LiquidityPool is
             (bool success, ) = receiver.call{value: _tokenAmount}("");
             require(success, "44");
         } else {
-            IERC20Upgradeable baseToken = IERC20Upgradeable(_tokenAddress);
+            IERC20WithDecimals baseToken = IERC20WithDecimals(_tokenAddress);
             require(baseToken.balanceOf(address(this)) >= _tokenAmount, "45");
             SafeERC20Upgradeable.safeTransfer(baseToken, receiver, _tokenAmount);
         }
