@@ -1,4 +1,4 @@
-import { expect, use } from "chai";
+import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import {
   ERC20Token,
@@ -47,6 +47,8 @@ describe("LiquidityPoolTests", function () {
   let maxFee = 200000000;
   let tokenAddress: string;
   let tag: string = "HyphenUI";
+
+  const abiCoder = new ethers.utils.AbiCoder();
 
   const NATIVE_WRAP_ADDRESS = "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
@@ -346,15 +348,21 @@ describe("LiquidityPoolTests", function () {
 
   function getSendFundsToUserFromCCMPCalldata(
     tokenSymbol: number,
-    amount: string,
+    sourceChainAmount: BigNumberish,
     tokenDecimals: number,
-    receiver: string
+    receiver: string,
+    gasFeePaidInTokenAmount: BigNumberish,
+    minAmount: BigNumberish
   ) {
     return liquidityPool.interface.encodeFunctionData("sendFundsToUserFromCCMP", [
-      tokenSymbol,
-      amount,
-      tokenDecimals,
-      receiver,
+      {
+        tokenSymbol,
+        sourceChainAmount,
+        sourceChainDecimals: tokenDecimals,
+        receiver,
+        gasFeePaidInTokenAmount,
+        hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+      },
     ]);
   }
 
@@ -1233,7 +1241,6 @@ describe("LiquidityPoolTests", function () {
   });
 
   describe("CCMP", async function () {
-    const abiCoder = new ethers.utils.AbiCoder();
     const emptyBytes = abiCoder.encode(["string"], ["0x"]);
     let chainId: number;
 
@@ -1246,9 +1253,6 @@ describe("LiquidityPoolTests", function () {
 
     const getCCMPArgs = (adaptorName: string, routerArgs: string) =>
       abiCoder.encode(["string", "bytes"], [adaptorName, routerArgs]);
-
-    const getExitCalldata = (tokenSymbol: number, amount: BigNumberish, decimals: number, receiver: string) =>
-      liquidityPool.interface.encodeFunctionData("sendFundsToUserFromCCMP", [tokenSymbol, amount, decimals, receiver]);
 
     const compareLastCallPayloads = (a: CCMPMessagePayload[], b: CCMPMessagePayload[]): boolean => {
       if (a.length !== b.length) {
@@ -1280,25 +1284,27 @@ describe("LiquidityPoolTests", function () {
       };
       const adaptorName = "wormhole";
       const routerArgs = emptyBytes;
-      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
       const destinationChainId = 1;
       const tokenSymbol = 1;
       const amount = BigNumber.from(minTokenCap);
+      const minAmount = 0;
 
-      await liquidityPool.setTokenSymbol(token.address, tokenSymbol, chainId);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
       await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
 
       await expect(() =>
-        liquidityPool.depositAndCall(
-          destinationChainId,
-          token.address,
-          charlie.address,
+        liquidityPool.depositAndCall({
+          toChainId: destinationChainId,
+          tokenAddress: token.address,
+          receiver: charlie.address,
           amount,
-          "test",
+          tag: "test",
           payloads,
           gasFeePaymentArgs,
-          ccmpArgs
-        )
+          adaptorName,
+          routerArgs,
+          hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+        })
       ).to.changeTokenBalances(token, [liquidityPool, owner], [amount, amount.mul(-1)]);
 
       const lastCallArgs = await ccmpMock.lastCallArgs();
@@ -1310,7 +1316,14 @@ describe("LiquidityPoolTests", function () {
         compareLastCallPayloads(lastCallPayload, [
           {
             to: liquidityPool.address,
-            _calldata: getExitCalldata(tokenSymbol, amount, 18, charlie.address),
+            _calldata: getSendFundsToUserFromCCMPCalldata(
+              tokenSymbol,
+              amount,
+              18,
+              charlie.address,
+              gasFeePaymentArgs.feeAmount,
+              minAmount
+            ),
           },
           ...payloads,
         ])
@@ -1330,24 +1343,28 @@ describe("LiquidityPoolTests", function () {
       };
       const adaptorName = "wormhole";
       const routerArgs = emptyBytes;
-      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
       const destinationChainId = 1;
       const tokenSymbol = 1;
       const amount = ethers.BigNumber.from(minTokenCap);
+      const minAmount = 0;
 
-      await liquidityPool.setTokenSymbol(NATIVE, tokenSymbol, chainId);
+      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol, chainId);
       await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
 
       await expect(() =>
         liquidityPool.depositAndCall(
-          destinationChainId,
-          NATIVE,
-          charlie.address,
-          amount,
-          "test",
-          payloads,
-          gasFeePaymentArgs,
-          ccmpArgs,
+          {
+            toChainId: destinationChainId,
+            tokenAddress: NATIVE,
+            receiver: charlie.address,
+            amount,
+            tag: "test",
+            payloads,
+            gasFeePaymentArgs,
+            adaptorName,
+            routerArgs,
+            hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+          },
           {
             value: amount,
           }
@@ -1363,7 +1380,14 @@ describe("LiquidityPoolTests", function () {
         compareLastCallPayloads(lastCallPayload, [
           {
             to: liquidityPool.address,
-            _calldata: getExitCalldata(tokenSymbol, amount, 18, charlie.address),
+            _calldata: getSendFundsToUserFromCCMPCalldata(
+              tokenSymbol,
+              amount,
+              18,
+              charlie.address,
+              gasFeePaymentArgs.feeAmount,
+              minAmount
+            ),
           },
           ...payloads,
         ])
@@ -1396,24 +1420,28 @@ describe("LiquidityPoolTests", function () {
       };
       const adaptorName = "wormhole";
       const routerArgs = emptyBytes;
-      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
       const destinationChainId = 1;
       const tokenSymbol = 1;
       const amount = ethers.BigNumber.from(minTokenCap);
+      const minAmount = 0;
 
-      await liquidityPool.setTokenSymbol(NATIVE, tokenSymbol, chainId);
+      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol, chainId);
       await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
 
       await expect(() =>
         liquidityPool.depositAndCall(
-          destinationChainId,
-          NATIVE,
-          charlie.address,
-          amount,
-          "test",
-          payloads,
-          gasFeePaymentArgs,
-          ccmpArgs,
+          {
+            toChainId: destinationChainId,
+            tokenAddress: NATIVE,
+            receiver: charlie.address,
+            amount,
+            tag: "test",
+            payloads,
+            gasFeePaymentArgs,
+            adaptorName,
+            routerArgs,
+            hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+          },
           {
             value: amount,
           }
@@ -1429,7 +1457,14 @@ describe("LiquidityPoolTests", function () {
         compareLastCallPayloads(lastCallPayload, [
           {
             to: liquidityPool.address,
-            _calldata: getExitCalldata(tokenSymbol, amount, 18, charlie.address),
+            _calldata: getSendFundsToUserFromCCMPCalldata(
+              tokenSymbol,
+              amount,
+              18,
+              charlie.address,
+              gasFeePaymentArgs.feeAmount,
+              minAmount
+            ),
           },
           ...payloads,
         ])
@@ -1451,24 +1486,28 @@ describe("LiquidityPoolTests", function () {
       };
       const adaptorName = "wormhole";
       const routerArgs = emptyBytes;
-      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
       const destinationChainId = 1;
       const tokenSymbol = 1;
       const amount = ethers.BigNumber.from(minTokenCap);
+      const minAmount = 0;
 
-      await liquidityPool.setTokenSymbol(NATIVE, tokenSymbol, chainId);
+      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol, chainId);
       await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
 
       await expect(() =>
         liquidityPool.depositAndCall(
-          destinationChainId,
-          NATIVE,
-          charlie.address,
-          amount,
-          "test",
-          payloads,
-          gasFeePaymentArgs,
-          ccmpArgs,
+          {
+            toChainId: destinationChainId,
+            tokenAddress: NATIVE,
+            receiver: charlie.address,
+            amount,
+            tag: "test",
+            payloads,
+            gasFeePaymentArgs,
+            adaptorName,
+            routerArgs,
+            hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+          },
           {
             value: amount.add(feeAmount),
           }
@@ -1484,7 +1523,14 @@ describe("LiquidityPoolTests", function () {
         compareLastCallPayloads(lastCallPayload, [
           {
             to: liquidityPool.address,
-            _calldata: getExitCalldata(tokenSymbol, amount, 18, charlie.address),
+            _calldata: getSendFundsToUserFromCCMPCalldata(
+              tokenSymbol,
+              amount,
+              18,
+              charlie.address,
+              gasFeePaymentArgs.feeAmount,
+              minAmount
+            ),
           },
           ...payloads,
         ])
@@ -1506,25 +1552,27 @@ describe("LiquidityPoolTests", function () {
       };
       const adaptorName = "wormhole";
       const routerArgs = emptyBytes;
-      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
       const destinationChainId = 1;
       const tokenSymbol = 1;
       const amount = ethers.BigNumber.from(minTokenCap);
+      const minAmount = 0;
 
-      await liquidityPool.setTokenSymbol(token.address, tokenSymbol, chainId);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
       await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
 
       await expect(() =>
-        liquidityPool.depositAndCall(
-          destinationChainId,
-          token.address,
-          charlie.address,
+        liquidityPool.depositAndCall({
+          toChainId: destinationChainId,
+          tokenAddress: token.address,
+          receiver: charlie.address,
           amount,
-          "test",
+          tag: "test",
           payloads,
           gasFeePaymentArgs,
-          ccmpArgs
-        )
+          adaptorName,
+          routerArgs,
+          hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+        })
       ).to.changeTokenBalances(
         token,
         [liquidityPool, owner, relayer],
@@ -1540,7 +1588,14 @@ describe("LiquidityPoolTests", function () {
         compareLastCallPayloads(lastCallPayload, [
           {
             to: liquidityPool.address,
-            _calldata: getExitCalldata(tokenSymbol, amount, 18, charlie.address),
+            _calldata: getSendFundsToUserFromCCMPCalldata(
+              tokenSymbol,
+              amount,
+              18,
+              charlie.address,
+              gasFeePaymentArgs.feeAmount,
+              minAmount
+            ),
           },
           ...payloads,
         ])
@@ -1560,23 +1615,27 @@ describe("LiquidityPoolTests", function () {
       };
       const adaptorName = "wormhole";
       const routerArgs = emptyBytes;
-      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
       const destinationChainId = 1;
       const tokenSymbol = 1;
       const amount = ethers.BigNumber.from(minTokenCap);
+      const minAmount = 0;
 
       await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
 
       await expect(
         liquidityPool.depositAndCall(
-          destinationChainId,
-          NATIVE,
-          charlie.address,
-          amount,
-          "test",
-          payloads,
-          gasFeePaymentArgs,
-          ccmpArgs,
+          {
+            toChainId: destinationChainId,
+            tokenAddress: NATIVE,
+            receiver: charlie.address,
+            amount,
+            tag: "test",
+            payloads,
+            gasFeePaymentArgs,
+            adaptorName,
+            routerArgs,
+            hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+          },
           {
             value: amount,
           }
@@ -1593,22 +1652,27 @@ describe("LiquidityPoolTests", function () {
       };
       const adaptorName = "wormhole";
       const routerArgs = emptyBytes;
-      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
       const destinationChainId = 1;
       const tokenSymbol = 1;
       const amount = ethers.BigNumber.from(minTokenCap);
-      await liquidityPool.setTokenSymbol(NATIVE, tokenSymbol, chainId);
+      const minAmount = 0;
+
+      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol, chainId);
 
       await expect(
         liquidityPool.depositAndCall(
-          destinationChainId,
-          NATIVE,
-          charlie.address,
-          amount,
-          "test",
-          payloads,
-          gasFeePaymentArgs,
-          ccmpArgs,
+          {
+            toChainId: destinationChainId,
+            tokenAddress: NATIVE,
+            receiver: charlie.address,
+            amount,
+            tag: "test",
+            payloads,
+            gasFeePaymentArgs,
+            adaptorName,
+            routerArgs,
+            hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+          },
           {
             value: amount,
           }
@@ -1620,7 +1684,7 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const fromChainId = BigNumber.from(2).pow(255).sub(1);
       const tokenSymbol = 1;
-      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address);
+      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address, 0, 0);
 
       const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
       const transferFee = amount.mul(transferFeePer).div(baseDivisor);
@@ -1629,8 +1693,8 @@ describe("LiquidityPoolTests", function () {
       expect(transferredAmount).to.be.gt(0);
 
       await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
-      await liquidityPool.setTokenSymbol(token.address, tokenSymbol, chainId);
-      await liquidityPool.setTokenSymbol(token.address, tokenSymbol, fromChainId);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol, fromChainId);
 
       await expect(() =>
         ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
@@ -1638,20 +1702,13 @@ describe("LiquidityPoolTests", function () {
     });
 
     it("Should revert if origin contract is invalid", async function () {
-      const amount = ethers.BigNumber.from(minTokenCap);
       const fromChainId = BigNumber.from(2).pow(255).sub(1);
       const tokenSymbol = 1;
-      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address);
-
-      const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
-      const transferFee = amount.mul(transferFeePer).div(baseDivisor);
-      const transferredAmount = amount.sub(transferFee);
-
-      expect(transferredAmount).to.be.gt(0);
+      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address, 0, 0);
 
       await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
-      await liquidityPool.setTokenSymbol(token.address, tokenSymbol, chainId);
-      await liquidityPool.setTokenSymbol(token.address, tokenSymbol, fromChainId);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol, fromChainId);
 
       await expect(
         ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, owner.address)
@@ -1659,22 +1716,60 @@ describe("LiquidityPoolTests", function () {
     });
 
     it("Should revert if token symbol is not set", async function () {
-      const amount = ethers.BigNumber.from(minTokenCap);
       const fromChainId = BigNumber.from(2).pow(255).sub(1);
       const tokenSymbol = 1;
-      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address);
-
-      const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
-      const transferFee = amount.mul(transferFeePer).div(baseDivisor);
-      const transferredAmount = amount.sub(transferFee);
-
-      expect(transferredAmount).to.be.gt(0);
+      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address, 0, 0);
 
       await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
 
       await expect(
         ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
       ).to.be.revertedWith("25");
+    });
+
+    it("Should revert if transferred amount is less than min value", async function () {
+      const amount = ethers.BigNumber.from(minTokenCap);
+      const fromChainId = BigNumber.from(2).pow(255).sub(1);
+      const tokenSymbol = 1;
+      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, amount, 18, charlie.address, 0, amount.add(1));
+
+      await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol, fromChainId);
+
+      await expect(
+        ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
+      ).to.be.revertedWith("49");
+    });
+
+    it("Should process transaction with tf < minAmount if origin is receiver", async function () {
+      const amount = ethers.BigNumber.from(minTokenCap);
+      const fromChainId = BigNumber.from(2).pow(255).sub(1);
+      const tokenSymbol = 1;
+      const receiver = charlie;
+      const gasFeePaid = 10;
+      const calldata = getSendFundsToUserFromCCMPCalldata(
+        tokenSymbol,
+        amount,
+        18,
+        receiver.address,
+        gasFeePaid,
+        amount.add(1)
+      );
+
+      const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
+      const transferFee = amount.mul(transferFeePer).div(baseDivisor);
+      const transferredAmount = amount.sub(transferFee).add(gasFeePaid);
+
+      expect(transferredAmount).to.be.gt(0);
+
+      await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol, fromChainId);
+
+      await expect(() =>
+        ccmpMock.connect(receiver).callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
+      ).to.changeTokenBalances(token, [liquidityPool, receiver], [transferredAmount.mul(-1), transferredAmount]);
     });
   });
 });
