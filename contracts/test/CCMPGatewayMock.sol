@@ -2,8 +2,11 @@
 pragma solidity ^0.8.0;
 
 import "../hyphen/interfaces/ICCMPGateway.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract CCMPGatewayMock is ICCMPGateway {
+    address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
     struct sendMessageArgs {
         uint256 destinationChainId;
         string adaptorName;
@@ -25,6 +28,19 @@ contract CCMPGatewayMock is ICCMPGateway {
     ) external payable override returns (bool sent) {
         if (shouldRevert) {
             revert("Mocked revert");
+        }
+
+        if (_gasFeePaymentArgs.feeTokenAddress != NATIVE) {
+            IERC20(_gasFeePaymentArgs.feeTokenAddress).transferFrom(
+                msg.sender,
+                _gasFeePaymentArgs.relayer,
+                _gasFeePaymentArgs.feeAmount
+            );
+        } else {
+            (bool success, bytes memory returndata) = _gasFeePaymentArgs.relayer.call{
+                value: _gasFeePaymentArgs.feeAmount
+            }("");
+            require(success, string(returndata));
         }
 
         sent = true;

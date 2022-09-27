@@ -253,8 +253,7 @@ describe("LiquidityPoolTests", function () {
     await liquidityProviders.setWhiteListPeriodManager(wlpm.address);
 
     ccmpMock = (await (await ethers.getContractFactory("CCMPGatewayMock")).deploy()) as CCMPGatewayMock;
-    await liquidityPool.setCCMPExecutor(ccmpMock.address);
-    await liquidityPool.setCCMPGateway(ccmpMock.address);
+    await liquidityPool.setCCMPContracts(ccmpMock.address, ccmpMock.address);
 
     for (const signer of [owner, bob, charlie]) {
       await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
@@ -1343,7 +1342,7 @@ describe("LiquidityPoolTests", function () {
     it("Should be able to accept deposits in Native", async function () {
       const payloads: CCMPMessagePayload[] = [];
       const gasFeePaymentArgs: GasFeePaymentArgs = {
-        feeTokenAddress: token.address,
+        feeTokenAddress: NATIVE,
         feeAmount: 0,
         relayer: owner.address,
       };
@@ -1409,7 +1408,7 @@ describe("LiquidityPoolTests", function () {
         },
       ];
       const gasFeePaymentArgs: GasFeePaymentArgs = {
-        feeTokenAddress: token.address,
+        feeTokenAddress: NATIVE,
         feeAmount: 0,
         relayer: owner.address,
       };
@@ -1459,10 +1458,121 @@ describe("LiquidityPoolTests", function () {
       expect(lastCallArgs.routerArgs).to.equal(routerArgs);
     });
 
+    it("Should be able to pay Native fee while depositing", async function () {
+      const payloads: CCMPMessagePayload[] = [];
+      const feeAmount = 20;
+      const relayer = bob;
+      const gasFeePaymentArgs: GasFeePaymentArgs = {
+        feeTokenAddress: NATIVE,
+        feeAmount: feeAmount,
+        relayer: relayer.address,
+      };
+      const adaptorName = "wormhole";
+      const routerArgs = emptyBytes;
+      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
+      const destinationChainId = 1;
+      const tokenSymbol = 1;
+      const amount = ethers.BigNumber.from(minTokenCap);
+
+      await liquidityPool.setTokenSymbol(NATIVE, tokenSymbol, chainId);
+      await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
+
+      await expect(() =>
+        liquidityPool.depositAndCall(
+          destinationChainId,
+          NATIVE,
+          charlie.address,
+          amount,
+          "test",
+          payloads,
+          gasFeePaymentArgs,
+          ccmpArgs,
+          {
+            value: amount.add(feeAmount),
+          }
+        )
+      ).to.changeEtherBalances([liquidityPool, owner, relayer], [amount, amount.add(feeAmount).mul(-1), feeAmount]);
+
+      const lastCallArgs = await ccmpMock.lastCallArgs();
+      const lastCallPayload = await ccmpMock.lastCallPayload();
+
+      expect(lastCallArgs.destinationChainId).to.equal(destinationChainId);
+      expect(lastCallArgs.adaptorName).to.equal(adaptorName);
+      expect(
+        compareLastCallPayloads(lastCallPayload, [
+          {
+            to: liquidityPool.address,
+            _calldata: getExitCalldata(tokenSymbol, amount, charlie.address),
+          },
+          ...payloads,
+        ])
+      ).to.be.true;
+      expect(lastCallArgs.gasFeePaymentArgs.relayer).to.equal(gasFeePaymentArgs.relayer);
+      expect(lastCallArgs.gasFeePaymentArgs.feeAmount).to.equal(gasFeePaymentArgs.feeAmount);
+      expect(lastCallArgs.gasFeePaymentArgs.feeTokenAddress).to.equal(gasFeePaymentArgs.feeTokenAddress);
+      expect(lastCallArgs.routerArgs).to.equal(routerArgs);
+    });
+
+    it("Should be able to pay ERC20 fee while depositing", async function () {
+      const payloads: CCMPMessagePayload[] = [];
+      const feeAmount = 20;
+      const relayer = bob;
+      const gasFeePaymentArgs: GasFeePaymentArgs = {
+        feeTokenAddress: token.address,
+        feeAmount: feeAmount,
+        relayer: relayer.address,
+      };
+      const adaptorName = "wormhole";
+      const routerArgs = emptyBytes;
+      const ccmpArgs = getCCMPArgs(adaptorName, routerArgs);
+      const destinationChainId = 1;
+      const tokenSymbol = 1;
+      const amount = ethers.BigNumber.from(minTokenCap);
+
+      await liquidityPool.setTokenSymbol(token.address, tokenSymbol, chainId);
+      await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
+
+      await expect(() =>
+        liquidityPool.depositAndCall(
+          destinationChainId,
+          token.address,
+          charlie.address,
+          amount,
+          "test",
+          payloads,
+          gasFeePaymentArgs,
+          ccmpArgs
+        )
+      ).to.changeTokenBalances(
+        token,
+        [liquidityPool, owner, relayer],
+        [amount, amount.add(feeAmount).mul(-1), feeAmount]
+      );
+
+      const lastCallArgs = await ccmpMock.lastCallArgs();
+      const lastCallPayload = await ccmpMock.lastCallPayload();
+
+      expect(lastCallArgs.destinationChainId).to.equal(destinationChainId);
+      expect(lastCallArgs.adaptorName).to.equal(adaptorName);
+      expect(
+        compareLastCallPayloads(lastCallPayload, [
+          {
+            to: liquidityPool.address,
+            _calldata: getExitCalldata(tokenSymbol, amount, charlie.address),
+          },
+          ...payloads,
+        ])
+      ).to.be.true;
+      expect(lastCallArgs.gasFeePaymentArgs.relayer).to.equal(gasFeePaymentArgs.relayer);
+      expect(lastCallArgs.gasFeePaymentArgs.feeAmount).to.equal(gasFeePaymentArgs.feeAmount);
+      expect(lastCallArgs.gasFeePaymentArgs.feeTokenAddress).to.equal(gasFeePaymentArgs.feeTokenAddress);
+      expect(lastCallArgs.routerArgs).to.equal(routerArgs);
+    });
+
     it("Should revert if token symbol is not registered", async function () {
       const payloads: CCMPMessagePayload[] = [];
       const gasFeePaymentArgs: GasFeePaymentArgs = {
-        feeTokenAddress: token.address,
+        feeTokenAddress: NATIVE,
         feeAmount: 0,
         relayer: owner.address,
       };
@@ -1495,7 +1605,7 @@ describe("LiquidityPoolTests", function () {
     it("Should revert if destination chain liquidity pool not registered", async function () {
       const payloads: CCMPMessagePayload[] = [];
       const gasFeePaymentArgs: GasFeePaymentArgs = {
-        feeTokenAddress: token.address,
+        feeTokenAddress: NATIVE,
         feeAmount: 0,
         relayer: owner.address,
       };
