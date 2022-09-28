@@ -352,8 +352,14 @@ describe("LiquidityPoolTests", function () {
     tokenDecimals: number,
     receiver: string,
     gasFeePaidInTokenAmount: BigNumberish,
-    minAmount: BigNumberish
+    minAmount?: BigNumberish,
+    reclaimerEoa?: string
   ) {
+    const hyphenArgs = [];
+    if (minAmount != null && reclaimerEoa != null) {
+      hyphenArgs.push(abiCoder.encode(["uint256", "address"], [minAmount, reclaimerEoa]));
+    }
+
     return liquidityPool.interface.encodeFunctionData("sendFundsToUserFromCCMP", [
       {
         tokenSymbol,
@@ -361,7 +367,7 @@ describe("LiquidityPoolTests", function () {
         sourceChainDecimals: tokenDecimals,
         receiver,
         gasFeePaidInTokenAmount,
-        hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+        hyphenArgs,
       },
     ]);
   }
@@ -541,7 +547,6 @@ describe("LiquidityPoolTests", function () {
       let equilibriumLiquidity = await liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
       let currentBalance = await token.balanceOf(liquidityPool.address);
       let gasFeeAccumulated = await liquidityPool.gasFeeAccumulatedByToken(tokenAddress);
-      // TODO: Update this test case
       let lpFeeAccumulated = await liquidityProviders.getTotalLPFeeByToken(tokenAddress);
 
       let currentLiquidity = currentBalance.sub(gasFeeAccumulated).sub(lpFeeAccumulated).sub(incentivePoolAmount);
@@ -672,7 +677,6 @@ describe("LiquidityPoolTests", function () {
 
       let gasFeeAccumulated = await liquidityPool.gasFeeAccumulatedByToken(NATIVE);
 
-      // TODO: Update this test case
       let lpFeeAccumulated = await liquidityProviders.getTotalLPFeeByToken(NATIVE);
 
       let currentLiquidity = currentBalance.sub(gasFeeAccumulated).sub(lpFeeAccumulated).sub(incentivePoolAmount);
@@ -1251,9 +1255,6 @@ describe("LiquidityPoolTests", function () {
       chainId = (await ethers.provider.getNetwork()).chainId;
     });
 
-    const getCCMPArgs = (adaptorName: string, routerArgs: string) =>
-      abiCoder.encode(["string", "bytes"], [adaptorName, routerArgs]);
-
     const compareLastCallPayloads = (a: CCMPMessagePayload[], b: CCMPMessagePayload[]): boolean => {
       if (a.length !== b.length) {
         console.log("lengths not equal");
@@ -1303,7 +1304,7 @@ describe("LiquidityPoolTests", function () {
           gasFeePaymentArgs,
           adaptorName,
           routerArgs,
-          hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+          hyphenArgs: [],
         })
       ).to.changeTokenBalances(token, [liquidityPool, owner], [amount, amount.mul(-1)]);
 
@@ -1321,8 +1322,7 @@ describe("LiquidityPoolTests", function () {
               amount,
               18,
               charlie.address,
-              gasFeePaymentArgs.feeAmount,
-              minAmount
+              gasFeePaymentArgs.feeAmount
             ),
           },
           ...payloads,
@@ -1346,6 +1346,7 @@ describe("LiquidityPoolTests", function () {
       const destinationChainId = 1;
       const tokenSymbol = 1;
       const amount = ethers.BigNumber.from(minTokenCap);
+      const reclaimer = charlie;
       const minAmount = 0;
 
       await tokenManager.setTokenSymbol(NATIVE, tokenSymbol, chainId);
@@ -1363,7 +1364,7 @@ describe("LiquidityPoolTests", function () {
             gasFeePaymentArgs,
             adaptorName,
             routerArgs,
-            hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+            hyphenArgs: [abiCoder.encode(["uint256", "address"], [minAmount, charlie.address])],
           },
           {
             value: amount,
@@ -1386,7 +1387,8 @@ describe("LiquidityPoolTests", function () {
               18,
               charlie.address,
               gasFeePaymentArgs.feeAmount,
-              minAmount
+              minAmount,
+              charlie.address
             ),
           },
           ...payloads,
@@ -1440,7 +1442,7 @@ describe("LiquidityPoolTests", function () {
             gasFeePaymentArgs,
             adaptorName,
             routerArgs,
-            hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+            hyphenArgs: [],
           },
           {
             value: amount,
@@ -1462,8 +1464,7 @@ describe("LiquidityPoolTests", function () {
               amount,
               18,
               charlie.address,
-              gasFeePaymentArgs.feeAmount,
-              minAmount
+              gasFeePaymentArgs.feeAmount
             ),
           },
           ...payloads,
@@ -1506,7 +1507,7 @@ describe("LiquidityPoolTests", function () {
             gasFeePaymentArgs,
             adaptorName,
             routerArgs,
-            hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+            hyphenArgs: [],
           },
           {
             value: amount.add(feeAmount),
@@ -1571,7 +1572,7 @@ describe("LiquidityPoolTests", function () {
           gasFeePaymentArgs,
           adaptorName,
           routerArgs,
-          hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+          hyphenArgs: [],
         })
       ).to.changeTokenBalances(
         token,
@@ -1593,8 +1594,7 @@ describe("LiquidityPoolTests", function () {
               amount,
               18,
               charlie.address,
-              gasFeePaymentArgs.feeAmount,
-              minAmount
+              gasFeePaymentArgs.feeAmount
             ),
           },
           ...payloads,
@@ -1634,7 +1634,7 @@ describe("LiquidityPoolTests", function () {
             gasFeePaymentArgs,
             adaptorName,
             routerArgs,
-            hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+            hyphenArgs: [],
           },
           {
             value: amount,
@@ -1671,7 +1671,7 @@ describe("LiquidityPoolTests", function () {
             gasFeePaymentArgs,
             adaptorName,
             routerArgs,
-            hyphenArgs: [abiCoder.encode(["uint256"], [minAmount])],
+            hyphenArgs: [],
           },
           {
             value: amount,
@@ -1684,7 +1684,7 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const fromChainId = BigNumber.from(2).pow(255).sub(1);
       const tokenSymbol = 1;
-      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address, 0, 0);
+      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address, 0);
 
       const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
       const transferFee = amount.mul(transferFeePer).div(baseDivisor);
@@ -1704,7 +1704,7 @@ describe("LiquidityPoolTests", function () {
     it("Should revert if origin contract is invalid", async function () {
       const fromChainId = BigNumber.from(2).pow(255).sub(1);
       const tokenSymbol = 1;
-      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address, 0, 0);
+      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address, 0);
 
       await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
       await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
@@ -1731,7 +1731,16 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const fromChainId = BigNumber.from(2).pow(255).sub(1);
       const tokenSymbol = 1;
-      const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, amount, 18, charlie.address, 0, amount.add(1));
+      const reclaimer = charlie;
+      const calldata = getSendFundsToUserFromCCMPCalldata(
+        tokenSymbol,
+        amount,
+        18,
+        charlie.address,
+        0,
+        amount.add(1),
+        reclaimer.address
+      );
 
       await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
       await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
@@ -1748,13 +1757,15 @@ describe("LiquidityPoolTests", function () {
       const tokenSymbol = 1;
       const receiver = charlie;
       const gasFeePaid = 10;
+      const reclaimer = charlie;
       const calldata = getSendFundsToUserFromCCMPCalldata(
         tokenSymbol,
         amount,
         18,
         receiver.address,
         gasFeePaid,
-        amount.add(1)
+        amount.add(1),
+        reclaimer.address
       );
 
       const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
@@ -1768,7 +1779,7 @@ describe("LiquidityPoolTests", function () {
       await tokenManager.setTokenSymbol(token.address, tokenSymbol, fromChainId);
 
       await expect(() =>
-        ccmpMock.connect(receiver).callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
+        ccmpMock.connect(reclaimer).callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
       ).to.changeTokenBalances(token, [liquidityPool, receiver], [transferredAmount.mul(-1), transferredAmount]);
     });
   });

@@ -577,15 +577,13 @@ contract LiquidityPool is
         }
 
         // Enforce that atleast minAmount (encoded in bytes as hyphenArgs[0]) is transferred to receiver
-        // This behaviour is overridable if they initiate the transaction themselves
-        if (args.hyphenArgs.length > 0 && tx.origin != args.receiver) {
+        // This behaviour is overridable if they initiate the transaction from the ReclaimerEOA
+        if (args.hyphenArgs.length > 0) {
+            (uint256 minAmount, address reclaimerEoa) = abi.decode(args.hyphenArgs[0], (uint256, address));
             require(
-                amountToTransfer >=
-                    _getDestinationChainTokenAmount(
-                        abi.decode(args.hyphenArgs[0], (uint256)),
-                        args.sourceChainDecimals,
-                        tokenDecimals
-                    ),
+                tx.origin == reclaimerEoa ||
+                    amountToTransfer >=
+                    _getDestinationChainTokenAmount(minAmount, args.sourceChainDecimals, tokenDecimals),
                 "49"
             );
         }
