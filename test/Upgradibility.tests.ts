@@ -9,6 +9,7 @@ import {
   WhitelistPeriodManager,
   TokenManager,
   HyphenLiquidityFarming,
+  LiquidityPool__factory,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
@@ -58,8 +59,11 @@ describe("Upgradibility", function () {
   before(async function () {
     [owner, pauser, charlie, bob, tf, executor] = await ethers.getSigners();
 
-    const tokenManagerFactory = await ethers.getContractFactory("TokenManagerOld");
-    tokenManager = (await tokenManagerFactory.deploy(trustedForwarder)) as TokenManager;
+    const tokenManagerFactory = await ethers.getContractFactory("TokenManager");
+    tokenManager = (await upgrades.deployProxy(tokenManagerFactory, [
+      trustedForwarder,
+      pauser.address,
+    ])) as TokenManager;
 
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
     executorManager = await executorManagerFactory.deploy();
@@ -185,24 +189,30 @@ describe("Upgradibility", function () {
   }
 
   it("Should be able to upgrade contracts", async function () {
-    const oldTokenManager = tokenManager.address;
+    const feeLibFactory = await ethers.getContractFactory("Fee");
+    const Fee = await feeLibFactory.deploy();
+    await Fee.deployed();
 
-    (await upgrades.upgradeProxy(liquidityPool.address, await ethers.getContractFactory("LiquidityPool"))).deployed();
+    const liquidtyPoolFactory = await ethers.getContractFactory("LiquidityPool", {
+      libraries: {
+        Fee: Fee.address,
+      },
+    });
+
+    (
+      await upgrades.upgradeProxy(liquidityPool.address, liquidtyPoolFactory, {
+        unsafeAllow: ["external-library-linking"],
+      })
+    ).deployed();
+    liquidityPool = LiquidityPool__factory.connect(liquidityPool.address, owner);
+
     (
       await upgrades.upgradeProxy(liquidityProviders.address, await ethers.getContractFactory("LiquidityProviders"))
     ).deployed();
     (
       await upgrades.upgradeProxy(farmingContract.address, await ethers.getContractFactory("HyphenLiquidityFarming"))
     ).deployed();
-    tokenManager = (await upgrades.deployProxy(await ethers.getContractFactory("TokenManager"), [
-      tf.address,
-      pauser.address,
-    ])) as TokenManager;
-    await tokenManager.deployed();
 
-    expect(tokenManager.address).to.not.equal(oldTokenManager);
-
-    await liquidityPool.setTokenManager(tokenManager.address);
     await liquidityProviders.setTokenManager(tokenManager.address);
     await wlpm.setTokenManager(tokenManager.address);
 
@@ -246,11 +256,13 @@ describe("Upgradibility", function () {
     const nativeBalance = await ethers.provider.getBalance(owner.address);
 
     await expect(
-      liquidityPool.connect(executor).sendFundsToUser(token.address, parseEther("1"), owner.address, depositHash1, 0, 1)
+      liquidityPool
+        .connect(executor)
+        .sendFundsToUserV2(token.address, parseEther("1"), owner.address, depositHash1, 0, 1, 0)
     ).to.not.be.reverted;
 
     await expect(
-      liquidityPool.connect(executor).sendFundsToUser(NATIVE, parseEther("1"), owner.address, depositHash2, 0, 1)
+      liquidityPool.connect(executor).sendFundsToUserV2(NATIVE, parseEther("1"), owner.address, depositHash2, 0, 1, 0)
     ).to.not.be.reverted;
 
     expect((await token.balanceOf(owner.address)).gte(tokenBalance)).to.be.true;
