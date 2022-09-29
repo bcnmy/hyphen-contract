@@ -31,7 +31,6 @@ type CCMPMessagePayload = {
 describe("LiquidityPoolTests", function () {
   let owner: SignerWithAddress, pauser: SignerWithAddress, bob: SignerWithAddress;
   let charlie: SignerWithAddress, tf: SignerWithAddress, executor: SignerWithAddress;
-  let proxyAdmin: SignerWithAddress;
   let executorManager: ExecutorManager;
   let token: ERC20Token, liquidityPool: LiquidityPool;
   let lpToken: LPToken;
@@ -149,7 +148,7 @@ describe("LiquidityPoolTests", function () {
   ];
 
   beforeEach(async function () {
-    [owner, pauser, charlie, bob, tf, proxyAdmin, executor] = await ethers.getSigners();
+    [owner, pauser, charlie, bob, tf, executor] = await ethers.getSigners();
 
     tokenManager = (await upgrades.deployProxy(await ethers.getContractFactory("TokenManager"), [
       tf.address,
@@ -366,7 +365,6 @@ describe("LiquidityPoolTests", function () {
         sourceChainAmount,
         sourceChainDecimals: tokenDecimals,
         receiver,
-        gasFeePaidInTokenAmount,
         hyphenArgs,
       },
     ]);
@@ -1290,8 +1288,8 @@ describe("LiquidityPoolTests", function () {
       const amount = BigNumber.from(minTokenCap);
       const minAmount = 0;
 
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
-      await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol);
+      await liquidityPool.setLiquidityPoolAddress([destinationChainId], [liquidityPool.address]);
 
       await expect(() =>
         liquidityPool.depositAndCall({
@@ -1349,8 +1347,8 @@ describe("LiquidityPoolTests", function () {
       const reclaimer = charlie;
       const minAmount = 0;
 
-      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol, chainId);
-      await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
+      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol);
+      await liquidityPool.setLiquidityPoolAddress([destinationChainId], [liquidityPool.address]);
 
       await expect(() =>
         liquidityPool.depositAndCall(
@@ -1427,8 +1425,8 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const minAmount = 0;
 
-      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol, chainId);
-      await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
+      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol);
+      await liquidityPool.setLiquidityPoolAddress([destinationChainId], [liquidityPool.address]);
 
       await expect(() =>
         liquidityPool.depositAndCall(
@@ -1492,8 +1490,8 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const minAmount = 0;
 
-      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol, chainId);
-      await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
+      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol);
+      await liquidityPool.setLiquidityPoolAddress([destinationChainId], [liquidityPool.address]);
 
       await expect(() =>
         liquidityPool.depositAndCall(
@@ -1558,8 +1556,8 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const minAmount = 0;
 
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
-      await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol);
+      await liquidityPool.setLiquidityPoolAddress([destinationChainId], [liquidityPool.address]);
 
       await expect(() =>
         liquidityPool.depositAndCall({
@@ -1620,7 +1618,7 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const minAmount = 0;
 
-      await liquidityPool.setLiquidityPoolAddress(destinationChainId, liquidityPool.address);
+      await liquidityPool.setLiquidityPoolAddress([destinationChainId], [liquidityPool.address]);
 
       await expect(
         liquidityPool.depositAndCall(
@@ -1657,7 +1655,7 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const minAmount = 0;
 
-      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol, chainId);
+      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol);
 
       await expect(
         liquidityPool.depositAndCall(
@@ -1692,9 +1690,8 @@ describe("LiquidityPoolTests", function () {
 
       expect(transferredAmount).to.be.gt(0);
 
-      await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol, fromChainId);
+      await liquidityPool.setLiquidityPoolAddress([fromChainId], [liquidityPool.address]);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol);
 
       await expect(() =>
         ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
@@ -1706,9 +1703,8 @@ describe("LiquidityPoolTests", function () {
       const tokenSymbol = 1;
       const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address, 0);
 
-      await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol, fromChainId);
+      await liquidityPool.setLiquidityPoolAddress([fromChainId], [liquidityPool.address]);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol);
 
       await expect(
         ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, owner.address)
@@ -1720,7 +1716,7 @@ describe("LiquidityPoolTests", function () {
       const tokenSymbol = 1;
       const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address, 0, 0);
 
-      await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
+      await liquidityPool.setLiquidityPoolAddress([fromChainId], [liquidityPool.address]);
 
       await expect(
         ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
@@ -1742,9 +1738,8 @@ describe("LiquidityPoolTests", function () {
         reclaimer.address
       );
 
-      await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol, fromChainId);
+      await liquidityPool.setLiquidityPoolAddress([fromChainId], [liquidityPool.address]);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol);
 
       await expect(
         ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
@@ -1770,13 +1765,12 @@ describe("LiquidityPoolTests", function () {
 
       const transferFeePer = await liquidityPool.getTransferFee(token.address, amount);
       const transferFee = amount.mul(transferFeePer).div(baseDivisor);
-      const transferredAmount = amount.sub(transferFee).add(gasFeePaid);
+      const transferredAmount = amount.sub(transferFee);
 
       expect(transferredAmount).to.be.gt(0);
 
-      await liquidityPool.setLiquidityPoolAddress(fromChainId, liquidityPool.address);
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol, chainId);
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol, fromChainId);
+      await liquidityPool.setLiquidityPoolAddress([fromChainId], [liquidityPool.address]);
+      await tokenManager.setTokenSymbol(token.address, tokenSymbol);
 
       await expect(() =>
         ccmpMock.connect(reclaimer).callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)

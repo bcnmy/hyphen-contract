@@ -35,7 +35,7 @@ interface ITokenManager {
 
     function changeExcessStateFee(address _tokenAddress, uint256 _excessStateFeePer) external;
 
-    function tokenAddressToSymbol(address tokenAddress, uint256 chainId) external view returns (uint256);
+    function tokenAddressToSymbol(address tokenAddress) external view returns (uint256);
 
-    function symbolToTokenAddress(uint256 symbol, uint256 chainId) external view returns (address);
+    function symbolToTokenAddress(uint256 symbol) external view returns (address);
 }

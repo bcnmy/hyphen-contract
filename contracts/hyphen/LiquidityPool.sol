@@ -79,9 +79,10 @@ import "./interfaces/IERC20WithDecimals.sol";
  * 44: ERR__NATIVE_TRANSFER_FAILED
  * 45: ERR__INSUFFICIENT_BALANCE
  * 46: InvalidOrigin
- * 47: Token Mismatch
+ * 47: Deposit token and Fee Payment Token should be same
  * 48: Invalid Decimals
  * 49: Transferred Amount Less than Min Amount
+ * 50: Parameter length mismatch
  */
 
 contract LiquidityPool is
@@ -91,6 +92,7 @@ contract LiquidityPool is
     OwnableUpgradeable,
     ERC2771ContextUpgradeable
 {
+    /* State */
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     uint256 private constant BASE_DIVISOR = 10000000000; // Basis Points * 100 for better accuracy
 
@@ -112,12 +114,34 @@ contract LiquidityPool is
     mapping(string => address) public swapAdaptorMap;
 
     // CCMP Gateway Address
-    address public _ccmpGateway;
+    address public ccmpGateway;
     // CCMP Integration
-    address public _ccmpExecutor;
+    address public ccmpExecutor;
     // Chain Id => Liquidity Pool Address
     mapping(uint256 => address) public chainIdToLiquidityPoolAddress;
 
+    /* Structures */
+    struct DepositAndCallArgs {
+        uint256 toChainId;
+        address tokenAddress; // Can be Native
+        address receiver;
+        uint256 amount;
+        string tag;
+        ICCMPGateway.CCMPMessagePayload[] payloads;
+        ICCMPGateway.GasFeePaymentArgs gasFeePaymentArgs;
+        string adaptorName;
+        bytes routerArgs;
+        bytes[] hyphenArgs;
+    }
+    struct SendFundsToUserFromCCMPArgs {
+        uint256 tokenSymbol;
+        uint256 sourceChainAmount;
+        uint256 sourceChainDecimals;
+        address payable receiver;
+        bytes[] hyphenArgs;
+    }
+
+    /* Events */
     event AssetSent(
         address indexed asset,
         uint256 indexed amount,
@@ -204,12 +228,21 @@ contract LiquidityPool is
     }
 
     function setCCMPContracts(address _newCCMPExecutor, address _newCCMPGateway) external onlyOwner {
-        _ccmpExecutor = _newCCMPExecutor;
-        _ccmpGateway = _newCCMPGateway;
+        ccmpExecutor = _newCCMPExecutor;
+        ccmpGateway = _newCCMPGateway;
     }
 
-    function setLiquidityPoolAddress(uint256 chainId, address liquidityPoolAddress) external onlyOwner {
-        chainIdToLiquidityPoolAddress[chainId] = liquidityPoolAddress;
+    function setLiquidityPoolAddress(uint256[] calldata chainId, address[] calldata liquidityPoolAddress)
+        external
+        onlyOwner
+    {
+        require(chainId.length == liquidityPoolAddress.length, "50");
+        unchecked {
+            uint256 length = chainId.length;
+            for (uint256 i = 0; i < length; ++i) {
+                chainIdToLiquidityPoolAddress[chainId[i]] = liquidityPoolAddress[i];
+            }
+        }
     }
 
     function setExecutorManager(address _executorManagerAddress) external onlyOwner {
@@ -225,6 +258,10 @@ contract LiquidityPool is
             liquidityProviders.totalLPFees(tokenAddress) -
             gasFeeAccumulatedByToken[tokenAddress] -
             incentivePool[tokenAddress];
+    }
+
+    function getExecutorManager() external view returns (address) {
+        return address(executorManager);
     }
 
     /**
@@ -246,19 +283,6 @@ contract LiquidityPool is
 
         // Emit (amount + reward amount) in event
         emit Deposit(sender, tokenAddress, receiver, toChainId, amount + rewardAmount, rewardAmount, tag);
-    }
-
-    struct DepositAndCallArgs {
-        uint256 toChainId;
-        address tokenAddress; // Can be Native
-        address receiver;
-        uint256 amount;
-        string tag;
-        ICCMPGateway.CCMPMessagePayload[] payloads;
-        ICCMPGateway.GasFeePaymentArgs gasFeePaymentArgs;
-        string adaptorName;
-        bytes routerArgs;
-        bytes[] hyphenArgs;
     }
 
     function depositAndCall(DepositAndCallArgs calldata args)
@@ -304,7 +328,7 @@ contract LiquidityPool is
         );
 
         {
-            require(tokenManager.tokenAddressToSymbol(args.tokenAddress, block.chainid) != 0, "11");
+            require(tokenManager.tokenAddressToSymbol(args.tokenAddress) != 0, "11");
             require(chainIdToLiquidityPoolAddress[args.toChainId] != address(0), "12");
             require(_getTokenDecimals(args.tokenAddress) != 0, "48");
 
@@ -314,11 +338,10 @@ contract LiquidityPool is
                 _calldata: abi.encodeWithSelector(
                     this.sendFundsToUserFromCCMP.selector,
                     SendFundsToUserFromCCMPArgs({
-                        tokenSymbol: tokenManager.tokenAddressToSymbol(args.tokenAddress, block.chainid),
+                        tokenSymbol: tokenManager.tokenAddressToSymbol(args.tokenAddress),
                         sourceChainAmount: transferredAmount,
                         sourceChainDecimals: _getTokenDecimals(args.tokenAddress),
                         receiver: payable(args.receiver),
-                        gasFeePaidInTokenAmount: args.gasFeePaymentArgs.feeAmount,
                         hyphenArgs: args.hyphenArgs
                     })
                 )
@@ -340,12 +363,12 @@ contract LiquidityPool is
         } else {
             SafeERC20Upgradeable.safeApprove(
                 IERC20WithDecimals(args.gasFeePaymentArgs.feeTokenAddress),
-                _ccmpGateway,
+                ccmpGateway,
                 args.gasFeePaymentArgs.feeAmount
             );
         }
 
-        ICCMPGateway(_ccmpGateway).sendMessage{value: txValue}(
+        ICCMPGateway(ccmpGateway).sendMessage{value: txValue}(
             args.toChainId,
             args.adaptorName,
             updatedPayloads,
@@ -534,22 +557,13 @@ contract LiquidityPool is
         liquidityProviders.addLPFee(_tokenAddress, lpFee);
     }
 
-    struct SendFundsToUserFromCCMPArgs {
-        uint256 tokenSymbol;
-        uint256 sourceChainAmount;
-        uint256 sourceChainDecimals;
-        address payable receiver;
-        uint256 gasFeePaidInTokenAmount;
-        bytes[] hyphenArgs;
-    }
-
     function sendFundsToUserFromCCMP(SendFundsToUserFromCCMPArgs calldata args) external whenNotPaused {
         // CCMP Verification
         (address senderContract, uint256 sourceChainId) = _ccmpMsgOrigin();
         require(senderContract == chainIdToLiquidityPoolAddress[sourceChainId], "24");
 
         // Get local token address
-        address tokenAddress = tokenManager.symbolToTokenAddress(args.tokenSymbol, block.chainid);
+        address tokenAddress = tokenManager.symbolToTokenAddress(args.tokenSymbol);
         require(tokenAddress != address(0), "25");
 
         // Calculate token amount on this chain
@@ -563,10 +577,7 @@ contract LiquidityPool is
 
         _verifyExitParams(tokenAddress, amount, args.receiver);
 
-        (uint256 lpFee, uint256 incentivePoolFee, uint256 transferFeeAmount) = _calculateAndUpdateFeeComponents(
-            tokenAddress,
-            amount
-        );
+        (uint256 lpFee, , uint256 transferFeeAmount) = _calculateAndUpdateFeeComponents(tokenAddress, amount);
 
         // Calculate final amount to transfer
         uint256 amountToTransfer;
@@ -587,15 +598,6 @@ contract LiquidityPool is
             );
         }
 
-        // Refund the gas fee if user is initiating the transaction
-        if (tx.origin == args.receiver) {
-            amountToTransfer += _getDestinationChainTokenAmount(
-                args.gasFeePaidInTokenAmount,
-                args.sourceChainDecimals,
-                tokenDecimals
-            );
-        }
-
         // Send funds to user
         liquidityProviders.decreaseCurrentLiquidity(tokenAddress, amountToTransfer);
         _releaseFunds(tokenAddress, args.receiver, amountToTransfer);
@@ -608,7 +610,7 @@ contract LiquidityPool is
             "",
             sourceChainId,
             lpFee,
-            incentivePoolFee,
+            transferFeeAmount,
             0
         );
     }
@@ -909,7 +911,7 @@ contract LiquidityPool is
     }
 
     function _ccmpMsgOrigin() internal view returns (address sourceChainSender, uint256 sourceChainId) {
-        require(msg.sender == _ccmpExecutor, "46");
+        require(msg.sender == ccmpExecutor, "46");
 
         /*
          * Calldata Map:

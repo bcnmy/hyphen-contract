@@ -25,9 +25,9 @@ contract TokenManager is ITokenManager, ERC2771ContextUpgradeable, OwnableUpgrad
     mapping(address => uint256) public override excessStateTransferFeePerc;
 
     // Token Address => chainId => Symbol
-    mapping(address => mapping(uint256 => uint256)) public override tokenAddressToSymbol;
+    mapping(address => uint256) public override tokenAddressToSymbol;
     // Symbol => chainId => Token Address
-    mapping(uint256 => mapping(uint256 => address)) public override symbolToTokenAddress;
+    mapping(uint256 => address) public override symbolToTokenAddress;
 
     event FeeChanged(address indexed tokenAddress, uint256 indexed equilibriumFee, uint256 indexed maxFee);
     event ExcessStateTransferFeePercChanged(address indexed tokenAddress, uint256 indexed fee);
@@ -177,13 +177,9 @@ contract TokenManager is ITokenManager, ERC2771ContextUpgradeable, OwnableUpgrad
         return transferConfig[tokenAddress];
     }
 
-    function setTokenSymbol(
-        address tokenAddress,
-        uint256 symbol,
-        uint256 chainId
-    ) external onlyOwner {
-        tokenAddressToSymbol[tokenAddress][chainId] = symbol;
-        symbolToTokenAddress[symbol][chainId] = tokenAddress;
+    function setTokenSymbol(address tokenAddress, uint256 symbol) external onlyOwner {
+        tokenAddressToSymbol[tokenAddress] = symbol;
+        symbolToTokenAddress[symbol] = tokenAddress;
     }
 
     function _msgSender()
