@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.0;
+
 interface IHyphenLiquidityFarmingV2 {
     function changePauser(address newPauser) external;
 

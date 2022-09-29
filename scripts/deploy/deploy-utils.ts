@@ -106,8 +106,16 @@ async function deployCoreContracts(trustedForwarder: string, pauser: string): Pr
   await liquidityProviders.deployed();
   console.log("LiquidityProviders Proxy deployed to:", liquidityProviders.address);
 
+  const feeLibFactory = await ethers.getContractFactory("Fee");
+  const Fee = await feeLibFactory.deploy();
+  await Fee.deployed();
+
   await wait(5000);
-  const LiquidityPool = await ethers.getContractFactory("LiquidityPool");
+  const LiquidityPool = await ethers.getContractFactory("LiquidityPool", {
+    libraries: {
+      Fee: Fee.address,
+    },
+  });
   console.log("Deploying LiquidityPool...");
   const liquidityPool = (await upgrades.deployProxy(LiquidityPool, [
     executorManager.address,
