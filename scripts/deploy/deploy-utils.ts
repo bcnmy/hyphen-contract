@@ -106,8 +106,16 @@ async function deployCoreContracts(trustedForwarder: string, pauser: string): Pr
   await liquidityProviders.deployed();
   console.log("LiquidityProviders Proxy deployed to:", liquidityProviders.address);
 
+  const feeLibFactory = await ethers.getContractFactory("Fee");
+  const Fee = await feeLibFactory.deploy();
+  await Fee.deployed();
+
   await wait(5000);
-  const LiquidityPool = await ethers.getContractFactory("LiquidityPool");
+  const LiquidityPool = await ethers.getContractFactory("LiquidityPool", {
+    libraries: {
+      Fee: Fee.address,
+    },
+  });
   console.log("Deploying LiquidityPool...");
   const liquidityPool = (await upgrades.deployProxy(LiquidityPool, [
     executorManager.address,
@@ -282,6 +290,18 @@ const getImplementationAddress = async (
   );
 };
 
+const getProxyAdmin = async (proxyAddress: string) => {
+  return ethers.utils.hexlify(
+    ethers.BigNumber.from(
+      await ethers.provider.send("eth_getStorageAt", [
+        proxyAddress,
+        "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103",
+        "latest",
+      ])
+    )
+  );
+};
+
 const verifyContract = async (address: string, constructorArguments: any[]) => {
   try {
     await run("verify:verify", {
@@ -299,7 +319,7 @@ const verifyImplementation = async (address: string) => {
       address: await getImplementationAddress(address),
     });
   } catch (e) {
-    console.log(`Failed to verify Contract ${address} `, e);
+    console.log(`Failed to verify Contract ${address} `);
   }
 };
 
@@ -363,6 +383,7 @@ export {
   verifyContract,
   verifyImplementation,
   deployToken,
+  getProxyAdmin,
   getImplementationAddress,
   getProviderMapByChain,
 };

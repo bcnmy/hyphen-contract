@@ -34,4 +34,8 @@ interface ITokenManager {
     function getTransferConfig(address tokenAddress) external view returns (TokenConfig memory);
 
     function changeExcessStateFee(address _tokenAddress, uint256 _excessStateFeePer) external;
+
+    function tokenAddressToSymbol(address tokenAddress) external view returns (uint256);
+
+    function symbolToTokenAddress(uint256 symbol) external view returns (address);
 }

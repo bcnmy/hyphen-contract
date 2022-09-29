@@ -109,14 +109,29 @@ describe("LiquidityFarmingTests", function () {
     );
     await wlpm.setAreWhiteListRestrictionsEnabled(true);
 
-    const lpFactory = await ethers.getContractFactory("LiquidityPool");
-    liquidityPool = (await upgrades.deployProxy(lpFactory, [
-      executorManager.address,
-      pauser.address,
-      tf.address,
-      tokenManager.address,
-      liquidityProviders.address,
-    ])) as LiquidityPool;
+    const feeLibFactory = await ethers.getContractFactory("Fee");
+    const Fee = await feeLibFactory.deploy();
+    await Fee.deployed();
+
+    const liquidtyPoolFactory = await ethers.getContractFactory("LiquidityPool", {
+      libraries: {
+        Fee: Fee.address,
+      },
+    });
+    liquidityPool = (await upgrades.deployProxy(
+      liquidtyPoolFactory,
+      [
+        executorManager.address,
+        await pauser.getAddress(),
+        trustedForwarder,
+        tokenManager.address,
+        liquidityProviders.address,
+      ],
+      {
+        unsafeAllow: ["external-library-linking"],
+      }
+    )) as LiquidityPool;
+
     await liquidityProviders.setLiquidityPool(liquidityPool.address);
 
     const farmingFactory = await ethers.getContractFactory("HyphenLiquidityFarming");

@@ -1,7 +1,18 @@
 import { ethers, upgrades } from "hardhat";
 
 export async function upgradeLiquidityPool(proxyAddress: string) {
-  const contract = await upgrades.upgradeProxy(proxyAddress, await ethers.getContractFactory("LiquidityPool"));
+  const feeLibFactory = await ethers.getContractFactory("Fee");
+  const Fee = await feeLibFactory.deploy();
+  await Fee.deployed();
+
+  const LiquidityPoolFactory = await ethers.getContractFactory("LiquidityPool", {
+    libraries: {
+      Fee: Fee.address,
+    },
+  });
+  const contract = await upgrades.upgradeProxy(proxyAddress, LiquidityPoolFactory, {
+    unsafeAllow: ["external-library-linking"],
+  });
   await contract.deployed();
   console.log("LiquidityPool Upgraded");
 }
@@ -31,7 +42,10 @@ export async function upgradeLiquidityFarming(proxyAddress: string) {
 }
 
 export async function upgradeLiquidityFarmingV2(proxyAddress: string) {
-  const contract = await upgrades.upgradeProxy(proxyAddress, await ethers.getContractFactory("HyphenLiquidityFarmingV2"));
+  const contract = await upgrades.upgradeProxy(
+    proxyAddress,
+    await ethers.getContractFactory("HyphenLiquidityFarmingV2")
+  );
   await contract.deployed();
   console.log("LiquidityFarmingV2 Upgraded");
 }
