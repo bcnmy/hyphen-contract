@@ -153,6 +153,16 @@ contract LiquidityPool is
         uint256 transferFee,
         uint256 gasFee
     );
+    event AssetSentFromCCMP(
+        address indexed asset,
+        uint256 indexed amount,
+        uint256 indexed transferredAmount,
+        address target,
+        uint256 fromChainId,
+        uint256 lpFee,
+        uint256 transferFee,
+        uint256 gasFee
+    );
     event Deposit(
         address indexed from,
         address indexed tokenAddress,
@@ -602,12 +612,11 @@ contract LiquidityPool is
         liquidityProviders.decreaseCurrentLiquidity(tokenAddress, amountToTransfer);
         _releaseFunds(tokenAddress, args.receiver, amountToTransfer);
 
-        emit AssetSent(
+        emit AssetSentFromCCMP(
             tokenAddress,
             amount,
             amountToTransfer,
             args.receiver,
-            "",
             sourceChainId,
             lpFee,
             transferFeeAmount,

@@ -177,9 +177,15 @@ contract TokenManager is ITokenManager, ERC2771ContextUpgradeable, OwnableUpgrad
         return transferConfig[tokenAddress];
     }
 
-    function setTokenSymbol(address tokenAddress, uint256 symbol) external onlyOwner {
-        tokenAddressToSymbol[tokenAddress] = symbol;
-        symbolToTokenAddress[symbol] = tokenAddress;
+    function setTokenSymbol(address[] calldata tokenAddresses, uint256[] calldata symbols) external onlyOwner {
+        require(tokenAddresses.length == symbols.length, "ERR_ARRAY_LENGTH_MISMATCH");
+        unchecked {
+            uint256 length = tokenAddresses.length;
+            for (uint256 i = 0; i < length; ++i) {
+                tokenAddressToSymbol[tokenAddresses[i]] = symbols[i];
+                symbolToTokenAddress[symbols[i]] = tokenAddresses[i];
+            }
+        }
     }
 
     function _msgSender()

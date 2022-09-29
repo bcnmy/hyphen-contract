@@ -1288,7 +1288,7 @@ describe("LiquidityPoolTests", function () {
       const amount = BigNumber.from(minTokenCap);
       const minAmount = 0;
 
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol);
+      await tokenManager.setTokenSymbol([token.address], [tokenSymbol]);
       await liquidityPool.setLiquidityPoolAddress([destinationChainId], [liquidityPool.address]);
 
       await expect(() =>
@@ -1347,7 +1347,7 @@ describe("LiquidityPoolTests", function () {
       const reclaimer = charlie;
       const minAmount = 0;
 
-      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol);
+      await tokenManager.setTokenSymbol([NATIVE], [tokenSymbol]);
       await liquidityPool.setLiquidityPoolAddress([destinationChainId], [liquidityPool.address]);
 
       await expect(() =>
@@ -1425,7 +1425,7 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const minAmount = 0;
 
-      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol);
+      await tokenManager.setTokenSymbol([NATIVE], [tokenSymbol]);
       await liquidityPool.setLiquidityPoolAddress([destinationChainId], [liquidityPool.address]);
 
       await expect(() =>
@@ -1490,7 +1490,7 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const minAmount = 0;
 
-      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol);
+      await tokenManager.setTokenSymbol([NATIVE], [tokenSymbol]);
       await liquidityPool.setLiquidityPoolAddress([destinationChainId], [liquidityPool.address]);
 
       await expect(() =>
@@ -1556,7 +1556,7 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const minAmount = 0;
 
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol);
+      await tokenManager.setTokenSymbol([token.address], [tokenSymbol]);
       await liquidityPool.setLiquidityPoolAddress([destinationChainId], [liquidityPool.address]);
 
       await expect(() =>
@@ -1655,7 +1655,7 @@ describe("LiquidityPoolTests", function () {
       const amount = ethers.BigNumber.from(minTokenCap);
       const minAmount = 0;
 
-      await tokenManager.setTokenSymbol(NATIVE, tokenSymbol);
+      await tokenManager.setTokenSymbol([NATIVE], [tokenSymbol]);
 
       await expect(
         liquidityPool.depositAndCall(
@@ -1691,7 +1691,7 @@ describe("LiquidityPoolTests", function () {
       expect(transferredAmount).to.be.gt(0);
 
       await liquidityPool.setLiquidityPoolAddress([fromChainId], [liquidityPool.address]);
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol);
+      await tokenManager.setTokenSymbol([token.address], [tokenSymbol]);
 
       await expect(() =>
         ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
@@ -1704,7 +1704,7 @@ describe("LiquidityPoolTests", function () {
       const calldata = getSendFundsToUserFromCCMPCalldata(tokenSymbol, minTokenCap, 18, charlie.address, 0);
 
       await liquidityPool.setLiquidityPoolAddress([fromChainId], [liquidityPool.address]);
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol);
+      await tokenManager.setTokenSymbol([token.address], [tokenSymbol]);
 
       await expect(
         ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, owner.address)
@@ -1739,7 +1739,7 @@ describe("LiquidityPoolTests", function () {
       );
 
       await liquidityPool.setLiquidityPoolAddress([fromChainId], [liquidityPool.address]);
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol);
+      await tokenManager.setTokenSymbol([token.address], [tokenSymbol]);
 
       await expect(
         ccmpMock.callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
@@ -1770,7 +1770,7 @@ describe("LiquidityPoolTests", function () {
       expect(transferredAmount).to.be.gt(0);
 
       await liquidityPool.setLiquidityPoolAddress([fromChainId], [liquidityPool.address]);
-      await tokenManager.setTokenSymbol(token.address, tokenSymbol);
+      await tokenManager.setTokenSymbol([token.address], [tokenSymbol]);
 
       await expect(() =>
         ccmpMock.connect(reclaimer).callContract(liquidityPool.address, calldata, fromChainId, liquidityPool.address)
