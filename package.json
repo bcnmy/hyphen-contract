@@ -1,4 +1,7 @@
 {
+  "name": "@biconomy/hyphen-contracts",
+  "version": "1.0.1",
+  "description": "Biconomy Liquidity Protocol Contracts",
   "devDependencies": {
     "@defi-wonderland/smock": "^2.3.0",
     "@nomiclabs/hardhat-ethers": "^2.0.0",
