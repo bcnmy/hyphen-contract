@@ -51,8 +51,8 @@ const forceImportForUpgrade = async (contracts: IContractAddresses) => {
   const chainId = (await ethers.provider.getNetwork()).chainId;
   // const contracts = await getContractAddressesByChain(process.env.PROD_API_URL as string, chainId);
   const contracts = {
-    liquidityPool: "0xB726675394b2dDeE2C897ad31a62C7545Ad7C68D"
-  }
+    liquidityPool: "0xb831F0848A055b146a0b13D54cfFa6C1FE201b83",
+  };
   console.log(`Forcing Import for Contracts on chain ${chainId}: ${JSON.stringify(contracts, null, 2)}`);
   await forceImportForUpgrade(contracts);
 })();
