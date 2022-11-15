@@ -24,11 +24,6 @@ contract TokenManager is ITokenManager, ERC2771ContextUpgradeable, OwnableUpgrad
     // Excess State Transfer Fee Percentage
     mapping(address => uint256) public override excessStateTransferFeePerc;
 
-    // Token Address => chainId => Symbol
-    mapping(address => uint256) public override tokenAddressToSymbol;
-    // Symbol => chainId => Token Address
-    mapping(uint256 => address) public override symbolToTokenAddress;
-
     event FeeChanged(address indexed tokenAddress, uint256 indexed equilibriumFee, uint256 indexed maxFee);
     event ExcessStateTransferFeePercChanged(address indexed tokenAddress, uint256 indexed fee);
 
@@ -48,6 +43,11 @@ contract TokenManager is ITokenManager, ERC2771ContextUpgradeable, OwnableUpgrad
      * Store min/max amount of token to transfer based on token address
      */
     mapping(address => TokenConfig) public transferConfig;
+
+    // Token Address => chainId => Symbol
+    mapping(address => uint256) public override tokenAddressToSymbol;
+    // Symbol => chainId => Token Address
+    mapping(uint256 => address) public override symbolToTokenAddress;
 
     function initialize(address trustedForwarder, address pauser) external initializer {
         __ERC2771Context_init(trustedForwarder);
