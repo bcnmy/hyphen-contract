@@ -210,8 +210,10 @@
     "@babel/helper-validator-identifier" "^7.19.1"
     to-fast-properties "^2.0.0"
 
-"@biconomy/ccmp-contracts@../../ccmp-contracts":
-  version "0.0.2"
+"@biconomy/ccmp-contracts@^0.0.3":
+  version "0.0.3"
+  resolved "https://registry.yarnpkg.com/@biconomy/ccmp-contracts/-/ccmp-contracts-0.0.3.tgz#18c1f135d335b13e2285f5a2b058a4f6e293eb5d"
+  integrity sha512-naow2Q0amRxYubYX847Xh9p3u8hupzVEoQdEMbOPCUt7QIuZozT8s/9T+2td30VxLmUf83QsCo04/hQpUusDbA==
   dependencies:
     "@abacus-network/app" "^0.4.2-processtest"
     "@abacus-network/sdk" "^0.4.3-processtest"
