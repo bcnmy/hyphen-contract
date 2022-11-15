@@ -83,6 +83,7 @@ import "./interfaces/IERC20WithDecimals.sol";
  * 48: Invalid Decimals
  * 49: Transferred Amount Less than Min Amount
  * 50: Parameter length mismatch
+ * 51: LiquidityPool cannot be set as recipient of payload
  */
 
 contract LiquidityPool is
@@ -270,10 +271,6 @@ contract LiquidityPool is
             incentivePool[tokenAddress];
     }
 
-    function getExecutorManager() external view returns (address) {
-        return address(executorManager);
-    }
-
     /**
      * @dev Function used to deposit tokens into pool to initiate a cross chain token transfer.
      * @param toChainId Chain id where funds needs to be transfered
@@ -338,19 +335,23 @@ contract LiquidityPool is
         );
 
         {
-            require(tokenManager.tokenAddressToSymbol(args.tokenAddress) != 0, "11");
-            require(chainIdToLiquidityPoolAddress[args.toChainId] != address(0), "12");
-            require(_getTokenDecimals(args.tokenAddress) != 0, "48");
+            address toChainLiquidityPoolAddress = chainIdToLiquidityPoolAddress[args.toChainId];
+            uint256 tokenSymbol = tokenManager.tokenAddressToSymbol(args.tokenAddress);
+            uint256 tokenDecimals = _getTokenDecimals(args.tokenAddress);
+
+            require(tokenSymbol != 0, "11");
+            require(toChainLiquidityPoolAddress != address(0), "12");
+            require(tokenDecimals != 0, "48");
 
             // Prepare the primary payload to be sent to liquidity pool on the exit chain
             updatedPayloads[0] = ICCMPGateway.CCMPMessagePayload({
-                to: chainIdToLiquidityPoolAddress[args.toChainId],
+                to: toChainLiquidityPoolAddress,
                 _calldata: abi.encodeWithSelector(
                     this.sendFundsToUserFromCCMP.selector,
                     SendFundsToUserFromCCMPArgs({
-                        tokenSymbol: tokenManager.tokenAddressToSymbol(args.tokenAddress),
+                        tokenSymbol: tokenSymbol,
                         sourceChainAmount: transferredAmount,
-                        sourceChainDecimals: _getTokenDecimals(args.tokenAddress),
+                        sourceChainDecimals: tokenDecimals,
                         receiver: payable(args.receiver),
                         hyphenArgs: args.hyphenArgs
                     })
@@ -359,7 +360,15 @@ contract LiquidityPool is
 
             uint256 length = updatedPayloads.length;
             for (uint256 i = 1; i < length; ) {
-                updatedPayloads[i] = args.payloads[i - 1];
+                // Other payloads must not call the liquidity pool contract on destination chain,
+                // else an attacker can simply ask the liquidity pool to send all funds on the exit chain
+                ICCMPGateway.CCMPMessagePayload memory payload = args.payloads[i - 1];
+                require(payload.to != toChainLiquidityPoolAddress, "51");
+
+                // Append msg.sender to payload, will be passed on to the receiving contract for verification
+                payload._calldata = abi.encodePacked(payload._calldata, msg.sender);
+
+                updatedPayloads[i] = payload;
                 unchecked {
                     ++i;
                 }
