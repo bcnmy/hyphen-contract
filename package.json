@@ -1,6 +1,6 @@
 {
   "name": "@biconomy/hyphen-contracts",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Biconomy Liquidity Protocol Contracts",
   "devDependencies": {
     "@defi-wonderland/smock": "^2.3.0",
