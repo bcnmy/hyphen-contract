@@ -23,6 +23,7 @@ import "./lib/Fee.sol";
 import "./metatx/ERC2771ContextUpgradeable.sol";
 import "../security/Pausable.sol";
 import "./structures/TokenConfig.sol";
+import "./structures/DepositAndCall.sol";
 import "./interfaces/IExecutorManager.sol";
 import "./interfaces/ILiquidityProviders.sol";
 import "../interfaces/IERC20Permit.sol";
@@ -30,6 +31,7 @@ import "./interfaces/ITokenManager.sol";
 import "./interfaces/ISwapAdaptor.sol";
 import "./interfaces/ICCMPGateway.sol";
 import "./interfaces/IERC20WithDecimals.sol";
+import "./interfaces/ILiquidityPool.sol";
 
 /**
  * Error Codes:
@@ -91,7 +93,8 @@ contract LiquidityPool is
     ReentrancyGuardUpgradeable,
     Pausable,
     OwnableUpgradeable,
-    ERC2771ContextUpgradeable
+    ERC2771ContextUpgradeable,
+    ILiquidityPool
 {
     /* State */
     address private constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
@@ -103,14 +106,14 @@ contract LiquidityPool is
     ITokenManager public tokenManager;
     ILiquidityProviders public liquidityProviders;
 
-    mapping(bytes32 => bool) public processedHash;
-    mapping(address => uint256) public gasFeeAccumulatedByToken;
+    mapping(bytes32 => bool) public override processedHash;
+    mapping(address => uint256) public override gasFeeAccumulatedByToken;
 
     // Gas fee accumulated by token address => executor address
-    mapping(address => mapping(address => uint256)) public gasFeeAccumulated;
+    mapping(address => mapping(address => uint256)) public override gasFeeAccumulated;
 
     // Incentive Pool amount per token address
-    mapping(address => uint256) public incentivePool;
+    mapping(address => uint256) public override incentivePool;
 
     mapping(string => address) public swapAdaptorMap;
 
@@ -120,27 +123,6 @@ contract LiquidityPool is
     address public ccmpExecutor;
     // Chain Id => Liquidity Pool Address
     mapping(uint256 => address) public chainIdToLiquidityPoolAddress;
-
-    /* Structures */
-    struct DepositAndCallArgs {
-        uint256 toChainId;
-        address tokenAddress; // Can be Native
-        address receiver;
-        uint256 amount;
-        string tag;
-        ICCMPGateway.CCMPMessagePayload[] payloads;
-        ICCMPGateway.GasFeePaymentArgs gasFeePaymentArgs;
-        string adaptorName;
-        bytes routerArgs;
-        bytes[] hyphenArgs;
-    }
-    struct SendFundsToUserFromCCMPArgs {
-        uint256 tokenSymbol;
-        uint256 sourceChainAmount;
-        uint256 sourceChainDecimals;
-        address payable receiver;
-        bytes[] hyphenArgs;
-    }
 
     /* Events */
     event AssetSent(
@@ -261,7 +243,7 @@ contract LiquidityPool is
         executorManager = IExecutorManager(_executorManagerAddress);
     }
 
-    function getCurrentLiquidity(address tokenAddress) public view returns (uint256 currentLiquidity) {
+    function getCurrentLiquidity(address tokenAddress) public view override returns (uint256 currentLiquidity) {
         uint256 liquidityPoolBalance = liquidityProviders.getCurrentLiquidity(tokenAddress);
 
         currentLiquidity =
@@ -284,7 +266,7 @@ contract LiquidityPool is
         address receiver,
         uint256 amount,
         string calldata tag
-    ) public tokenChecks(tokenAddress) whenNotPaused nonReentrant {
+    ) public override tokenChecks(tokenAddress) whenNotPaused nonReentrant {
         address sender = _msgSender();
         uint256 rewardAmount = _depositErc20(sender, toChainId, tokenAddress, receiver, amount, 0);
 
@@ -295,6 +277,7 @@ contract LiquidityPool is
     function depositAndCall(DepositAndCallArgs calldata args)
         external
         payable
+        override
         tokenChecks(args.tokenAddress)
         whenNotPaused
         nonReentrant
@@ -489,7 +472,7 @@ contract LiquidityPool is
         );
     }
 
-    function getRewardAmount(uint256 amount, address tokenAddress) public view returns (uint256 rewardAmount) {
+    function getRewardAmount(uint256 amount, address tokenAddress) public view override returns (uint256 rewardAmount) {
         uint256 currentLiquidity = getCurrentLiquidity(tokenAddress);
         uint256 providedLiquidity = liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
         if (currentLiquidity < providedLiquidity) {
@@ -513,7 +496,7 @@ contract LiquidityPool is
         address receiver,
         uint256 toChainId,
         string calldata tag
-    ) external payable whenNotPaused nonReentrant {
+    ) external payable override whenNotPaused nonReentrant {
         uint256 rewardAmount = _depositNative(receiver, toChainId);
         emit Deposit(_msgSender(), NATIVE, receiver, toChainId, msg.value + rewardAmount, rewardAmount, tag);
     }
@@ -843,7 +826,7 @@ contract LiquidityPool is
         return gasFee;
     }
 
-    function getTransferFee(address tokenAddress, uint256 amount) external view returns (uint256) {
+    function getTransferFee(address tokenAddress, uint256 amount) external view override returns (uint256) {
         TokenInfo memory tokenInfo = tokenManager.getTokensInfo(tokenAddress);
 
         return
@@ -868,13 +851,13 @@ contract LiquidityPool is
         status = processedHash[hashSendTransaction];
     }
 
-    function withdrawErc20GasFee(address tokenAddress) external onlyExecutor whenNotPaused nonReentrant {
+    function withdrawErc20GasFee(address tokenAddress) external override onlyExecutor whenNotPaused nonReentrant {
         require(tokenAddress != NATIVE, "38");
         uint256 gasFeeAccumulatedByExecutor = _updateGasFeeAccumulated(tokenAddress, _msgSender());
         SafeERC20Upgradeable.safeTransfer(IERC20WithDecimals(tokenAddress), _msgSender(), gasFeeAccumulatedByExecutor);
     }
 
-    function withdrawNativeGasFee() external onlyExecutor whenNotPaused nonReentrant {
+    function withdrawNativeGasFee() external override onlyExecutor whenNotPaused nonReentrant {
         uint256 gasFeeAccumulatedByExecutor = _updateGasFeeAccumulated(NATIVE, _msgSender());
         (bool success, ) = payable(_msgSender()).call{value: gasFeeAccumulatedByExecutor}("");
         require(success, "41");
@@ -894,7 +877,7 @@ contract LiquidityPool is
         address _tokenAddress,
         address receiver,
         uint256 _tokenAmount
-    ) external whenNotPaused nonReentrant {
+    ) external override whenNotPaused nonReentrant {
         require(receiver != address(0), "42");
         require(_msgSender() == address(liquidityProviders), "2");
         if (_tokenAddress == NATIVE) {
