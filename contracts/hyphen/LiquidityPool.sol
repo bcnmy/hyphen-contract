@@ -285,7 +285,7 @@ contract LiquidityPool is
         uint256 rewardAmount = 0;
         if (args.tokenAddress == NATIVE) {
             require(args.amount + args.gasFeePaymentArgs.feeAmount == msg.value, "10");
-            rewardAmount = _depositNative(args.receiver, args.toChainId);
+            rewardAmount = _depositNative(args.receiver, args.toChainId, args.amount);
         } else {
             rewardAmount = _depositErc20(
                 _msgSender(),
@@ -449,8 +449,8 @@ contract LiquidityPool is
         return rewardAmount;
     }
 
-    function _depositNative(address receiver, uint256 toChainId) internal returns (uint256) {
-        return _preDeposit(NATIVE, toChainId, receiver, msg.value);
+    function _depositNative(address receiver, uint256 toChainId, uint256 amount) internal returns (uint256) {
+        return _preDeposit(NATIVE, toChainId, receiver, amount);
     }
 
     function _depositErc20(
@@ -497,7 +497,7 @@ contract LiquidityPool is
         uint256 toChainId,
         string calldata tag
     ) external payable override whenNotPaused nonReentrant {
-        uint256 rewardAmount = _depositNative(receiver, toChainId);
+        uint256 rewardAmount = _depositNative(receiver, toChainId, msg.value);
         emit Deposit(_msgSender(), NATIVE, receiver, toChainId, msg.value + rewardAmount, rewardAmount, tag);
     }
 
@@ -519,7 +519,7 @@ contract LiquidityPool is
 
         require(totalPercentage <= 100 * BASE_DIVISOR, "19");
 
-        uint256 rewardAmount = _depositNative(receiver, toChainId);
+        uint256 rewardAmount = _depositNative(receiver, toChainId, msg.value);
         emit DepositAndSwap(
             _msgSender(),
             NATIVE,
