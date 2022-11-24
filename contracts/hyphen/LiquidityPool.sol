@@ -86,6 +86,7 @@ import "./interfaces/ILiquidityPool.sol";
  * 49: Transferred Amount Less than Min Amount
  * 50: Parameter length mismatch
  * 51: LiquidityPool cannot be set as recipient of payload
+ * 52: msg value must be 0 when doing ERC20 transfer
  */
 
 contract LiquidityPool is
@@ -287,6 +288,7 @@ contract LiquidityPool is
             require(args.amount + args.gasFeePaymentArgs.feeAmount == msg.value, "10");
             rewardAmount = _depositNative(args.receiver, args.toChainId, args.amount);
         } else {
+            require(msg.value == 0, "52");
             rewardAmount = _depositErc20(
                 _msgSender(),
                 args.toChainId,
