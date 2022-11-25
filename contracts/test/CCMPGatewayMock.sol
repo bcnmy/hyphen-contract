@@ -69,10 +69,20 @@ contract CCMPGatewayMock is ICCMPGateway {
         bytes calldata _calldata,
         uint256 _fromChainId,
         address _fromContractAddress
-    ) external {
+    ) public {
         (bool success, bytes memory returnData) = to.call(
             abi.encodePacked(_calldata, _fromChainId, _fromContractAddress)
         );
         require(success, string(returnData));
+    }
+
+    function executePayloads(
+        ICCMPGateway.CCMPMessagePayload[] calldata _payloads,
+        uint256 _fromChainId,
+        address _fromContractAddress
+    ) external {
+        for (uint256 i = 0; i < _payloads.length; ++i) {
+            callContract(_payloads[i].to, _payloads[i]._calldata, _fromChainId, _fromContractAddress);
+        }
     }
 }

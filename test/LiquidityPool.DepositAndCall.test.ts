@@ -11,11 +11,11 @@ import {
   MockAdaptor,
   SampleContract,
   SampleContract__factory,
+  CCMPGatewayMock,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, BigNumberish } from "ethers";
-import { CCMPGatewayMock } from "../typechain/CCMPGatewayMock";
 
 let { getLocaleString } = require("./utils");
 
@@ -510,13 +510,6 @@ describe("LiquidityPoolTests - Deposit And Call", function () {
     });
 
     it("Should prevent secondary paylods from executing on liquidity pool on destination chain", async function () {
-      const message = "MESSAGE_TEST";
-      const payloads: CCMPMessagePayload[] = [
-        {
-          to: liquidityPool.address,
-          _calldata: sampleContract.interface.encodeFunctionData("emitEvent", [message]),
-        },
-      ];
       const gasFeePaymentArgs: GasFeePaymentArgs = {
         feeTokenAddress: NATIVE,
         feeAmount: 0,
@@ -524,32 +517,66 @@ describe("LiquidityPoolTests - Deposit And Call", function () {
       };
       const adaptorName = "wormhole";
       const routerArgs = emptyBytes;
+      const fromChainId = 2;
       const destinationChainId = 1;
       const tokenSymbol = 1;
       const amount = ethers.BigNumber.from(minTokenCap);
 
-      await tokenManager.setTokenSymbol([NATIVE], [tokenSymbol]);
-      await liquidityPool.setLiquidityPoolAddress([destinationChainId], [liquidityPool.address]);
+      // Malicious Payload to extract excess funds from liquidity pool
+      const payloads: CCMPMessagePayload[] = [
+        {
+          to: liquidityPool.address,
+          _calldata: liquidityPool.interface.encodeFunctionData("sendFundsToUserFromCCMP", [
+            {
+              tokenSymbol,
+              sourceChainAmount: amount, // Can be any arbtiary amount
+              sourceChainDecimals: 18,
+              receiver: charlie.address,
+              hyphenArgs: [],
+            },
+          ]),
+        },
+      ];
 
-      await expect(
-        liquidityPool.depositAndCall(
-          {
-            toChainId: destinationChainId,
-            tokenAddress: NATIVE,
-            receiver: charlie.address,
-            amount,
-            tag: "test",
-            payloads,
-            gasFeePaymentArgs,
-            adaptorName,
-            routerArgs,
-            hyphenArgs: [],
-          },
-          {
-            value: amount,
-          }
-        )
-      ).to.be.revertedWith("51");
+      await tokenManager.setTokenSymbol([NATIVE], [tokenSymbol]);
+      await liquidityPool.setLiquidityPoolAddress(
+        [destinationChainId, fromChainId],
+        [liquidityPool.address, liquidityPool.address]
+      );
+
+      // Source Transaction
+      await liquidityPool.depositAndCall(
+        {
+          toChainId: destinationChainId,
+          tokenAddress: NATIVE,
+          receiver: charlie.address,
+          amount,
+          tag: "test",
+          payloads,
+          gasFeePaymentArgs,
+          adaptorName,
+          routerArgs,
+          hyphenArgs: [],
+        },
+        {
+          value: amount,
+        }
+      );
+
+      // Destination Transaction
+      const emittedPayloads = await ccmpMock.lastCallPayload();
+      console.log(payloads);
+      const balanceBefore = await ethers.provider.getBalance(charlie.address);
+      await ccmpMock.executePayloads(emittedPayloads, fromChainId, liquidityPool.address);
+      const balanceAfter = await ethers.provider.getBalance(charlie.address);
+      const amountReceived = balanceAfter.sub(balanceBefore);
+      console.log(`Amount deposited on source chain: ${amount.toString()}`);
+      console.log(`Amount received on destination chain: ${amountReceived.toString()}`);
+      if (amountReceived.gt(amount)) {
+        console.log('💀 attack successfull 💀')
+      }
+
+      expect(amountReceived.lte(amount)).to.be.true;
     });
 
     it("Should prevent recipient from receiving messages from contracts other than hyphen", async function () {
