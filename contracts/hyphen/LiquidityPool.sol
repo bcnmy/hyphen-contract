@@ -187,11 +187,7 @@ contract LiquidityPool is
         _;
     }
 
-    function _verifyExitParams(
-        address tokenAddress,
-        uint256 amount,
-        address payable receiver
-    ) internal view {
+    function _verifyExitParams(address tokenAddress, uint256 amount, address payable receiver) internal view {
         TokenConfig memory config = tokenManager.getTransferConfig(tokenAddress);
         require(config.min <= amount && config.max >= amount, "26");
         require(receiver != address(0), "27");
@@ -226,10 +222,10 @@ contract LiquidityPool is
         ccmpGateway = _newCCMPGateway;
     }
 
-    function setLiquidityPoolAddress(uint256[] calldata chainId, address[] calldata liquidityPoolAddress)
-        external
-        onlyOwner
-    {
+    function setLiquidityPoolAddress(
+        uint256[] calldata chainId,
+        address[] calldata liquidityPoolAddress
+    ) external onlyOwner {
         require(chainId.length == liquidityPoolAddress.length, "50");
         unchecked {
             uint256 length = chainId.length;
@@ -246,12 +242,11 @@ contract LiquidityPool is
 
     function getCurrentLiquidity(address tokenAddress) public view override returns (uint256 currentLiquidity) {
         uint256 liquidityPoolBalance = liquidityProviders.getCurrentLiquidity(tokenAddress);
-
-        currentLiquidity =
-            liquidityPoolBalance -
-            liquidityProviders.totalLPFees(tokenAddress) -
-            gasFeeAccumulatedByToken[tokenAddress] -
+        uint256 reservedLiquidity = liquidityProviders.totalLPFees(tokenAddress) +
+            gasFeeAccumulatedByToken[tokenAddress] +
             incentivePool[tokenAddress];
+
+        currentLiquidity = liquidityPoolBalance > reservedLiquidity ? liquidityPoolBalance - reservedLiquidity : 0;
     }
 
     /**
@@ -275,14 +270,9 @@ contract LiquidityPool is
         emit Deposit(sender, tokenAddress, receiver, toChainId, amount + rewardAmount, rewardAmount, tag);
     }
 
-    function depositAndCall(DepositAndCallArgs calldata args)
-        external
-        payable
-        override
-        tokenChecks(args.tokenAddress)
-        whenNotPaused
-        nonReentrant
-    {
+    function depositAndCall(
+        DepositAndCallArgs calldata args
+    ) external payable override tokenChecks(args.tokenAddress) whenNotPaused nonReentrant {
         uint256 rewardAmount = 0;
         if (args.tokenAddress == NATIVE) {
             require(args.amount + args.gasFeePaymentArgs.feeAmount == msg.value, "10");
@@ -534,14 +524,10 @@ contract LiquidityPool is
         );
     }
 
-    function _calculateAndUpdateFeeComponents(address _tokenAddress, uint256 _amount)
-        private
-        returns (
-            uint256 lpFee,
-            uint256 incentivePoolFee,
-            uint256 transferFeeAmount
-        )
-    {
+    function _calculateAndUpdateFeeComponents(
+        address _tokenAddress,
+        uint256 _amount
+    ) private returns (uint256 lpFee, uint256 incentivePoolFee, uint256 transferFeeAmount) {
         TokenInfo memory tokenInfo = tokenManager.getTokensInfo(_tokenAddress);
         (lpFee, incentivePoolFee, transferFeeAmount) = Fee.getFeeComponents(
             _amount,
@@ -627,7 +613,7 @@ contract LiquidityPool is
         uint256 _sourceTokenDecimals,
         uint256 _destinationChainDecimals
     ) private pure returns (uint256 amount) {
-        amount = (_sourceTokenAmount * (10**_destinationChainDecimals)) / (10**_sourceTokenDecimals);
+        amount = (_sourceTokenAmount * (10 ** _destinationChainDecimals)) / (10 ** _sourceTokenDecimals);
     }
 
     function sendFundsToUserV2(
@@ -662,11 +648,7 @@ contract LiquidityPool is
         );
     }
 
-    function _releaseFunds(
-        address tokenAddress,
-        address payable receiver,
-        uint256 amount
-    ) internal {
+    function _releaseFunds(address tokenAddress, address payable receiver, uint256 amount) internal {
         if (tokenAddress == NATIVE) {
             (bool success, ) = receiver.call{value: amount}("");
             require(success, "30");
@@ -865,10 +847,10 @@ contract LiquidityPool is
         require(success, "41");
     }
 
-    function _updateGasFeeAccumulated(address tokenAddress, address executor)
-        private
-        returns (uint256 gasFeeAccumulatedByExecutor)
-    {
+    function _updateGasFeeAccumulated(
+        address tokenAddress,
+        address executor
+    ) private returns (uint256 gasFeeAccumulatedByExecutor) {
         gasFeeAccumulatedByExecutor = gasFeeAccumulated[tokenAddress][executor];
         require(gasFeeAccumulatedByExecutor != 0, "39");
         gasFeeAccumulatedByToken[tokenAddress] = gasFeeAccumulatedByToken[tokenAddress] - gasFeeAccumulatedByExecutor;
