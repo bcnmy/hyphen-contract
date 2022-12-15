@@ -34,7 +34,7 @@ import "./interfaces/IERC20WithDecimals.sol";
 import "./interfaces/ILiquidityPool.sol";
 
 /**
- * Error Codes:
+ * Error Codes (to reduce contract deployment size):
  * 1: Only executor is allowed
  * 2: Only liquidityProviders is allowed
  * 3: Token not supported
@@ -264,22 +264,26 @@ contract LiquidityPool is
         string calldata tag
     ) public override tokenChecks(tokenAddress) whenNotPaused nonReentrant {
         address sender = _msgSender();
-        uint256 rewardAmount = _depositErc20(sender, toChainId, tokenAddress, receiver, amount, 0);
+        uint256 rewardAmount = _preDepositErc20(sender, toChainId, tokenAddress, receiver, amount, 0);
 
         // Emit (amount + reward amount) in event
         emit Deposit(sender, tokenAddress, receiver, toChainId, amount + rewardAmount, rewardAmount, tag);
     }
 
+    /**
+     * @notice Function used to deposit tokens into pool and optionally execute post operation callback(s)
+     * @param args Struct containing all the arguments for depositAndCall
+     */
     function depositAndCall(
         DepositAndCallArgs calldata args
     ) external payable override tokenChecks(args.tokenAddress) whenNotPaused nonReentrant {
         uint256 rewardAmount = 0;
         if (args.tokenAddress == NATIVE) {
             require(args.amount + args.gasFeePaymentArgs.feeAmount == msg.value, "10");
-            rewardAmount = _depositNative(args.receiver, args.toChainId, args.amount);
+            rewardAmount = _preDepositNative(args.receiver, args.toChainId, args.amount);
         } else {
             require(msg.value == 0, "52");
-            rewardAmount = _depositErc20(
+            rewardAmount = _preDepositErc20(
                 _msgSender(),
                 args.toChainId,
                 args.tokenAddress,
@@ -304,6 +308,12 @@ contract LiquidityPool is
         );
     }
 
+    /**
+     * @notice Internal function to prepare the message payload and send a cross chain message to the liquidity pool
+     *         on the destination chain via CCMPGateway.
+     * @param args Struct containing all the arguments for depositAndCall
+     * @param transferredAmount Amount of tokens being transfered. This included the actual amount + any rebalancing incentive reward
+     */
     function _invokeCCMP(DepositAndCallArgs calldata args, uint256 transferredAmount) internal {
         ICCMPGateway.CCMPMessagePayload[] memory updatedPayloads = new ICCMPGateway.CCMPMessagePayload[](
             args.payloads.length + 1
@@ -400,7 +410,7 @@ contract LiquidityPool is
 
         require(totalPercentage <= 100 * BASE_DIVISOR, "13");
         address sender = _msgSender();
-        uint256 rewardAmount = _depositErc20(sender, toChainId, tokenAddress, receiver, amount, 0);
+        uint256 rewardAmount = _preDepositErc20(sender, toChainId, tokenAddress, receiver, amount, 0);
         // Emit (amount + reward amount) in event
         emit DepositAndSwap(
             sender,
@@ -414,6 +424,14 @@ contract LiquidityPool is
         );
     }
 
+    /**
+     * @notice Performs pre deposit checks, updates incentive pool and available liquidity
+     * @param _tokenAddress Address of token being deposited
+     * @param _toChainId Chain id where funds needs to be transfered
+     * @param _receiver Address on toChainId where tokens needs to be transfered
+     * @param _amount Amount of token being transfered
+     * @return rewardAmount Amount of incentive reward (if any) being given for rebalancing the pool
+     */
     function _preDeposit(
         address _tokenAddress,
         uint256 _toChainId,
@@ -441,11 +459,11 @@ contract LiquidityPool is
         return rewardAmount;
     }
 
-    function _depositNative(address receiver, uint256 toChainId, uint256 amount) internal returns (uint256) {
+    function _preDepositNative(address receiver, uint256 toChainId, uint256 amount) internal returns (uint256) {
         return _preDeposit(NATIVE, toChainId, receiver, amount);
     }
 
-    function _depositErc20(
+    function _preDepositErc20(
         address sender,
         uint256 toChainId,
         address tokenAddress,
@@ -464,6 +482,12 @@ contract LiquidityPool is
         );
     }
 
+    /**
+     * @notice Function to calcluate the reward awarded for rebalancing the liquidity pool (if any) from a deficit state
+     * @param amount Amount of token being deposited into the liquidity pool
+     * @param tokenAddress Address of token being deposited
+     * @return rewardAmount Amount of incentive reward (if any) being given for rebalancing the pool
+     */
     function getRewardAmount(uint256 amount, address tokenAddress) public view override returns (uint256 rewardAmount) {
         uint256 currentLiquidity = getCurrentLiquidity(tokenAddress);
         uint256 providedLiquidity = liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
@@ -489,7 +513,7 @@ contract LiquidityPool is
         uint256 toChainId,
         string calldata tag
     ) external payable override whenNotPaused nonReentrant {
-        uint256 rewardAmount = _depositNative(receiver, toChainId, msg.value);
+        uint256 rewardAmount = _preDepositNative(receiver, toChainId, msg.value);
         emit Deposit(_msgSender(), NATIVE, receiver, toChainId, msg.value + rewardAmount, rewardAmount, tag);
     }
 
@@ -511,7 +535,7 @@ contract LiquidityPool is
 
         require(totalPercentage <= 100 * BASE_DIVISOR, "19");
 
-        uint256 rewardAmount = _depositNative(receiver, toChainId, msg.value);
+        uint256 rewardAmount = _preDepositNative(receiver, toChainId, msg.value);
         emit DepositAndSwap(
             _msgSender(),
             NATIVE,
@@ -524,6 +548,15 @@ contract LiquidityPool is
         );
     }
 
+    /**
+     * @notice Calculates and updates the fee components for a given token transfer and amount
+     *         Executed on the destination chain while transferring tokens
+     * @param _tokenAddress Address of token being transferred
+     * @param _amount Amount of token being transferred
+     * @return lpFee Fee component deducted and to be paid to liquidity providers
+     * @return incentivePoolFee Fee component deducted and to be paid to arbitrageurs to incentivize them to rebalance the pool
+     * @return transferFeeAmount Total Fee deducted
+     */
     function _calculateAndUpdateFeeComponents(
         address _tokenAddress,
         uint256 _amount
@@ -547,6 +580,11 @@ contract LiquidityPool is
         liquidityProviders.addLPFee(_tokenAddress, lpFee);
     }
 
+    /**
+     * @notice Executed on the destination chain by the CCMPExecutor
+     *         Releases tokens to the receiver on the destination chain.
+     * @param args Struct containing the arguments for the function
+     */
     function sendFundsToUserFromCCMP(SendFundsToUserFromCCMPArgs calldata args) external whenNotPaused {
         // CCMP Verification
         (address senderContract, uint256 sourceChainId) = _ccmpMsgOrigin();
@@ -894,7 +932,9 @@ contract LiquidityPool is
     {
         return ERC2771ContextUpgradeable._msgData();
     }
-
+    /// @notice This function is called by the receiver contract on the destination chain to get the source of the sent message
+    ///         CCMPGateway will append the source details at the end of the calldata, this is done so that existing (upgradeable)
+    ///         contracts do not need to change their function signatures
     function _ccmpMsgOrigin() internal view returns (address sourceChainSender, uint256 sourceChainId) {
         require(msg.sender == ccmpExecutor, "46");
 
