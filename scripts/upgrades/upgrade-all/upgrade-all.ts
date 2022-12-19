@@ -30,6 +30,15 @@ export const getContractAddressesByChain = async (baseUrl: string, chainId: numb
   return chain.contracts.hyphen;
 };
 
+export const getSupportedTokens = async (
+  baseUrl: string,
+  chainId: number
+): Promise<{ address: string; decimal: number; symbol: string }[]> => {
+  const response = (await axios.get(`${baseUrl}/api/v1/configuration/tokens`)).data.message as any[];
+  const supportedTokens = response.map((token) => token[chainId]).filter((x) => x);
+  return supportedTokens;
+};
+
 export const getSupportedTokenAddresses = async (baseUrl: string, chainId: number): Promise<string[]> => {
   const response = (await axios.get(`${baseUrl}/api/v1/configuration/tokens`)).data.message as any[];
   const supportedTokenAddresses = response
@@ -40,11 +49,11 @@ export const getSupportedTokenAddresses = async (baseUrl: string, chainId: numbe
 };
 
 export const upgradeAllContracts = async (addresses: IContractAddresses) => {
-  await upgradeAndVerify(addresses.lpToken, upgradeLPToken);
-  await upgradeAndVerify(addresses.liquidityPool, upgradeLiquidityPool);
-  await upgradeAndVerify(addresses.liquidityProviders, upgradeLiquidityProviders);
-  await upgradeAndVerify(addresses.tokenManager, upgradeTokenManager);
-  await upgradeAndVerify(addresses.whitelistPeriodManager, upgradeWhiteListPeriodManager);
+  await upgradeAndVerify(addresses.lpToken!, upgradeLPToken);
+  await upgradeAndVerify(addresses.liquidityPool!, upgradeLiquidityPool);
+  await upgradeAndVerify(addresses.liquidityProviders!, upgradeLiquidityProviders);
+  await upgradeAndVerify(addresses.tokenManager!, upgradeTokenManager);
+  await upgradeAndVerify(addresses.whitelistPeriodManager!, upgradeWhiteListPeriodManager);
   if (addresses.liquidityFarmingV1) {
     await upgradeAndVerify(addresses.liquidityFarmingV1, upgradeLiquidityFarming);
   }
