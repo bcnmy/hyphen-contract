@@ -35,13 +35,35 @@ const config: HardhatUserConfig = {
         settings: {
           evmVersion: "istanbul",
           optimizer: { enabled: true, runs: 200 },
+          outputSelection: {
+            "*": {
+              "*": ["storageLayout"],
+            },
+          },
         },
       },
       {
         version: "0.8.2",
         settings: {
           evmVersion: "istanbul",
-          optimizer: { enabled: true, runs: 200 },
+          optimizer: { enabled: true, runs: 2000 },
+          outputSelection: {
+            "*": {
+              "*": ["storageLayout"],
+            },
+          },
+        },
+      },
+      {
+        version: "0.8.16",
+        settings: {
+          evmVersion: "istanbul",
+          optimizer: { enabled: true, runs: 2000 },
+          outputSelection: {
+            "*": {
+              "*": ["storageLayout"],
+            },
+          },
         },
       },
     ],

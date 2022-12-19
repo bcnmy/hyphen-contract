@@ -1,4 +1,4 @@
-import { expect, use } from "chai";
+import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import {
   ERC20Token,
@@ -13,14 +13,13 @@ import {
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, BigNumberish } from "ethers";
-import { sign } from "crypto";
+import { CCMPGatewayMock } from "../typechain/CCMPGatewayMock";
 
 let { getLocaleString } = require("./utils");
 
 describe("LiquidityPoolTests", function () {
   let owner: SignerWithAddress, pauser: SignerWithAddress, bob: SignerWithAddress;
   let charlie: SignerWithAddress, tf: SignerWithAddress, executor: SignerWithAddress;
-  let proxyAdmin: SignerWithAddress;
   let executorManager: ExecutorManager;
   let token: ERC20Token, liquidityPool: LiquidityPool;
   let lpToken: LPToken;
@@ -28,6 +27,7 @@ describe("LiquidityPoolTests", function () {
   let liquidityProviders: LiquidityProvidersTest;
   let tokenManager: TokenManager;
   let mockAdaptor: MockAdaptor;
+  let ccmpMock: CCMPGatewayMock;
 
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   let equilibriumFee = 10000000;
@@ -36,7 +36,8 @@ describe("LiquidityPoolTests", function () {
   let tokenAddress: string;
   let tag: string = "HyphenUI";
 
-  const TOKEN_PRICE_BASE_DIVISOR = BigNumber.from(10).pow(28);
+  const abiCoder = new ethers.utils.AbiCoder();
+
   const NATIVE_WRAP_ADDRESS = "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -136,7 +137,7 @@ describe("LiquidityPoolTests", function () {
   ];
 
   beforeEach(async function () {
-    [owner, pauser, charlie, bob, tf, proxyAdmin, executor] = await ethers.getSigners();
+    [owner, pauser, charlie, bob, tf, executor] = await ethers.getSigners();
 
     tokenManager = (await upgrades.deployProxy(await ethers.getContractFactory("TokenManager"), [
       tf.address,
@@ -168,14 +169,28 @@ describe("LiquidityPoolTests", function () {
       pauser.address,
     ])) as LiquidityProvidersTest;
 
-    const liquidtyPoolFactory = await ethers.getContractFactory("LiquidityPool");
-    liquidityPool = (await upgrades.deployProxy(liquidtyPoolFactory, [
-      executorManager.address,
-      await pauser.getAddress(),
-      trustedForwarder,
-      tokenManager.address,
-      liquidityProviders.address,
-    ])) as LiquidityPool;
+    const feeLibFactory = await ethers.getContractFactory("Fee");
+    const Fee = await feeLibFactory.deploy();
+    await Fee.deployed();
+
+    const liquidtyPoolFactory = await ethers.getContractFactory("LiquidityPool", {
+      libraries: {
+        Fee: Fee.address,
+      },
+    });
+    liquidityPool = (await upgrades.deployProxy(
+      liquidtyPoolFactory,
+      [
+        executorManager.address,
+        await pauser.getAddress(),
+        trustedForwarder,
+        tokenManager.address,
+        liquidityProviders.address,
+      ],
+      {
+        unsafeAllow: ["external-library-linking"],
+      }
+    )) as LiquidityPool;
 
     await liquidityPool.deployed();
 
@@ -226,6 +241,9 @@ describe("LiquidityPoolTests", function () {
     );
 
     await liquidityProviders.setWhiteListPeriodManager(wlpm.address);
+
+    ccmpMock = (await (await ethers.getContractFactory("CCMPGatewayMock")).deploy()) as CCMPGatewayMock;
+    await liquidityPool.setCCMPContracts(ccmpMock.address, ccmpMock.address);
 
     for (const signer of [owner, bob, charlie]) {
       await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
@@ -300,7 +318,7 @@ describe("LiquidityPoolTests", function () {
     tokenAddress: string,
     amount: string,
     receiver: string,
-    relativeNativeTokenPrice: string,
+    tokenGasPrice: string,
     depositHash?: string
   ) {
     return await liquidityPool
@@ -310,13 +328,38 @@ describe("LiquidityPoolTests", function () {
         amount,
         receiver,
         depositHash ? depositHash : dummyDepositHash,
-        relativeNativeTokenPrice,
+        tokenGasPrice,
         137,
         0
       );
   }
 
-  async function swapAndSendFundsToUser(
+  function getSendFundsToUserFromCCMPCalldata(
+    tokenSymbol: number,
+    sourceChainAmount: BigNumberish,
+    tokenDecimals: number,
+    receiver: string,
+    gasFeePaidInTokenAmount: BigNumberish,
+    minAmount?: BigNumberish,
+    reclaimerEoa?: string
+  ) {
+    const hyphenArgs = [];
+    if (minAmount != null && reclaimerEoa != null) {
+      hyphenArgs.push(abiCoder.encode(["uint256", "address"], [minAmount, reclaimerEoa]));
+    }
+
+    return liquidityPool.interface.encodeFunctionData("sendFundsToUserFromCCMP", [
+      {
+        tokenSymbol,
+        sourceChainAmount,
+        sourceChainDecimals: tokenDecimals,
+        receiver,
+        hyphenArgs,
+      },
+    ]);
+  }
+
+  async function swapAndsendFundsToUser(
     tokenAddress: string,
     amount: string,
     receiver: string,
@@ -344,9 +387,7 @@ describe("LiquidityPoolTests", function () {
 
   async function checkStorage() {
     let isTrustedForwarderSet = await liquidityPool.isTrustedForwarder(trustedForwarder);
-    let _executorManager = await liquidityPool.getExecutorManager();
     expect(isTrustedForwarderSet).to.equal(true);
-    expect(_executorManager).to.equal(executorManager.address);
     expect(await liquidityPool.isPauser(await pauser.getAddress())).to.equals(true);
   }
 
@@ -362,24 +403,6 @@ describe("LiquidityPoolTests", function () {
 
   it("Check if Pool is initialized properly", async () => {
     await checkStorage();
-  });
-
-  it("Should get ExecutorManager Address successfully", async () => {
-    let executorManagerAddr = await liquidityPool.getExecutorManager();
-    expect(executorManagerAddr).to.equal(executorManager.address);
-  });
-
-  describe("Trusted Forwarder Changes", async () => {
-    it("Should change trustedForwarder successfully", async () => {
-      let newTrustedForwarder = "0xa6389C06cD27bB7Fb87B15F33BC8702494B43e05";
-      await liquidityPool.setTrustedForwarder(newTrustedForwarder);
-      expect(await liquidityPool.isTrustedForwarder(newTrustedForwarder)).to.equals(true);
-    });
-
-    it("Should fail when changing trustedForwarder from non-admin account", async () => {
-      let newTrustedForwarder = "0xa6389C06cD27bB7Fb87B15F33BC8702494B43e05";
-      expect(liquidityPool.connect(bob).setTrustedForwarder(newTrustedForwarder)).to.be.reverted;
-    });
   });
 
   it("Should addSupportedToken successfully", async () => {
@@ -511,7 +534,6 @@ describe("LiquidityPoolTests", function () {
       let equilibriumLiquidity = await liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
       let currentBalance = await token.balanceOf(liquidityPool.address);
       let gasFeeAccumulated = await liquidityPool.gasFeeAccumulatedByToken(tokenAddress);
-      // TODO: Update this test case
       let lpFeeAccumulated = await liquidityProviders.getTotalLPFeeByToken(tokenAddress);
 
       let currentLiquidity = currentBalance.sub(gasFeeAccumulated).sub(lpFeeAccumulated).sub(incentivePoolAmount);
@@ -642,7 +664,6 @@ describe("LiquidityPoolTests", function () {
 
       let gasFeeAccumulated = await liquidityPool.gasFeeAccumulatedByToken(NATIVE);
 
-      // TODO: Update this test case
       let lpFeeAccumulated = await liquidityProviders.getTotalLPFeeByToken(NATIVE);
 
       let currentLiquidity = currentBalance.sub(gasFeeAccumulated).sub(lpFeeAccumulated).sub(incentivePoolAmount);
@@ -803,13 +824,6 @@ describe("LiquidityPoolTests", function () {
     ).to.be.reverted;
   });
 
-  it("Should add new ExecutorManager Address successfully", async () => {
-    let newExecutorManager = await bob.getAddress();
-    await liquidityPool.connect(owner).setExecutorManager(newExecutorManager);
-    let newExecutorManagerAddr = await liquidityPool.getExecutorManager();
-    expect(newExecutorManager).to.equal(newExecutorManagerAddr);
-  });
-
   it("Should fail to set new ExecutorManager : only owner can set", async () => {
     let newExecutorManager = await bob.getAddress();
     await expect(liquidityPool.connect(bob).setExecutorManager(newExecutorManager)).be.reverted;
@@ -927,7 +941,7 @@ describe("LiquidityPoolTests", function () {
         amount.toString(),
         await getReceiverAddress(),
         dummyDepositHash,
-        TOKEN_PRICE_BASE_DIVISOR.mul(10),
+        BigNumber.from(10).pow(28),
         137,
         0
       );
@@ -947,16 +961,17 @@ describe("LiquidityPoolTests", function () {
     const amount = minTokenCap;
     await executorManager.connect(owner).addExecutor(await executor.getAddress());
 
-    await liquidityPool.connect(executor).sendFundsToUserV2(
-      NATIVE,
-      amount.toString(),
-      await getReceiverAddress(),
-      dummyDepositHash,
-
-      TOKEN_PRICE_BASE_DIVISOR.mul(10),
-      137,
-      0
-    );
+    await liquidityPool
+      .connect(executor)
+      .sendFundsToUserV2(
+        NATIVE,
+        amount.toString(),
+        await getReceiverAddress(),
+        dummyDepositHash,
+        BigNumber.from(10).pow(28),
+        137,
+        0
+      );
 
     const gasFeeAccumulated = await liquidityPool.gasFeeAccumulated(NATIVE, executor.address);
     expect(gasFeeAccumulated.gt(0)).to.be.true;
@@ -965,21 +980,6 @@ describe("LiquidityPoolTests", function () {
       [liquidityPool, executor],
       [-gasFeeAccumulated, gasFeeAccumulated]
     );
-  });
-
-  it("Should revert on re-entrant calls to transfer", async function () {
-    const maliciousContract = await (
-      await ethers.getContractFactory("LiquidityProvidersMaliciousReentrant")
-    ).deploy(liquidityPool.address);
-    await addNativeLiquidity(ethers.BigNumber.from(10).pow(20).toString(), owner);
-    await liquidityPool.setLiquidityProviders(maliciousContract.address);
-
-    await expect(
-      owner.sendTransaction({
-        to: maliciousContract.address,
-        value: 1,
-      })
-    ).to.be.reverted;
   });
 
   describe("Transfer Fee", async function () {
@@ -1067,7 +1067,7 @@ describe("LiquidityPoolTests", function () {
 
       let transferFeeFromContract = await liquidityPool.getTransferFee(tokenAddress, amount);
       await setSwapAdaptor("uniswap", mockAdaptor.address);
-      await swapAndSendFundsToUser(
+      await swapAndsendFundsToUser(
         token.address,
         amount.toString(),
         await getReceiverAddress(),
@@ -1105,7 +1105,7 @@ describe("LiquidityPoolTests", function () {
       await executorManager.connect(owner).addExecutor(await executor.getAddress());
 
       await expect(
-        swapAndSendFundsToUser(
+        swapAndsendFundsToUser(
           token.address,
           amount.toString(),
           await getReceiverAddress(),
@@ -1121,7 +1121,7 @@ describe("LiquidityPoolTests", function () {
     it("Should fail if Array length is 0", async () => {
       await executorManager.connect(owner).addExecutor(await executor.getAddress());
       await expect(
-        swapAndSendFundsToUser(
+        swapAndsendFundsToUser(
           token.address,
           minTokenCap.toString(),
           await getReceiverAddress(),
@@ -1131,13 +1131,13 @@ describe("LiquidityPoolTests", function () {
           [],
           "uniswap"
         )
-      ).to.be.revertedWith("Wrong method call");
+      ).to.be.revertedWith("31");
     });
 
     it("Should fail if SwapAdaptor Not Found", async () => {
       await executorManager.connect(owner).addExecutor(await executor.getAddress());
       await expect(
-        swapAndSendFundsToUser(
+        swapAndsendFundsToUser(
           token.address,
           minTokenCap.toString(),
           await getReceiverAddress(),
@@ -1147,7 +1147,7 @@ describe("LiquidityPoolTests", function () {
           swapNexitRequestTwo,
           "anyRandomSwap"
         )
-      ).to.be.revertedWith("Swap adaptor not found");
+      ).to.be.revertedWith("32");
     });
 
     it("Should fail Swap Array > 3", async () => {
@@ -1156,7 +1156,7 @@ describe("LiquidityPoolTests", function () {
 
       await executorManager.connect(owner).addExecutor(await executor.getAddress());
       await expect(
-        swapAndSendFundsToUser(
+        swapAndsendFundsToUser(
           token.address,
           minTokenCap.toString(),
           await getReceiverAddress(),
@@ -1175,7 +1175,7 @@ describe("LiquidityPoolTests", function () {
 
       await executorManager.connect(owner).addExecutor(await executor.getAddress());
       await expect(
-        swapAndSendFundsToUser(
+        swapAndsendFundsToUser(
           token.address,
           minTokenCap.toString(),
           await getReceiverAddress(),
@@ -1228,65 +1228,6 @@ describe("LiquidityPoolTests", function () {
           .sendFundsToUserV2(token.address, amount, bob.address, dummyDepositHash, 0, 1, tokenGasBaseFee)
       ).to.changeTokenBalances(token, [liquidityPool, bob], [amount.sub(fee).mul(-1), amount.sub(fee)]);
       expect(await liquidityPool.gasFeeAccumulated(token.address, executor.address)).to.equal(tokenGasBaseFee);
-    });
-  });
-
-  describe("CCMP", async function () {
-    beforeEach(async () => {
-      await addTokenLiquidity(token.address, ethers.BigNumber.from(minTokenCap).mul(10), owner);
-      await addNativeLiquidity(ethers.BigNumber.from(minTokenCap).mul(10), owner);
-      await executorManager.addExecutor(executor.address);
-      await liquidityPool.setCCMPExecutor(charlie.address);
-    });
-
-    it("Should allow only CCMPExecutor to call CCMP Functions", async function () {
-      await expect(liquidityPool.depositErc20FromCCMP(137, token.address, bob.address, 1)).to.be.revertedWith(
-        "Only CCMPExecutor is allowed"
-      );
-      await expect(liquidityPool.depositNativeFromCCMP(bob.address, 137)).to.be.revertedWith(
-        "Only CCMPExecutor is allowed"
-      );
-      await expect(liquidityPool.sendFundsToUserFromCCMP(token.address, 1, bob.address)).to.be.revertedWith(
-        "Only CCMPExecutor is allowed"
-      );
-    });
-
-    it("Executor be able to deposit ERC20 from CCMP", async function () {
-      // Assume tokens have already been transferred to this contract by CCMP Executor
-      await expect(() =>
-        liquidityPool.connect(charlie).depositErc20FromCCMP(1, token.address, bob.address, minTokenCap)
-      ).to.changeTokenBalances(token, [liquidityPool, charlie], [0, 0]);
-    });
-
-    it("Executor be able to deposit Native from CCMP", async function () {
-      await expect(() =>
-        liquidityPool.connect(charlie).depositNativeFromCCMP(bob.address, 1, { value: minTokenCap })
-      ).to.changeEtherBalances([liquidityPool, charlie], [minTokenCap, BigNumber.from(minTokenCap).mul(-1)]);
-    });
-
-    it("Should be able to send funds to user on exit chain", async function () {
-      const providedLiquidity = ethers.BigNumber.from(minTokenCap).mul(10);
-      const amount = ethers.BigNumber.from(minTokenCap);
-      const resultingLiquidity = providedLiquidity.sub(amount);
-
-      const expectedFeePerNum = providedLiquidity.mul(providedLiquidity).mul(equilibriumFee).mul(maxFee);
-      const expectedFeePerDen = providedLiquidity
-        .mul(providedLiquidity)
-        .mul(equilibriumFee)
-        .add(resultingLiquidity.mul(resultingLiquidity).mul(maxFee - equilibriumFee));
-      const expectedFeePer = expectedFeePerNum.div(expectedFeePerDen);
-
-      const expectedTransferFee = amount.mul(expectedFeePer).div(baseDivisor);
-
-      const expectedTransferredAmount = amount.sub(expectedTransferFee);
-
-      await expect(() =>
-        liquidityPool.connect(charlie).sendFundsToUserFromCCMP(token.address, amount, bob.address)
-      ).to.changeTokenBalances(
-        token,
-        [liquidityPool, bob],
-        [expectedTransferredAmount.mul(-1), expectedTransferredAmount]
-      );
     });
   });
 });

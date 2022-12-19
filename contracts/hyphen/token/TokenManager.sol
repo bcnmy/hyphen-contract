@@ -44,6 +44,11 @@ contract TokenManager is ITokenManager, ERC2771ContextUpgradeable, OwnableUpgrad
      */
     mapping(address => TokenConfig) public transferConfig;
 
+    // Token Address => chainId => Symbol
+    mapping(address => uint256) public override tokenAddressToSymbol;
+    // Symbol => chainId => Token Address
+    mapping(uint256 => address) public override symbolToTokenAddress;
+
     function initialize(address trustedForwarder, address pauser) external initializer {
         __ERC2771Context_init(trustedForwarder);
         __Ownable_init();
@@ -170,6 +175,17 @@ contract TokenManager is ITokenManager, ERC2771ContextUpgradeable, OwnableUpgrad
 
     function getTransferConfig(address tokenAddress) public view override returns (TokenConfig memory) {
         return transferConfig[tokenAddress];
+    }
+
+    function setTokenSymbol(address[] calldata tokenAddresses, uint256[] calldata symbols) external onlyOwner {
+        require(tokenAddresses.length == symbols.length, "ERR_ARRAY_LENGTH_MISMATCH");
+        unchecked {
+            uint256 length = tokenAddresses.length;
+            for (uint256 i = 0; i < length; ++i) {
+                tokenAddressToSymbol[tokenAddresses[i]] = symbols[i];
+                symbolToTokenAddress[symbols[i]] = tokenAddresses[i];
+            }
+        }
     }
 
     function _msgSender()

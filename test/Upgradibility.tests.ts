@@ -9,7 +9,6 @@ import {
   WhitelistPeriodManager,
   TokenManager,
   HyphenLiquidityFarming,
-  LiquidityPoolOld,
   LiquidityPool__factory,
   // eslint-disable-next-line node/no-missing-import
 } from "../typechain";
@@ -22,8 +21,7 @@ describe("Upgradibility", function () {
   let owner: SignerWithAddress, pauser: SignerWithAddress, bob: SignerWithAddress;
   let charlie: SignerWithAddress, tf: SignerWithAddress, executor: SignerWithAddress;
   let executorManager: ExecutorManager;
-  let token: ERC20Token, liquidityPool: LiquidityPoolOld;
-  let liquidityPoolV2: LiquidityPool;
+  let token: ERC20Token, liquidityPool: LiquidityPool;
   let lpToken: LPToken;
   let wlpm: WhitelistPeriodManager;
   let liquidityProviders: LiquidityProvidersTest;
@@ -61,8 +59,11 @@ describe("Upgradibility", function () {
   before(async function () {
     [owner, pauser, charlie, bob, tf, executor] = await ethers.getSigners();
 
-    const tokenManagerFactory = await ethers.getContractFactory("TokenManagerOld");
-    tokenManager = (await tokenManagerFactory.deploy(trustedForwarder)) as TokenManager;
+    const tokenManagerFactory = await ethers.getContractFactory("TokenManager");
+    tokenManager = (await upgrades.deployProxy(tokenManagerFactory, [
+      trustedForwarder,
+      pauser.address,
+    ])) as TokenManager;
 
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
     executorManager = await executorManagerFactory.deploy();
@@ -91,7 +92,7 @@ describe("Upgradibility", function () {
       trustedForwarder,
       tokenManager.address,
       liquidityProviders.address,
-    ])) as LiquidityPoolOld;
+    ])) as LiquidityPool;
 
     await liquidityPool.deployed();
 
@@ -188,25 +189,30 @@ describe("Upgradibility", function () {
   }
 
   it("Should be able to upgrade contracts", async function () {
-    const oldTokenManager = tokenManager.address;
+    const feeLibFactory = await ethers.getContractFactory("Fee");
+    const Fee = await feeLibFactory.deploy();
+    await Fee.deployed();
 
-    (await upgrades.upgradeProxy(liquidityPool.address, await ethers.getContractFactory("LiquidityPool"))).deployed();
-    liquidityPoolV2 = LiquidityPool__factory.connect(liquidityPool.address, owner);
+    const liquidtyPoolFactory = await ethers.getContractFactory("LiquidityPool", {
+      libraries: {
+        Fee: Fee.address,
+      },
+    });
+
+    (
+      await upgrades.upgradeProxy(liquidityPool.address, liquidtyPoolFactory, {
+        unsafeAllow: ["external-library-linking"],
+      })
+    ).deployed();
+    liquidityPool = LiquidityPool__factory.connect(liquidityPool.address, owner);
+
     (
       await upgrades.upgradeProxy(liquidityProviders.address, await ethers.getContractFactory("LiquidityProviders"))
     ).deployed();
     (
       await upgrades.upgradeProxy(farmingContract.address, await ethers.getContractFactory("HyphenLiquidityFarming"))
     ).deployed();
-    tokenManager = (await upgrades.deployProxy(await ethers.getContractFactory("TokenManager"), [
-      tf.address,
-      pauser.address,
-    ])) as TokenManager;
-    await tokenManager.deployed();
 
-    expect(tokenManager.address).to.not.equal(oldTokenManager);
-
-    await liquidityPool.setTokenManager(tokenManager.address);
     await liquidityProviders.setTokenManager(tokenManager.address);
     await wlpm.setTokenManager(tokenManager.address);
 
@@ -250,13 +256,13 @@ describe("Upgradibility", function () {
     const nativeBalance = await ethers.provider.getBalance(owner.address);
 
     await expect(
-      liquidityPoolV2
+      liquidityPool
         .connect(executor)
         .sendFundsToUserV2(token.address, parseEther("1"), owner.address, depositHash1, 0, 1, 0)
     ).to.not.be.reverted;
 
     await expect(
-      liquidityPoolV2.connect(executor).sendFundsToUserV2(NATIVE, parseEther("1"), owner.address, depositHash2, 0, 1, 0)
+      liquidityPool.connect(executor).sendFundsToUserV2(NATIVE, parseEther("1"), owner.address, depositHash2, 0, 1, 0)
     ).to.not.be.reverted;
 
     expect((await token.balanceOf(owner.address)).gte(tokenBalance)).to.be.true;
@@ -268,11 +274,11 @@ describe("Upgradibility", function () {
     const rewards2 = await liquidityProviders.getFeeAccumulatedOnNft(2);
     await expect(() => liquidityProviders.removeLiquidity(1, parseEther("0.05"))).to.changeTokenBalances(
       token,
-      [liquidityPoolV2, owner],
+      [liquidityPool, owner],
       [parseEther("-0.05").sub(rewards1), parseEther("0.05").add(rewards1)]
     );
     await expect(() => liquidityProviders.removeLiquidity(2, parseEther("0.05"))).to.changeEtherBalances(
-      [liquidityPoolV2, owner],
+      [liquidityPool, owner],
       [parseEther("-0.05").sub(rewards2), parseEther("0.05").add(rewards2)]
     );
   });
