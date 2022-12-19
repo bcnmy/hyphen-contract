@@ -46,7 +46,7 @@ export const configureLiquidityPool = async (
   }
 
   // Set CCMP gateway and executor
-  ({ wait, hash } = await LiquidityPool.setCCMPContracts(ccmpGatewayAddress, ccmpExecutorAddress));
+  ({ wait, hash } = await LiquidityPool.setCCMPContracts(ccmpExecutorAddress, ccmpGatewayAddress));
   debug && console.log(`CCMP Gateway and Executor set tx hash: ${hash}`);
   ({ blockNumber, status } = await wait());
   if (status === 1) {
