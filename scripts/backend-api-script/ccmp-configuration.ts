@@ -71,7 +71,9 @@ export const configureTokenManager = async (
   // Set Token symbols
   const TokenManager = TokenManager__factory.connect(tokenManagerAddress, signer);
   const supportedTokens = await getSupportedTokens(process.env.INTEGRATION_API_URL!, chainId);
-  const tokenSymbolList = supportedTokens.map((token) => [token.address, tokenSymbols[token.symbol]]);
+  const tokenSymbolList = supportedTokens
+    .map((token) => [token.address, tokenSymbols[token.symbol]])
+    .filter(([_address, _symbol]) => _address && _symbol);
   debug && console.log(`Token list: ${JSON.stringify(tokenSymbolList, null, 2)}`);
 
   let { wait, hash } = await TokenManager.setTokenSymbol(
