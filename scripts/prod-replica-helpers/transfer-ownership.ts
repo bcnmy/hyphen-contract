@@ -17,7 +17,7 @@ import { impersonateAndExecute, sendTransaction, setNativeBalance } from "./util
 
 const transferOwnership = async (contracts: IContractAddresses, newOwner: string) => {
   const chainId = (await ethers.provider.getNetwork()).chainId;
-  const oldOwner = await ExecutorManager__factory.connect(contracts.executorManager, ethers.provider).owner();
+  const oldOwner = await ExecutorManager__factory.connect(contracts.executorManager!, ethers.provider).owner();
   if (!oldOwner) {
     throw new Error("Error while fetching old owner");
   }
@@ -25,27 +25,27 @@ const transferOwnership = async (contracts: IContractAddresses, newOwner: string
 
   await impersonateAndExecute(oldOwner, async (signer) => {
     console.log(`Transferring Ownership For Executor Manager on chain ${chainId}...`);
-    const executorManager = ExecutorManager__factory.connect(contracts.executorManager, signer);
+    const executorManager = ExecutorManager__factory.connect(contracts.executorManager!, signer);
     await sendTransaction(executorManager.transferOwnership(newOwner), "Updating Executor Manager Owner");
 
     console.log(`Transferring Ownership For LiquidityPool on chain ${chainId}...`);
-    const liquidityPool = LiquidityPool__factory.connect(contracts.liquidityPool, signer);
+    const liquidityPool = LiquidityPool__factory.connect(contracts.liquidityPool!, signer);
     await sendTransaction(liquidityPool.transferOwnership(newOwner), "Updating Liquidity Pool Owner");
 
     console.log(`Transferring Ownership For LiquidityProviderson chain ${chainId}...`);
-    const liquidityProviders = LiquidityProviders__factory.connect(contracts.liquidityProviders, signer);
+    const liquidityProviders = LiquidityProviders__factory.connect(contracts.liquidityProviders!, signer);
     await sendTransaction(liquidityProviders.transferOwnership(newOwner), "Updating LiquidityProviders Owner");
 
     console.log(`Transferring Ownership For LpToken on chain ${chainId}...`);
-    const lpToken = LPToken__factory.connect(contracts.lpToken, signer);
+    const lpToken = LPToken__factory.connect(contracts.lpToken!, signer);
     await sendTransaction(lpToken.transferOwnership(newOwner), "Updating LpToken Owner");
 
     console.log(`Transferring Ownership For TokenManager on chain ${chainId}...`);
-    const tokenManager = TokenManager__factory.connect(contracts.tokenManager, signer);
+    const tokenManager = TokenManager__factory.connect(contracts.tokenManager!, signer);
     await sendTransaction(tokenManager.transferOwnership(newOwner), "Updating TokenManager Owner");
 
     console.log(`Transferring Ownership For WhiteListPeriodManager on chain ${chainId}...`);
-    const wlpm = WhitelistPeriodManager__factory.connect(contracts.whitelistPeriodManager, signer);
+    const wlpm = WhitelistPeriodManager__factory.connect(contracts.whitelistPeriodManager!, signer);
     await sendTransaction(wlpm.transferOwnership(newOwner), "Updating WhitelistPeriod Manager Owner");
 
     if (contracts.liquidityFarmingV1) {
@@ -61,7 +61,7 @@ const transferOwnership = async (contracts: IContractAddresses, newOwner: string
     }
   });
 
-  const proxyAdminAddress = await getProxyAdmin(contracts.liquidityPool);
+  const proxyAdminAddress = await getProxyAdmin(contracts.liquidityPool!);
   console.log(`Transferring Ownership For ProxyAdmin ${proxyAdminAddress} on chain ${chainId}...`);
   let proxyAdmin = new ethers.Contract(proxyAdminAddress, proxyAdminAbi, ethers.provider);
   const currentProxyAdminOwner = await proxyAdmin.owner();
