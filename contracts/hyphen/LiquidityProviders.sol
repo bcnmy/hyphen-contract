@@ -120,6 +120,10 @@ contract LiquidityProviders is
         return currentLiquidity[tokenAddress];
     }
 
+    function setCurrentLiquidity(address tokenAddress, uint256 amount) public onlyLiquidityPool {
+        currentLiquidity[tokenAddress] = amount;
+    }
+
     /**
      * @dev To be called post initialization, used to set address of NFT Contract
      * @param _lpToken address of lpToken
