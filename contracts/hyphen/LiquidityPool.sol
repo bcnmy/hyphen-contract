@@ -193,6 +193,11 @@ contract LiquidityPool is
             incentivePool[tokenAddress];
     }
 
+    /**
+     * @dev Function used to set the correct value of CurrentLiqudity variable defined in LiquidityProvider.sol
+     * by calculating reward, accumulatedFee, total Fee & available token balance in the pool
+     * @param tokenAddress of which corect value needs to be set
+     */
     function setCurrentLiquidity(address tokenAddress) public onlyOwner {
         uint256 tokenLiquidity = 0;
         if (tokenAddress == NATIVE) {
