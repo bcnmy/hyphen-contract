@@ -2,6 +2,7 @@ import { ethers } from "hardhat";
 import axios from "axios";
 import {
   upgradeLPToken,
+  upgradeLiquidityFarming,
   upgradeLiquidityFarmingV2,
   upgradeLiquidityPool,
   upgradeLiquidityProviders,
@@ -29,13 +30,27 @@ export const getContractAddressesByChain = async (baseUrl: string, chainId: numb
   return chain.contracts.hyphen;
 };
 
+export const getSupportedTokenAddresses = async (baseUrl: string, chainId: number): Promise<string[]> => {
+  const response = (await axios.get(`${baseUrl}/api/v1/configuration/tokens`)).data.message as any[];
+  const supportedTokenAddresses = response
+    .map((token) => token[chainId])
+    .filter((x) => x)
+    .map((x) => x.address);
+  return supportedTokenAddresses;
+};
+
 export const upgradeAllContracts = async (addresses: IContractAddresses) => {
   await upgradeAndVerify(addresses.lpToken, upgradeLPToken);
   await upgradeAndVerify(addresses.liquidityPool, upgradeLiquidityPool);
   await upgradeAndVerify(addresses.liquidityProviders, upgradeLiquidityProviders);
   await upgradeAndVerify(addresses.tokenManager, upgradeTokenManager);
-  await upgradeAndVerify(addresses.liquidityFarming, upgradeLiquidityFarmingV2);
   await upgradeAndVerify(addresses.whitelistPeriodManager, upgradeWhiteListPeriodManager);
+  if (addresses.liquidityFarmingV1) {
+    await upgradeAndVerify(addresses.liquidityFarmingV1, upgradeLiquidityFarming);
+  }
+  if (addresses.liquidityFarmingV2) {
+    await upgradeAndVerify(addresses.liquidityFarmingV2, upgradeLiquidityFarmingV2);
+  }
 };
 
 const upgradeAndVerify = async (proxy: string, upgrader: (address: string) => Promise<void>) => {

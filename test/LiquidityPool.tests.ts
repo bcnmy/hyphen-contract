@@ -1,4 +1,4 @@
-import { expect, use } from "chai";
+import { expect } from "chai";
 import { ethers, upgrades } from "hardhat";
 import {
   ERC20Token,
@@ -13,14 +13,13 @@ import {
 } from "../typechain";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { BigNumber, BigNumberish } from "ethers";
-import { sign } from "crypto";
+import { CCMPGatewayMock } from "../typechain/CCMPGatewayMock";
 
 let { getLocaleString } = require("./utils");
 
 describe("LiquidityPoolTests", function () {
   let owner: SignerWithAddress, pauser: SignerWithAddress, bob: SignerWithAddress;
   let charlie: SignerWithAddress, tf: SignerWithAddress, executor: SignerWithAddress;
-  let proxyAdmin: SignerWithAddress;
   let executorManager: ExecutorManager;
   let token: ERC20Token, liquidityPool: LiquidityPool;
   let lpToken: LPToken;
@@ -28,6 +27,7 @@ describe("LiquidityPoolTests", function () {
   let liquidityProviders: LiquidityProvidersTest;
   let tokenManager: TokenManager;
   let mockAdaptor: MockAdaptor;
+  let ccmpMock: CCMPGatewayMock;
 
   let trustedForwarder = "0xFD4973FeB2031D4409fB57afEE5dF2051b171104";
   let equilibriumFee = 10000000;
@@ -35,6 +35,8 @@ describe("LiquidityPoolTests", function () {
   let maxFee = 200000000;
   let tokenAddress: string;
   let tag: string = "HyphenUI";
+
+  const abiCoder = new ethers.utils.AbiCoder();
 
   const NATIVE_WRAP_ADDRESS = "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6";
   const NATIVE = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE";
@@ -135,7 +137,7 @@ describe("LiquidityPoolTests", function () {
   ];
 
   beforeEach(async function () {
-    [owner, pauser, charlie, bob, tf, proxyAdmin, executor] = await ethers.getSigners();
+    [owner, pauser, charlie, bob, tf, executor] = await ethers.getSigners();
 
     tokenManager = (await upgrades.deployProxy(await ethers.getContractFactory("TokenManager"), [
       tf.address,
@@ -167,14 +169,28 @@ describe("LiquidityPoolTests", function () {
       pauser.address,
     ])) as LiquidityProvidersTest;
 
-    const liquidtyPoolFactory = await ethers.getContractFactory("LiquidityPool");
-    liquidityPool = (await upgrades.deployProxy(liquidtyPoolFactory, [
-      executorManager.address,
-      await pauser.getAddress(),
-      trustedForwarder,
-      tokenManager.address,
-      liquidityProviders.address,
-    ])) as LiquidityPool;
+    const feeLibFactory = await ethers.getContractFactory("Fee");
+    const Fee = await feeLibFactory.deploy();
+    await Fee.deployed();
+
+    const liquidtyPoolFactory = await ethers.getContractFactory("LiquidityPool", {
+      libraries: {
+        Fee: Fee.address,
+      },
+    });
+    liquidityPool = (await upgrades.deployProxy(
+      liquidtyPoolFactory,
+      [
+        executorManager.address,
+        await pauser.getAddress(),
+        trustedForwarder,
+        tokenManager.address,
+        liquidityProviders.address,
+      ],
+      {
+        unsafeAllow: ["external-library-linking"],
+      }
+    )) as LiquidityPool;
 
     await liquidityPool.deployed();
 
@@ -225,6 +241,9 @@ describe("LiquidityPoolTests", function () {
     );
 
     await liquidityProviders.setWhiteListPeriodManager(wlpm.address);
+
+    ccmpMock = (await (await ethers.getContractFactory("CCMPGatewayMock")).deploy()) as CCMPGatewayMock;
+    await liquidityPool.setCCMPContracts(ccmpMock.address, ccmpMock.address);
 
     for (const signer of [owner, bob, charlie]) {
       await token.mint(signer.address, ethers.BigNumber.from(100000000).mul(ethers.BigNumber.from(10).pow(18)));
@@ -295,7 +314,7 @@ describe("LiquidityPoolTests", function () {
       .depositAndSwapErc20(tokenAddress, receiver, toChainId, tokenValue, tag, swapRequest);
   }
 
-  async function sendFundsToUser(
+  async function sendFundsToUserV2(
     tokenAddress: string,
     amount: string,
     receiver: string,
@@ -304,17 +323,43 @@ describe("LiquidityPoolTests", function () {
   ) {
     return await liquidityPool
       .connect(executor)
-      .sendFundsToUser(
+      .sendFundsToUserV2(
         tokenAddress,
         amount,
         receiver,
         depositHash ? depositHash : dummyDepositHash,
         tokenGasPrice,
-        137
+        137,
+        0
       );
   }
 
-  async function swapAndSendFundsToUser(
+  function getSendFundsToUserFromCCMPCalldata(
+    tokenSymbol: number,
+    sourceChainAmount: BigNumberish,
+    tokenDecimals: number,
+    receiver: string,
+    gasFeePaidInTokenAmount: BigNumberish,
+    minAmount?: BigNumberish,
+    reclaimerEoa?: string
+  ) {
+    const hyphenArgs = [];
+    if (minAmount != null && reclaimerEoa != null) {
+      hyphenArgs.push(abiCoder.encode(["uint256", "address"], [minAmount, reclaimerEoa]));
+    }
+
+    return liquidityPool.interface.encodeFunctionData("sendFundsToUserFromCCMP", [
+      {
+        tokenSymbol,
+        sourceChainAmount,
+        sourceChainDecimals: tokenDecimals,
+        receiver,
+        hyphenArgs,
+      },
+    ]);
+  }
+
+  async function swapAndsendFundsToUser(
     tokenAddress: string,
     amount: string,
     receiver: string,
@@ -342,9 +387,7 @@ describe("LiquidityPoolTests", function () {
 
   async function checkStorage() {
     let isTrustedForwarderSet = await liquidityPool.isTrustedForwarder(trustedForwarder);
-    let _executorManager = await liquidityPool.getExecutorManager();
     expect(isTrustedForwarderSet).to.equal(true);
-    expect(_executorManager).to.equal(executorManager.address);
     expect(await liquidityPool.isPauser(await pauser.getAddress())).to.equals(true);
   }
 
@@ -360,24 +403,6 @@ describe("LiquidityPoolTests", function () {
 
   it("Check if Pool is initialized properly", async () => {
     await checkStorage();
-  });
-
-  it("Should get ExecutorManager Address successfully", async () => {
-    let executorManagerAddr = await liquidityPool.getExecutorManager();
-    expect(executorManagerAddr).to.equal(executorManager.address);
-  });
-
-  describe("Trusted Forwarder Changes", async () => {
-    it("Should change trustedForwarder successfully", async () => {
-      let newTrustedForwarder = "0xa6389C06cD27bB7Fb87B15F33BC8702494B43e05";
-      await liquidityPool.setTrustedForwarder(newTrustedForwarder);
-      expect(await liquidityPool.isTrustedForwarder(newTrustedForwarder)).to.equals(true);
-    });
-
-    it("Should fail when changing trustedForwarder from non-admin account", async () => {
-      let newTrustedForwarder = "0xa6389C06cD27bB7Fb87B15F33BC8702494B43e05";
-      expect(liquidityPool.connect(bob).setTrustedForwarder(newTrustedForwarder)).to.be.reverted;
-    });
   });
 
   it("Should addSupportedToken successfully", async () => {
@@ -502,14 +527,13 @@ describe("LiquidityPoolTests", function () {
       await addTokenLiquidity(tokenAddress, liquidityToBeAdded, owner);
       await executorManager.addExecutor(executor.address);
       // Send funds to put pool into deficit state so current liquidity < provided liquidity
-      let tx = await sendFundsToUser(tokenAddress, amountToWithdraw, receiver, "0");
+      let tx = await sendFundsToUserV2(tokenAddress, amountToWithdraw, receiver, "0");
       await tx.wait();
       let rewardAmoutFromContract = await liquidityPool.getRewardAmount(amountToDeposit, tokenAddress);
       let incentivePoolAmount = await liquidityPool.incentivePool(tokenAddress);
       let equilibriumLiquidity = await liquidityProviders.getSuppliedLiquidityByToken(tokenAddress);
       let currentBalance = await token.balanceOf(liquidityPool.address);
       let gasFeeAccumulated = await liquidityPool.gasFeeAccumulatedByToken(tokenAddress);
-      // TODO: Update this test case
       let lpFeeAccumulated = await liquidityProviders.getTotalLPFeeByToken(tokenAddress);
 
       let currentLiquidity = currentBalance.sub(gasFeeAccumulated).sub(lpFeeAccumulated).sub(incentivePoolAmount);
@@ -544,7 +568,7 @@ describe("LiquidityPoolTests", function () {
       await executorManager.addExecutor(executor.address);
 
       // Send funds to put pool into deficit state so current liquidity < provided liquidity
-      let tx = await sendFundsToUser(tokenAddress, amountToWithdraw, receiver, "0");
+      let tx = await sendFundsToUserV2(tokenAddress, amountToWithdraw, receiver, "0");
       await tx.wait();
       let rewardAmoutFromContract = await liquidityPool.getRewardAmount(amountToDeposit, tokenAddress);
       let incentivePoolAmount = await liquidityPool.incentivePool(tokenAddress);
@@ -576,7 +600,7 @@ describe("LiquidityPoolTests", function () {
       let toChainId = 1;
       await executorManager.addExecutor(executor.address);
       // Send funds to put pool into deficit state so current liquidity < provided liquidity
-      let tx = await sendFundsToUser(NATIVE, amountToWithdraw, receiver, "0");
+      let tx = await sendFundsToUserV2(NATIVE, amountToWithdraw, receiver, "0");
       await tx.wait();
 
       const amountToDeposit = BigNumber.from(minTokenCap)
@@ -617,11 +641,11 @@ describe("LiquidityPoolTests", function () {
       let toChainId = 1;
       await executorManager.addExecutor(executor.address);
       // Send funds to put pool into deficit state so current liquidity < provided liquidity
-      let tx = await sendFundsToUser(NATIVE, amountToWithdraw, receiver, "0");
+      let tx = await sendFundsToUserV2(NATIVE, amountToWithdraw, receiver, "0");
       await tx.wait();
 
       let rewardPoolBeforeTransfer = await liquidityPool.incentivePool(NATIVE);
-      tx = await sendFundsToUser(
+      tx = await sendFundsToUserV2(
         NATIVE,
         amountToWithdraw,
         receiver,
@@ -640,7 +664,6 @@ describe("LiquidityPoolTests", function () {
 
       let gasFeeAccumulated = await liquidityPool.gasFeeAccumulatedByToken(NATIVE);
 
-      // TODO: Update this test case
       let lpFeeAccumulated = await liquidityProviders.getTotalLPFeeByToken(NATIVE);
 
       let currentLiquidity = currentBalance.sub(gasFeeAccumulated).sub(lpFeeAccumulated).sub(incentivePoolAmount);
@@ -678,7 +701,7 @@ describe("LiquidityPoolTests", function () {
       let toChainId = 1;
       await executorManager.addExecutor(executor.address);
       // Send funds to put pool into deficit state so current liquidity < provided liquidity
-      let tx = await sendFundsToUser(NATIVE, amountToWithdraw.toString(), receiver, "0");
+      let tx = await sendFundsToUserV2(NATIVE, amountToWithdraw.toString(), receiver, "0");
       await tx.wait();
 
       let rewardPoolBeforeTransfer = await liquidityPool.incentivePool(NATIVE);
@@ -687,7 +710,7 @@ describe("LiquidityPoolTests", function () {
 
       let excessFeePercentage = transferFeePercentage.sub(BigNumber.from("10000000"));
       let expectedRewardAmount = amountToWithdraw.mul(excessFeePercentage).div(1e10);
-      tx = await sendFundsToUser(
+      tx = await sendFundsToUserV2(
         NATIVE,
         amountToWithdraw.toString(),
         receiver,
@@ -755,7 +778,7 @@ describe("LiquidityPoolTests", function () {
     let transferFeeFromContract = await liquidityPool.getTransferFee(tokenAddress, amount);
     await liquidityPool
       .connect(executor)
-      .sendFundsToUser(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash, 0, 137);
+      .sendFundsToUserV2(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash, 0, 137, 0);
 
     let equilibriumLiquidity = suppliedLiquidity;
     let resultingLiquidity = usdtBalanceBefore.sub(amount);
@@ -777,7 +800,7 @@ describe("LiquidityPoolTests", function () {
     await expect(
       liquidityPool
         .connect(executor)
-        .sendFundsToUser(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash, 0, 137)
+        .sendFundsToUserV2(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash, 0, 137, 0)
     ).to.be.reverted;
   });
 
@@ -787,7 +810,7 @@ describe("LiquidityPoolTests", function () {
     await expect(
       liquidityPool
         .connect(bob)
-        .sendFundsToUser(token.address, "1000000", await getReceiverAddress(), dummyDepositHash, 0, 137)
+        .sendFundsToUserV2(token.address, "1000000", await getReceiverAddress(), dummyDepositHash, 0, 137, 0)
     ).to.be.reverted;
   });
 
@@ -795,15 +818,10 @@ describe("LiquidityPoolTests", function () {
     const dummyDepositHash = "0xf408509b00caba5d37325ab33a92f6185c9b5f007a965dfbeff7b81ab1ec871a";
     await executorManager.connect(owner).addExecutors([await executor.getAddress()]);
     await expect(
-      liquidityPool.connect(executor).sendFundsToUser(token.address, "1000000", ZERO_ADDRESS, dummyDepositHash, 0, 137)
+      liquidityPool
+        .connect(executor)
+        .sendFundsToUserV2(token.address, "1000000", ZERO_ADDRESS, dummyDepositHash, 0, 137, 0)
     ).to.be.reverted;
-  });
-
-  it("Should add new ExecutorManager Address successfully", async () => {
-    let newExecutorManager = await bob.getAddress();
-    await liquidityPool.connect(owner).setExecutorManager(newExecutorManager);
-    let newExecutorManagerAddr = await liquidityPool.getExecutorManager();
-    expect(newExecutorManager).to.equal(newExecutorManagerAddr);
   });
 
   it("Should fail to set new ExecutorManager : only owner can set", async () => {
@@ -918,7 +936,15 @@ describe("LiquidityPoolTests", function () {
 
     await liquidityPool
       .connect(executor)
-      .sendFundsToUser(token.address, amount.toString(), await getReceiverAddress(), dummyDepositHash, 1, 137);
+      .sendFundsToUserV2(
+        token.address,
+        amount.toString(),
+        await getReceiverAddress(),
+        dummyDepositHash,
+        BigNumber.from(10).pow(28),
+        137,
+        0
+      );
 
     const gasFeeAccumulated = await liquidityPool.gasFeeAccumulated(token.address, executor.address);
     expect(gasFeeAccumulated.gt(0)).to.be.true;
@@ -937,7 +963,15 @@ describe("LiquidityPoolTests", function () {
 
     await liquidityPool
       .connect(executor)
-      .sendFundsToUser(NATIVE, amount.toString(), await getReceiverAddress(), dummyDepositHash, 1, 137);
+      .sendFundsToUserV2(
+        NATIVE,
+        amount.toString(),
+        await getReceiverAddress(),
+        dummyDepositHash,
+        BigNumber.from(10).pow(28),
+        137,
+        0
+      );
 
     const gasFeeAccumulated = await liquidityPool.gasFeeAccumulated(NATIVE, executor.address);
     expect(gasFeeAccumulated.gt(0)).to.be.true;
@@ -946,21 +980,6 @@ describe("LiquidityPoolTests", function () {
       [liquidityPool, executor],
       [-gasFeeAccumulated, gasFeeAccumulated]
     );
-  });
-
-  it("Should revert on re-entrant calls to transfer", async function () {
-    const maliciousContract = await (
-      await ethers.getContractFactory("LiquidityProvidersMaliciousReentrant")
-    ).deploy(liquidityPool.address);
-    await addNativeLiquidity(ethers.BigNumber.from(10).pow(20).toString(), owner);
-    await liquidityPool.setLiquidityProviders(maliciousContract.address);
-
-    await expect(
-      owner.sendTransaction({
-        to: maliciousContract.address,
-        value: 1,
-      })
-    ).to.be.reverted;
   });
 
   describe("Transfer Fee", async function () {
@@ -986,7 +1005,7 @@ describe("LiquidityPoolTests", function () {
       await expect(
         liquidityPool
           .connect(executor)
-          .sendFundsToUser(token.address, amount, await getReceiverAddress(), dummyDepositHash, 0, 137)
+          .sendFundsToUserV2(token.address, amount, await getReceiverAddress(), dummyDepositHash, 0, 137, 0)
       )
         .to.emit(liquidityPool, "AssetSent")
         .withArgs(
@@ -1021,7 +1040,7 @@ describe("LiquidityPoolTests", function () {
         await expect(
           liquidityPool
             .connect(executor)
-            .sendFundsToUser(token.address, amount, await getReceiverAddress(), hash, 0, 137)
+            .sendFundsToUserV2(token.address, amount, await getReceiverAddress(), hash, 0, 137, 0)
         )
           .to.emit(liquidityPool, "AssetSent")
           .withArgs(
@@ -1048,7 +1067,7 @@ describe("LiquidityPoolTests", function () {
 
       let transferFeeFromContract = await liquidityPool.getTransferFee(tokenAddress, amount);
       await setSwapAdaptor("uniswap", mockAdaptor.address);
-      await swapAndSendFundsToUser(
+      await swapAndsendFundsToUser(
         token.address,
         amount.toString(),
         await getReceiverAddress(),
@@ -1086,7 +1105,7 @@ describe("LiquidityPoolTests", function () {
       await executorManager.connect(owner).addExecutor(await executor.getAddress());
 
       await expect(
-        swapAndSendFundsToUser(
+        swapAndsendFundsToUser(
           token.address,
           amount.toString(),
           await getReceiverAddress(),
@@ -1102,7 +1121,7 @@ describe("LiquidityPoolTests", function () {
     it("Should fail if Array length is 0", async () => {
       await executorManager.connect(owner).addExecutor(await executor.getAddress());
       await expect(
-        swapAndSendFundsToUser(
+        swapAndsendFundsToUser(
           token.address,
           minTokenCap.toString(),
           await getReceiverAddress(),
@@ -1112,13 +1131,13 @@ describe("LiquidityPoolTests", function () {
           [],
           "uniswap"
         )
-      ).to.be.revertedWith("Wrong method call");
+      ).to.be.revertedWith("31");
     });
 
     it("Should fail if SwapAdaptor Not Found", async () => {
       await executorManager.connect(owner).addExecutor(await executor.getAddress());
       await expect(
-        swapAndSendFundsToUser(
+        swapAndsendFundsToUser(
           token.address,
           minTokenCap.toString(),
           await getReceiverAddress(),
@@ -1128,7 +1147,7 @@ describe("LiquidityPoolTests", function () {
           swapNexitRequestTwo,
           "anyRandomSwap"
         )
-      ).to.be.revertedWith("Swap adaptor not found");
+      ).to.be.revertedWith("32");
     });
 
     it("Should fail Swap Array > 3", async () => {
@@ -1137,7 +1156,7 @@ describe("LiquidityPoolTests", function () {
 
       await executorManager.connect(owner).addExecutor(await executor.getAddress());
       await expect(
-        swapAndSendFundsToUser(
+        swapAndsendFundsToUser(
           token.address,
           minTokenCap.toString(),
           await getReceiverAddress(),
@@ -1156,7 +1175,7 @@ describe("LiquidityPoolTests", function () {
 
       await executorManager.connect(owner).addExecutor(await executor.getAddress());
       await expect(
-        swapAndSendFundsToUser(
+        swapAndsendFundsToUser(
           token.address,
           minTokenCap.toString(),
           await getReceiverAddress(),

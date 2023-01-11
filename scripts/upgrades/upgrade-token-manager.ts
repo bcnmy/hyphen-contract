@@ -1,4 +1,4 @@
-import { upgradeLiquidityPool } from "./upgrade";
+import { upgradeTokenManager } from "./upgrade";
 import { verifyImplementation } from "../deploy/deploy-utils";
 import { ethers } from "hardhat";
 
@@ -8,7 +8,7 @@ import { ethers } from "hardhat";
 
   console.log("Proxy: ", proxy, " Deployer: ", signer.address);
   console.log("Upgrading Proxy...");
-  await upgradeLiquidityPool(proxy);
+  await upgradeTokenManager(proxy);
   await new Promise((resolve) => setTimeout(resolve, 5000));
   await verifyImplementation(proxy);
 })();

@@ -35,13 +35,35 @@ const config: HardhatUserConfig = {
         settings: {
           evmVersion: "istanbul",
           optimizer: { enabled: true, runs: 200 },
+          outputSelection: {
+            "*": {
+              "*": ["storageLayout"],
+            },
+          },
         },
       },
       {
         version: "0.8.2",
         settings: {
           evmVersion: "istanbul",
-          optimizer: { enabled: true, runs: 200 },
+          optimizer: { enabled: true, runs: 2000 },
+          outputSelection: {
+            "*": {
+              "*": ["storageLayout"],
+            },
+          },
+        },
+      },
+      {
+        version: "0.8.16",
+        settings: {
+          evmVersion: "istanbul",
+          optimizer: { enabled: true, runs: 2000 },
+          outputSelection: {
+            "*": {
+              "*": ["storageLayout"],
+            },
+          },
         },
       },
     ],
@@ -56,47 +78,55 @@ const config: HardhatUserConfig = {
     },
     ropsten: {
       url: process.env.ROPSTEN_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
     },
     goerli: {
       url: process.env.GOERLI_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
     },
     rinkeby: {
       url: process.env.RINKEBY_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
     },
     polygonMumbai: {
       url: process.env.MUMBAI_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
     },
     fuji: {
       url: process.env.FUJI_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
     },
     polygon: {
       url: process.env.POLYGON_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: 35000000000
+      gasPrice: 35000000000,
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
     },
     bscTestnet: {
       url: process.env.BSC_TESTNET_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
+    },
+    optimismEthereum: {
+      url: process.env.OPTIMISM_ETHEREUM_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
+    },
+    optimismKovan: {
+      url: process.env.OPTIMISM_KOVAN_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
     },
     bsc: {
       url: process.env.BSC_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
       gasPrice: 10000000000,
     },
     avalanche: {
       url: process.env.AVALANCHE_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
       gasPrice: 70000000000,
     },
     mainnet: {
       url: process.env.MAINNET_URL || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-      gasPrice: 35000000000,
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : undefined,
+      gasPrice: 50000000000,
     },
     arbitrumOne: {
       url: process.env.ARBITRUM_URL || "",
