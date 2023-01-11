@@ -91,5 +91,5 @@ import type { IDeployConfig } from "../../types";
       },
     ],
   };
-  await deploy(config);
+  // await deploy(config);
 })();

@@ -115,3 +115,4 @@ artifacts
 .openzeppelin
 
 .DS_Store
+*.csv
