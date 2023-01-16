@@ -208,12 +208,7 @@ contract LiquidityPool is
             tokenLiquidity =  baseToken.balanceOf(address(this));
         }
 
-        uint256 availableLiquidity = tokenLiquidity -
-                liquidityProviders.totalLPFees(tokenAddress) -
-                gasFeeAccumulatedByToken[tokenAddress] -
-                incentivePool[tokenAddress];
-
-        liquidityProviders.setCurrentLiquidity(tokenAddress, availableLiquidity);
+        liquidityProviders.setCurrentLiquidity(tokenAddress, tokenLiquidity);
     }
 
     /**

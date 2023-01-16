@@ -406,7 +406,7 @@ contract LiquidityProviders is
         totalLiquidity[_tokenAddress] -= _amount;
         totalSharesMinted[_tokenAddress] -= lpSharesToBurn;
 
-        _decreaseCurrentLiquidity(_tokenAddress, _amount);
+        _decreaseCurrentLiquidity(_tokenAddress, amountToWithdraw);
 
         _burnSharesFromNft(_nftId, lpSharesToBurn, _amount, _tokenAddress);
 
@@ -438,6 +438,7 @@ contract LiquidityProviders is
 
         _burnSharesFromNft(_nftId, lpSharesRepresentingFee, 0, _tokenAddress);
         _transferFromLiquidityPool(_tokenAddress, _msgSender(), lpFeeAccumulated);
+        _decreaseCurrentLiquidity(_tokenAddress, lpFeeAccumulated);
         emit FeeClaimed(_tokenAddress, lpFeeAccumulated, _msgSender(), lpSharesRepresentingFee);
     }
 
