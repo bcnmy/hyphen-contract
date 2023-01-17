@@ -194,6 +194,24 @@ contract LiquidityPool is
     }
 
     /**
+     * @dev Function used to set the correct value of CurrentLiqudity variable defined in LiquidityProvider.sol
+     * by calculating reward, accumulatedFee, total Fee & available token balance in the pool
+     * @param tokenAddress of which corect value needs to be set
+     */
+    function setCurrentLiquidity(address tokenAddress) public onlyOwner {
+        uint256 tokenLiquidity = 0;
+        if (tokenAddress == NATIVE) {
+            tokenLiquidity = address(this).balance;
+
+        } else {
+            IERC20Upgradeable baseToken = IERC20Upgradeable(tokenAddress);
+            tokenLiquidity =  baseToken.balanceOf(address(this));
+        }
+
+        liquidityProviders.setCurrentLiquidity(tokenAddress, tokenLiquidity);
+    }
+
+    /**
      * @dev Function used to deposit tokens into pool to initiate a cross chain token transfer.
      * @param toChainId Chain id where funds needs to be transfered
      * @param tokenAddress ERC20 Token address that needs to be transfered
@@ -748,6 +766,7 @@ contract LiquidityPool is
         gasFeeAccumulatedByToken[tokenAddress] = gasFeeAccumulatedByToken[tokenAddress] - _gasFeeAccumulated;
         gasFeeAccumulated[tokenAddress][_msgSender()] = 0;
         SafeERC20Upgradeable.safeTransfer(IERC20Upgradeable(tokenAddress), _msgSender(), _gasFeeAccumulated);
+        liquidityProviders.decreaseCurrentLiquidity(tokenAddress, _gasFeeAccumulated);
         emit GasFeeWithdraw(tokenAddress, _msgSender(), _gasFeeAccumulated);
     }
 
@@ -758,7 +777,7 @@ contract LiquidityPool is
         gasFeeAccumulated[NATIVE][_msgSender()] = 0;
         (bool success, ) = payable(_msgSender()).call{value: _gasFeeAccumulated}("");
         require(success, "Native Transfer Failed");
-
+        liquidityProviders.decreaseCurrentLiquidity(NATIVE, _gasFeeAccumulated);
         emit GasFeeWithdraw(address(this), _msgSender(), _gasFeeAccumulated);
     }
 

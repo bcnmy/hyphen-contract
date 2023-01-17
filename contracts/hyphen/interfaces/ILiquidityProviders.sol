@@ -65,4 +65,6 @@ interface ILiquidityProviders {
     function decreaseCurrentLiquidity(address tokenAddress, uint256 amount) external;
 
     function getCurrentLiquidity(address tokenAddress) external view returns (uint256);
+
+    function setCurrentLiquidity(address tokenAddress, uint256 amount) external;
 }
