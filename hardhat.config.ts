@@ -115,6 +115,10 @@ const config: HardhatUserConfig = {
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
       gas: 250000000,
     },
+    zkevmMangoTestnet: {
+      url: process.env.ZKEVM_MANGO_TESTNET_URL || "",
+      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    }
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
@@ -131,10 +135,20 @@ const config: HardhatUserConfig = {
       bsc: process.env.BSCSCAN_API_KEY || "",
       bscTestnet: process.env.BSCSCAN_API_KEY || "",
       optimisticEthereum: process.env.OPTIMISM_ETHERSCAN_API_KEY || "",
-      optimisticKovan: process.env.OPTIMISM_KOVAN_ETHERSCAN_API_KEY || "",
       arbitrumOne: process.env.ARBITRUM_ETHERSCAN_API_KEY || "",
       arbitrumTestnet: process.env.ARBITRUM_RINKEBY_ETHERSCAN_API_KEY || "",
+      zkevmMangoTestnet: process.env.POLYGON_ZKEVM_BLOCKNATIVE_API_KEY || "",
     },
+    customChains: [
+      {
+        network: "zkevmMangoTestnet",
+        chainId: 1422,
+        urls: {
+          apiURL: "https://explorer.public.zkevm-test.net/api",
+          browserURL: "https://explorer.public.zkevm-test.net/"
+        }
+      }
+    ]
   },
   contractSizer: {
     alphaSort: true,
