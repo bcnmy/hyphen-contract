@@ -152,7 +152,7 @@ describe("LiquidityProviderTests", function () {
     await tokenManager.connect(owner).setDepositConfig([1], [token.address], [tokenDepositConfig]);
 
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
-    executorManager = await executorManagerFactory.deploy();
+    executorManager = await executorManagerFactory.deploy() as ExecutorManager;
 
     await executorManager.addExecutor(executor.address);
 

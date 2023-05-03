@@ -84,11 +84,11 @@ describe("AdaptorTests", function () {
       [owner, pauser, charlie, bob, tf, executor] = await ethers.getSigners();
   
       const mockRouterFactory = await ethers.getContractFactory("MockSwapRouter");
-      mockswapManager = await mockRouterFactory.deploy();
+      mockswapManager = await mockRouterFactory.deploy() as MockSwapRouter;
       await mockswapManager.deployed();
 
       const uniswapAdaptorFactory = await ethers.getContractFactory("UniswapAdaptor");
-      uniswapManager = await uniswapAdaptorFactory.deploy(mockswapManager.address, NATIVE_WRAP_ADDRESS);
+      uniswapManager = await uniswapAdaptorFactory.deploy(mockswapManager.address, NATIVE_WRAP_ADDRESS) as UniswapAdaptor;
       await uniswapManager.deployed();
 
       const erc20factory = await ethers.getContractFactory("ERC20Token");
@@ -170,7 +170,7 @@ describe("AdaptorTests", function () {
         await mockswapFailManager.deployed();
 
         const uniswapAdaptorFactory = await ethers.getContractFactory("UniswapAdaptor");
-        uniswapManager = await uniswapAdaptorFactory.deploy(mockswapFailManager.address, NATIVE_WRAP_ADDRESS);
+        uniswapManager = await uniswapAdaptorFactory.deploy(mockswapFailManager.address, NATIVE_WRAP_ADDRESS) as UniswapAdaptor;
         await uniswapManager.deployed();
 
         await token.approve(uniswapManager.address, minTokenCap);

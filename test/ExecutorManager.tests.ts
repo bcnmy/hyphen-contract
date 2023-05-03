@@ -16,7 +16,7 @@ describe("ExecutorManagerTests", function () {
     [owner, pauser, charlie, bob, tf, executor] = await ethers.getSigners();
 
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
-    executorManager = await executorManagerFactory.deploy();
+    executorManager = await executorManagerFactory.deploy() as ExecutorManager;
     await executorManager.deployed();
   });
 

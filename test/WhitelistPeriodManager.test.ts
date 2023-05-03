@@ -43,7 +43,7 @@ describe("WhiteListPeriodManager", function () {
     await tokenManager.addSupportedToken(token.address, BigNumber.from(1), BigNumber.from(10).pow(30), 0, 0, 0);
 
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
-    executorManager = await executorManagerFactory.deploy();
+    executorManager = await executorManagerFactory.deploy() as ExecutorManager;
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
     lpToken = (await upgrades.deployProxy(lpTokenFactory, [
