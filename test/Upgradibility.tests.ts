@@ -66,7 +66,7 @@ describe("Upgradibility", function () {
     ])) as TokenManager;
 
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
-    executorManager = await executorManagerFactory.deploy();
+    executorManager = await executorManagerFactory.deploy() as ExecutorManager;
     await executorManager.deployed();
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");

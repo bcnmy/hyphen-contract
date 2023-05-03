@@ -79,11 +79,11 @@ describe("LiquidityPoolTests - Deposit And Call", function () {
     await tokenManager.deployed();
 
     const executorManagerFactory = await ethers.getContractFactory("ExecutorManager");
-    executorManager = await executorManagerFactory.deploy();
+    executorManager = await executorManagerFactory.deploy() as ExecutorManager;
     await executorManager.deployed();
 
     const mockAdaptorFactory = await ethers.getContractFactory("MockAdaptor");
-    mockAdaptor = await mockAdaptorFactory.deploy("0xE592427A0AEce92De3Edee1F18E0157C05861564", NATIVE_WRAP_ADDRESS);
+    mockAdaptor = await mockAdaptorFactory.deploy("0xE592427A0AEce92De3Edee1F18E0157C05861564", NATIVE_WRAP_ADDRESS) as MockAdaptor;
     await mockAdaptor.deployed();
 
     const lpTokenFactory = await ethers.getContractFactory("LPToken");
